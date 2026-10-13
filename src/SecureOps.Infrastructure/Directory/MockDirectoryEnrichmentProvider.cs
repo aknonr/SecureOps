@@ -14,6 +14,8 @@ public sealed class MockDirectoryEnrichmentProvider : IDirectoryEnrichmentProvid
             ["normal.user"] = ["primary-domain-users", "ops-read"],
             ["pam.zero"] = ["primary-domain-users", "ops-read"],
             ["service.zero"] = ["primary-domain-users", "ops-read"],
+            ["syn.gmsa$"] = ["primary-domain-users", "ops-read"],
+            ["syn.msa$"] = ["primary-domain-users", "ops-read"],
             ["zero.groups"] = []
         };
     private static readonly IReadOnlyDictionary<string, string[]> _parents =
@@ -52,7 +54,7 @@ public sealed class MockDirectoryEnrichmentProvider : IDirectoryEnrichmentProvid
             "S-1-5-21-2001",
             "Sample Operations Account",
             account,
-            $"{account}@example.invalid",
+            account.EndsWith('$') ? null : $"{account}@example.invalid",
             true,
             false,
             new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero),
@@ -64,7 +66,12 @@ public sealed class MockDirectoryEnrichmentProvider : IDirectoryEnrichmentProvid
             allSpns.Take(maxSpns).ToArray(),
             allSpns.Length,
             allSpns.Length > maxSpns,
-            "User");
+            account switch
+            {
+                "syn.gmsa$" => "GroupManagedServiceAccount",
+                "syn.msa$" => "ManagedServiceAccount",
+                _ => "User"
+            });
         return Task.FromResult<DirectoryPrincipalEnrichmentRecord?>(record);
     }
 

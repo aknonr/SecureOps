@@ -12,6 +12,7 @@ namespace SecureOps.Shared.Contracts.Identity;
 /// <param name="ManagerDisplayName">Manager display name when resolvable.</param>
 /// <param name="Enabled">Whether the account is enabled when known.</param>
 /// <param name="Locked">Whether the account is locked when known.</param>
+/// <param name="AccountTypeEvidence">User, ManagedServiceAccount or GroupManagedServiceAccount from directory class evidence.</param>
 public sealed record IdentityLookupUserDto(
     string? DisplayName,
     string SamAccountName,
@@ -21,4 +22,5 @@ public sealed record IdentityLookupUserDto(
     string? Title,
     string? ManagerDisplayName,
     bool? Enabled,
-    bool? Locked);
+    bool? Locked,
+    string AccountTypeEvidence = "User");

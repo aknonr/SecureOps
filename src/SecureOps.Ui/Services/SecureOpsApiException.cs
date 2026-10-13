@@ -17,4 +17,10 @@ public sealed class SecureOpsApiException(UiProblem problem, Exception? innerExc
     /// Operator-facing translation of the failure.
     /// </summary>
     public UiProblem Problem { get; } = problem;
+
+    /// <summary>
+    /// Raw JSON of the safe <c>current</c> extension an API error may carry (per-account results, the plan's current view).
+    /// Null when the response had none; a page deserializes it into the contract type it expects.
+    /// </summary>
+    public string? CurrentJson { get; init; }
 }

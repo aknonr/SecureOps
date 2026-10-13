@@ -302,6 +302,7 @@ public static class DependencyInjection
         services.AddScoped<WorkflowReportService>();
         AddManagementReportingSources(services, configuration, auditProvider);
 
+        ItsmRecords.ItsmRecordLookupRegistration.AddItsmRecordLookup(services, configuration, environmentName);
         return services;
     }
 

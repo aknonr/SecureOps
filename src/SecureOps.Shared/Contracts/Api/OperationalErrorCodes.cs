@@ -3,6 +3,9 @@ namespace SecureOps.Shared.Contracts.Api;
 /// <summary>Stable operational error codes for RFC ProblemDetails responses.</summary>
 public static class OperationalErrorCodes
 {
+    /// <summary>An unsafe API request failed the request-intent or source-origin guard.</summary>
+    public const string ApiCsrfRejected = "ApiCsrfRejected";
+
     /// <summary>Identity input was invalid.</summary>
     public const string InvalidIdentityInput = "InvalidIdentityInput";
     /// <summary>An identity was not found.</summary>

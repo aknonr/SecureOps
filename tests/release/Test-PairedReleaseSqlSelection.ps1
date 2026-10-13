@@ -36,7 +36,15 @@ function Assert-Refusal([string]$Name, [scriptblock]$Action, [string]$Expected) 
     if (!$message -or $message -notlike "*$Expected*") { throw "Unexpected refusal in $Name : $message" }
     $results.Add([pscustomobject]@{Case=$Name;Result='PASS';ExpectedRefusal=$Expected})
 }
-$args025 = @{RepositoryRoot=$root; ExpectedSource=$source; UpgradeFromRc626=$true; IncludeServiceAccounts=$true; SqlUpgradeReview=$reviewPath}
+$selectionRoot = Join-Path $evidence 'source-026'
+foreach ($folder in @('migrations','schema','pending/service-accounts')) {
+    $target = Join-Path $selectionRoot "sql/$folder"
+    New-Item -ItemType Directory -Path $target -Force | Out-Null
+    Get-ChildItem (Join-Path $root "sql/$folder") -File -Filter '*.sql' | Where-Object {
+        $folder -eq 'pending/service-accounts' -or [int]$_.Name.Substring(0,3) -le 26
+    } | Copy-Item -Destination $target
+}
+$args025 = @{RepositoryRoot=$selectionRoot; ExpectedSource=$source; UpgradeFromRc626=$true; IncludeServiceAccounts=$true; SqlUpgradeReview=$reviewPath}
 Save-Review
 $plan = & $helper @args025
 Assert-Case 'Explicit reviewed 024/025/026 selection excludes installed 022/023' {
@@ -44,7 +52,7 @@ Assert-Case 'Explicit reviewed 024/025/026 selection excludes installed 022/023'
         @($plan.DeltaFiles | Where-Object { $_ -match '/02[23]-' }).Count -ne 0 -or $plan.RoleFiles.Count -ne 3) { throw 'Wrong upgrade selection.' }
 }
 Assert-Refusal 'No implicit 025' { & $helper -RepositoryRoot $root -ExpectedSource $source -UpgradeFromRc626 } 'exact complete'
-Assert-Refusal 'No missing review' { & $helper -RepositoryRoot $root -ExpectedSource $source -UpgradeFromRc626 -IncludeServiceAccounts } '025 requires'
+Assert-Refusal 'No missing review' { & $helper -RepositoryRoot $selectionRoot -ExpectedSource $source -UpgradeFromRc626 -IncludeServiceAccounts } '025 requires'
 Assert-Refusal 'No older baseline for 025' { & $helper -RepositoryRoot $root -ExpectedSource $source -UpgradeFromRc624 -IncludeServiceAccounts } 'rc6.26/023'
 Assert-Refusal 'No conflicting baselines' { & $helper -RepositoryRoot $root -ExpectedSource $source -UpgradeFromRc624 -UpgradeFromRc626 } 'exactly one'
 foreach ($flag in @('Baseline023Verified','Delta024Reviewed','ServiceAccounts025Reviewed','ServiceAccounts026Reviewed')) {

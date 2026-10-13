@@ -1,6 +1,6 @@
 # 020 — Backend (.NET)
 
-Owner: Codex. Read the README of each project you touch; it records current contracts and evidence.
+Owner: Codex (Service Accounts module: Claude, see `AGENTS.md`). Each project's `README.md` records current contracts and dated evidence; search it for what you touch.
 
 ## Build settings (from `Directory.Build.props` / `global.json`)
 

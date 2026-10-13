@@ -33,7 +33,8 @@ public sealed class AuthorizationDeniedAuditMiddleware
     {
         await _next(context);
 
-        if (context.Response.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        if (!context.Items.ContainsKey(ApiCsrfMiddleware.RejectionItem)
+            && context.Response.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
             string correlationId = Activity.Current?.Id ?? context.TraceIdentifier;
 

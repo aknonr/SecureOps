@@ -43,7 +43,7 @@ async function noOverflow(page, label) {
         // Find: search narrows the list; the head states the range and the filter in words.
         await page.waitForFunction(() => [...(document.querySelector('[aria-label="Bağlantı ara"]')?.attributes || [])]
             .some(attribute => attribute.name.startsWith('_bl_')));
-        await page.getByRole('textbox', { name: 'Bağlantı ara' }).fill(label);
+        await page.getByRole('textbox', { name: 'Bağlantı ara' }).pressSequentially(label);
         await page.locator('.so-resource-filter-summary').filter({ hasText: `Arama: “${label}”` }).waitFor();
         const head = page.locator('.so-resource-results-head [role=status]');
         await head.filter({ hasText: '30 bağlantı · 1–' }).waitFor();
@@ -65,7 +65,7 @@ async function noOverflow(page, label) {
         if (await dialog.getByRole('textbox', { name: 'Grup adı' }).count() === 0) {
             await dialog.getByRole('button', { name: 'Yeni kişisel grup oluştur' }).click();
         }
-        await dialog.getByRole('textbox', { name: 'Grup adı' }).fill(group);
+        await dialog.getByRole('textbox', { name: 'Grup adı' }).pressSequentially(group);
         await dialog.getByRole('button', { name: 'Oluştur ve kaydet' }).click();
         await dialog.waitFor({ state: 'detached' });
         const notice = page.locator('.so-workspace-notice');

@@ -23,7 +23,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Exact PAM account or AD username. Wildcards and bulk input are rejected."
+          "description": "Exact PAM account or AD sAMAccountName, including one trailing $ for gMSA/MSA. Wildcards, LDAP grammar, bulk input and $ elsewhere are rejected."
         },
         "purpose": {
           "type": "string",
@@ -68,7 +68,8 @@
             "title": { "type": ["string", "null"] },
             "managerDisplayName": { "type": ["string", "null"] },
             "enabled": { "type": ["boolean", "null"] },
-            "locked": { "type": ["boolean", "null"] }
+            "locked": { "type": ["boolean", "null"] },
+            "accountTypeEvidence": { "type": "string", "enum": ["User", "ManagedServiceAccount", "GroupManagedServiceAccount"] }
           },
           "additionalProperties": false
         }

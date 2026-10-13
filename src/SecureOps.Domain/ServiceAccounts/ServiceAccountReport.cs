@@ -20,9 +20,10 @@ public sealed record AccountFact(Guid Id, string Label, Guid? OwnerTeamId, Guid?
 /// <param name="OrderKey">Deterministic ordering key (creation time, legacy row) for the legacy projection.</param>
 /// <param name="CreatedAt">Record creation instant (trend).</param>
 /// <param name="ClosedAt">Close instant; null for an open request or a legacy close without a time (trend).</param>
+/// <param name="RequestedGmsaName">Requested gMSA name (gMSA work only; null before migration 031 or when none is recorded).</param>
 public sealed record RequestFact(Guid Id, Guid AccountId, ServiceAccountActionType ActionType, ServiceAccountRequestStatus Status,
     Guid? TargetTeamId, DateOnly? PlanStart, DateOnly? PlanEnd, Guid? FollowupPersonId, string OrderKey, DateTimeOffset? CreatedAt = null,
-    DateTimeOffset? ClosedAt = null);
+    DateTimeOffset? ClosedAt = null, string? RequestedGmsaName = null);
 
 /// <summary>Scoped action fact; one row per action identity.</summary>
 /// <param name="Id">Action.</param>
@@ -54,7 +55,8 @@ public sealed record HandoverFact(Guid AccountId, HandoverStatus Status, bool Ha
 /// <param name="AccountId">Account.</param>
 /// <param name="Suitability">Suitability.</param>
 /// <param name="Completed">A valid completed gMSA action exists.</param>
-public sealed record TransitionFact(Guid AccountId, GmsaSuitability Suitability, bool Completed);
+/// <param name="RequestedGmsaName">Planned gMSA name (null before migration 031 or when none is recorded).</param>
+public sealed record TransitionFact(Guid AccountId, GmsaSuitability Suitability, bool Completed, string? RequestedGmsaName = null);
 
 /// <summary>Finding fact.</summary>
 /// <param name="AccountId">Account.</param>
@@ -71,9 +73,10 @@ public sealed record FindingFact(Guid AccountId, FindingStatus Status);
 /// <param name="Findings">Findings.</param>
 /// <param name="TeamNames">Team labels.</param>
 /// <param name="Insights">Metric version 2 inputs; without them only the version 1 sections are computed.</param>
+/// <param name="RequestedGmsaNames">True when migration 031 is applied, so the requested gMSA name list can be computed.</param>
 public sealed record ReportFacts(IReadOnlyList<AccountFact> Accounts, IReadOnlyList<RequestFact> Requests, IReadOnlyList<ActionFact> Actions,
     IReadOnlyList<CommunicationFact> Communications, IReadOnlyList<HandoverFact> Handovers, IReadOnlyList<TransitionFact> Transitions,
-    IReadOnlyList<FindingFact> Findings, IReadOnlyDictionary<Guid, string> TeamNames, InsightFacts? Insights = null);
+    IReadOnlyList<FindingFact> Findings, IReadOnlyDictionary<Guid, string> TeamNames, InsightFacts? Insights = null, bool RequestedGmsaNames = false);
 
 /// <summary>Reconciled weekly category counts: the parts always add up to the total.</summary>
 /// <param name="InPeriod">In the report week.</param>
@@ -123,6 +126,9 @@ public sealed record PlanLine(string Account, string Action, DateOnly Start, Dat
 public sealed record HandoverSummary(int Reported, int Accepted, int Rejected, int GmsaTargeted, int GmsaCompleted, int GmsaPending,
     IReadOnlyList<NamedCount> PendingBySuitability);
 
+/// <summary>One requested gMSA name on an open request or a gMSA transition, with its counted length (shared 15-character rule).</summary>
+public sealed record GmsaNameLine(string Account, string Source, string RequestedName, int Length, string Status);
+
 /// <summary>Label with count.</summary>
 public sealed record NamedCount(string Label, int Count);
 
@@ -154,7 +160,8 @@ public sealed record ServiceAccountReport(
     GmsaFunnel? Funnel = null,
     ReportTrend? Trend = null,
     RiskSummary? Risk = null,
-    IReadOnlyList<DirectorateRow>? Directorate = null);
+    IReadOnlyList<DirectorateRow>? Directorate = null,
+    IReadOnlyList<GmsaNameLine>? GmsaNames = null);
 
 /// <summary>Report period kinds. The week stays the default; a month or a custom range uses the same metric rules.</summary>
 public static class ReportPeriods

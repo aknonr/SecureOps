@@ -6,6 +6,16 @@ Codex-owned backend identity lookup. `IIdentityLookupService` normalizes, audits
 
 `GET /api/v1/identity/lookup/capabilities` reports the active provider's effective UPN behavior. `supportsUpnLookup` is not configuration intent alone: it is true only when the selected provider can perform exact UPN lookup and that behavior is enabled.
 
+G-26 (2026-10-07): an exact nonempty sAMAccountName may end with one `$`; dollars elsewhere
+and managed-account UPN forms remain invalid. The default `AllowedAccountPattern` is
+`^[a-zA-Z0-9._@-]+\$?$`. Existing runtime overrides with the old pattern must be updated
+before managed lookup can work. gMSA/MSA queries use `ManagedServiceAccountLookup` with
+the configured domain/container, only the two managed object classes, a fixed metadata
+projection, time/size limits, no referrals and exact result checks. Ordinary computer
+accounts do not match. Identity and Directory Explorer service evidence return
+`AccountTypeEvidence`; password/secret attributes and `msDS-GroupMSAMembership` are never
+requested. Mock seeds include `syn.gmsa$` and `syn.msa$`. Real AD validation remains pending.
+
 Infrastructure DI activates the default mock provider through an explicit options-aware factory. Constructors that accept a supplied user set are test seams only; runtime DI must not infer mock seed data from `IEnumerable<DirectoryUserRecord>`. The Active Directory provider and transport each have one public constructor and are selected only by `IdentityLookup:Provider=ActiveDirectory`.
 
 `IPamAccountResolver` remains a Mock-only extension boundary. A real PAM adapter is planned only after an approved contract. Local development has no corporate AD/PAM access and must never contact it. Controlled test-server validation must use the application runtime identity, approved domain/container, DC reachability, exact lookup, timeout, and authorization checks.

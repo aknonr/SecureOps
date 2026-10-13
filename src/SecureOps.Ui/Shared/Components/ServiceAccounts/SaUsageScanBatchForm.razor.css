@@ -1,0 +1,24 @@
+.sa-batch-subtitle {
+    margin: 1rem 0 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+/* Account names and searched names are long and unbroken; they must wrap at 390 px and 200 % zoom. */
+.sa-batch-wrap {
+    overflow-wrap: anywhere;
+    min-width: 0;
+}
+
+/* The stacked (mobile) table cell is a flex row: one shrinkable block per cell, so the label keeps its width and the value
+   wraps instead of widening the table. */
+.sa-batch-cell {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/* The reason beside a not-ready send button (aria-describedby target). */
+.sa-batch-why {
+    margin: 0.25rem 0 0;
+}

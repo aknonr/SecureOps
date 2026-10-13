@@ -63,7 +63,13 @@ public sealed class SqlAssetContractTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray()!;
         migrationNames.Should().Equal(schemaNames)
-            .And.HaveCount(28)
+            .And.HaveCount(34)
+            .And.ContainSingle(name => name == "034-service-account-plan-evidence.sql")
+            .And.ContainSingle(name => name == "033-service-account-change-plans.sql")
+            .And.ContainSingle(name => name == "032-access-request-user-index.sql")
+            .And.ContainSingle(name => name == "031-service-account-requested-gmsa-name.sql")
+            .And.ContainSingle(name => name == "030-service-account-usage-scans.sql")
+            .And.ContainSingle(name => name == "029-service-account-scope-bootstrap.sql")
             .And.ContainSingle(name => name == "028-admin-service-account-operations.sql")
             .And.ContainSingle(name => name == "027-admin-service-account-navigation.sql")
             .And.ContainSingle(name => name == "026-service-account-usage-rules.sql")
@@ -289,6 +295,125 @@ public sealed class SqlAssetContractTests
             .And.NotContain("INSERT INTO security.RoleAssignments")
             .And.NotContain("ALTER ROLE")
             .And.NotContain("UPDATE audit.AuditLog");
+    }
+
+    [Fact]
+    public void ScopeBootstrapMigration_IncludesReviewedCandidateOnceAndKeepsSelfGrantGuard()
+    {
+        string root = FindRepositoryRoot();
+        string migration = File.ReadAllText(Path.Combine(root, "sql", "migrations", "029-service-account-scope-bootstrap.sql"));
+        string schema = File.ReadAllText(Path.Combine(root, "sql", "schema", "029-service-account-scope-bootstrap.sql"));
+        string candidate = File.ReadAllText(Path.Combine(root, "sql", "pending", "service-accounts", "SA-003-scope-bootstrap.sql"));
+
+        migration.Should().Contain(":r ../schema/029-service-account-scope-bootstrap.sql");
+        schema.Should().Contain("svcacct.ScopeGrants")
+            .And.Contain("requires reviewed 025/026")
+            .And.Contain(":r ../pending/service-accounts/SA-003-scope-bootstrap.sql");
+        candidate.Should().Contain("already applied; compare definitions, do not replay")
+            .And.Contain("(IsBootstrap = 0 AND UserId <> GrantedBy)")
+            .And.Contain("IsBootstrap = 1 AND UserId = GrantedBy AND ScopeKind = 'All'")
+            .And.Contain("CREATE UNIQUE INDEX UX_SaScopeGrants_OneBootstrap ON svcacct.ScopeGrants(IsBootstrap) WHERE IsBootstrap = 1")
+            .And.NotContain("INSERT INTO svcacct.ScopeGrants")
+            .And.NotContain("DELETE FROM")
+            .And.NotContain("ALTER ROLE");
+    }
+
+    [Fact]
+    public void UsageScanMigration_IncludesReviewedCandidateOnce_IsAppendOnly_AndHasNoSecretColumn()
+    {
+        string root = FindRepositoryRoot();
+        string migration = File.ReadAllText(Path.Combine(root, "sql", "migrations", "030-service-account-usage-scans.sql"));
+        string schema = File.ReadAllText(Path.Combine(root, "sql", "schema", "030-service-account-usage-scans.sql"));
+        string candidate = File.ReadAllText(Path.Combine(root, "sql", "pending", "service-accounts", "SA-004-usage-scans.sql"));
+        string grants = File.ReadAllText(Path.Combine(root, "sql", "pending", "service-accounts", "SA-004-API-permissions.sql"));
+
+        migration.Should().Contain(":r ../schema/030-service-account-usage-scans.sql");
+        schema.Should().Contain("requires reviewed 025/026").And.Contain(":r ../pending/service-accounts/SA-004-usage-scans.sql");
+        candidate.Should().Contain("already applied; compare definitions, do not replay");
+        foreach (string table in new[] { "UsageScans", "UsageScanServers", "UsageScanItems", "UsageScanLinks", "UsageScanDecisions" })
+        {
+            candidate.Should().Contain($"CREATE TABLE svcacct.{table}(");
+            candidate.Should().MatchRegex($@"CREATE TRIGGER svcacct\.TR_Sa\w+_Immutable ON svcacct\.{table} AFTER UPDATE, DELETE");
+            grants.Should().Contain($"GRANT SELECT, INSERT ON OBJECT::svcacct.{table} TO svcacct_api_runtime;");
+        }
+
+        candidate.Should().NotContainEquivalentOf("password").And.NotContain("ALTER TABLE").And.NotContain("DROP ").And.NotContain("ALTER ROLE");
+        grants.Should().NotContain("UPDATE").And.NotContain("DELETE").And.NotContain("ALTER ROLE");
+    }
+
+    [Fact]
+    public void ChangePlanMigration_IsAdditive_AppendOnly_RefusesReplay_AndGrantsNoDelete()
+    {
+        string root = FindRepositoryRoot();
+        string migration = File.ReadAllText(Path.Combine(root, "sql", "migrations", "033-service-account-change-plans.sql"));
+        string schema = File.ReadAllText(Path.Combine(root, "sql", "schema", "033-service-account-change-plans.sql"));
+        string candidate = File.ReadAllText(Path.Combine(root, "sql", "pending", "service-accounts", "SA-006-change-plans.sql"));
+        string grants = File.ReadAllText(Path.Combine(root, "sql", "pending", "service-accounts", "SA-006-API-permissions.sql"));
+
+        migration.Should().Contain(":r ../schema/033-service-account-change-plans.sql");
+        schema.Should().Contain("requires reviewed 025, 030 and 031").And.Contain(":r ../pending/service-accounts/SA-006-change-plans.sql");
+        candidate.Should().Contain("already applied; compare definitions, do not replay");
+        foreach (string table in new[] { "ChangePlanAccounts", "ChangePlanPreviews", "ChangePlanItems", "ChangePlanApprovals", "ChangeItemChecks", "ChangePlanEvents" })
+        {
+            candidate.Should().Contain($"CREATE TABLE svcacct.{table}(");
+            candidate.Should().MatchRegex($@"CREATE TRIGGER svcacct\.TR_Sa\w+_AppendOnly ON svcacct\.{table} AFTER UPDATE, DELETE");
+            grants.Should().Contain($"GRANT SELECT, INSERT ON OBJECT::svcacct.{table} TO svcacct_api_runtime;");
+        }
+
+        candidate.Should().Contain("CREATE TRIGGER svcacct.TR_SaChangePlans_Fixed ON svcacct.ChangePlans AFTER UPDATE, DELETE")
+            .And.Contain("CREATE TRIGGER svcacct.TR_SaChangePlanApprovals_Separation ON svcacct.ChangePlanApprovals AFTER INSERT")
+            .And.Contain("CONSTRAINT UQ_SaChangePlanApprovals_Preview UNIQUE (PreviewId)");
+        // T8: UPDATE only on the status columns; the trigger compares fixed columns exactly (the database collation is CI_AS).
+        grants.Should().Contain("GRANT SELECT, INSERT ON OBJECT::svcacct.ChangePlans TO svcacct_api_runtime;")
+            .And.Contain("GRANT UPDATE ON OBJECT::svcacct.ChangePlans (Status, CurrentPreviewVersion, UpdatedBy, UpdatedAt) TO svcacct_api_runtime;")
+            .And.NotContain("INSERT, UPDATE ON");
+        candidate.Should().Contain("i.Title COLLATE Latin1_General_BIN2 <> d.Title COLLATE Latin1_General_BIN2 OR DATALENGTH(i.Title) <> DATALENGTH(d.Title)")
+            .And.Contain("i.Kind COLLATE Latin1_General_BIN2 <> d.Kind COLLATE Latin1_General_BIN2 OR DATALENGTH(i.Kind) <> DATALENGTH(d.Kind)")
+            .And.Contain("DATEPART(TZOFFSET, i.CreatedAt) <> DATEPART(TZOFFSET, d.CreatedAt)");
+        foreach (string column in new[] { "Kind", "Status", "Action", "ComponentType", "Flag", "State", "Event" })
+        {
+            candidate.Should().MatchRegex($@"CHECK \({column} COLLATE Latin1_General_BIN2 IN \([^)]*\)\s+AND DATALENGTH\({column}\) = LEN\({column}\)\)");
+        }
+        // Additive only: no existing object is altered or dropped, no secret column, no role or delete grant.
+        candidate.Should().NotContainEquivalentOf("password").And.NotContain("ALTER TABLE").And.NotContain("DROP ").And.NotContain("ALTER ROLE");
+        grants.Should().NotContain("DELETE").And.NotContain("ALTER ROLE").And.NotContain("svcacct_worker");
+    }
+
+    [Fact]
+    public void PlanEvidenceMigration_OnlyWidensOwnerCheck_RefusesReplay()
+    {
+        string root = FindRepositoryRoot();
+        string migration = File.ReadAllText(Path.Combine(root, "sql", "migrations", "034-service-account-plan-evidence.sql"));
+        string schema = File.ReadAllText(Path.Combine(root, "sql", "schema", "034-service-account-plan-evidence.sql"));
+        string candidate = File.ReadAllText(Path.Combine(root, "sql", "pending", "service-accounts", "SA-007-plan-evidence.sql"));
+        string original = File.ReadAllText(Path.Combine(root, "sql", "pending", "service-accounts", "SA-001-service-accounts.sql"));
+
+        migration.Should().Contain(":r ../schema/034-service-account-plan-evidence.sql");
+        schema.Should().Contain("requires reviewed 033").And.Contain(":r ../pending/service-accounts/SA-007-plan-evidence.sql");
+        candidate.Should().Contain("already applied; compare definitions, do not replay").And.Contain("THROW 51396");
+        // The same constraint name comes back with exactly one more owner type, validated against existing rows.
+        string before = Regex.Match(original, @"CONSTRAINT CK_SaEvidence_Owner CHECK \(OwnerEntityType IN \(([^)]*)\)\)").Groups[1].Value;
+        before.Should().NotBeEmpty().And.NotContain("ChangePlan");
+        candidate.Should().Contain("ALTER TABLE svcacct.Evidence DROP CONSTRAINT CK_SaEvidence_Owner;")
+            .And.Contain($"ALTER TABLE svcacct.Evidence WITH CHECK ADD CONSTRAINT CK_SaEvidence_Owner CHECK (OwnerEntityType IN ({before},'ChangePlan'));");
+        Regex.Matches(candidate, @"ALTER TABLE").Should().HaveCount(2, "only the owner check is replaced");
+        candidate.Should().NotContain("ChangePlanItem").And.NotContain("GRANT").And.NotContain("DROP TABLE").And.NotContain("ALTER ROLE")
+            .And.NotContain("INSERT").And.NotContain("UPDATE ").And.NotContain("DELETE ").And.NotContainEquivalentOf("password");
+    }
+    [Fact]
+    public void RequestedGmsaNameMigration_AddsTwoNullableColumns_RefusesReplay_AndGrantsNothing()
+    {
+        string root = FindRepositoryRoot();
+        string migration = File.ReadAllText(Path.Combine(root, "sql", "migrations", "031-service-account-requested-gmsa-name.sql"));
+        string schema = File.ReadAllText(Path.Combine(root, "sql", "schema", "031-service-account-requested-gmsa-name.sql"));
+        string candidate = File.ReadAllText(Path.Combine(root, "sql", "pending", "service-accounts", "SA-005-requested-gmsa-name.sql"));
+
+        migration.Should().Contain(":r ../schema/031-service-account-requested-gmsa-name.sql");
+        schema.Should().Contain("requires reviewed 025 and 030").And.Contain(":r ../pending/service-accounts/SA-005-requested-gmsa-name.sql");
+        candidate.Should().Contain("already applied; compare definitions, do not replay")
+            .And.Contain("ALTER TABLE svcacct.WorkRequests ADD RequestedGmsaName nvarchar(256) NULL;")
+            .And.Contain("ALTER TABLE svcacct.IdentityTransitions ADD RequestedGmsaName nvarchar(256) NULL;")
+            .And.NotContain("DEFAULT").And.NotContain("UPDATE svcacct").And.NotContain("DROP ").And.NotContain("GRANT ").And.NotContain("ALTER ROLE");
     }
 
     private static string FindRepositoryRoot()

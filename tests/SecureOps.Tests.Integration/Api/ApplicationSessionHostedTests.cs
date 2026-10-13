@@ -248,6 +248,7 @@ public sealed class ApplicationSessionHostedTests
             InnerHandler = factory.Server.CreateHandler()
         };
         using HttpClient browser = new(sessionHandler) { BaseAddress = new Uri("http://localhost/") };
+        browser.DefaultRequestHeaders.Add(Shared.Contracts.Api.ApiCsrf.HeaderName, Shared.Contracts.Api.ApiCsrf.HeaderValue);
         browser.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
         browser.DefaultRequestHeaders.Add(ApiSessionHeaders.BrowserSession, "one-logical-browser-session");
 
@@ -364,6 +365,7 @@ public sealed class ApplicationSessionHostedTests
             InnerHandler = factory.Server.CreateHandler()
         };
         using HttpClient browser = new(sessionHandler) { BaseAddress = new Uri("http://localhost/") };
+        browser.DefaultRequestHeaders.Add(Shared.Contracts.Api.ApiCsrf.HeaderName, Shared.Contracts.Api.ApiCsrf.HeaderValue);
         browser.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
         browser.DefaultRequestHeaders.Add(ApiSessionHeaders.BrowserSession, "self-revoked-browser");
 
@@ -524,7 +526,7 @@ public sealed class ApplicationSessionHostedTests
 
     private static HttpClient Client(WebApplicationFactory<Program> factory, string? actor = null)
     {
-        HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        HttpClient client = factory.CreateApiClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
         if (actor is not null)
         {
             client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", actor);

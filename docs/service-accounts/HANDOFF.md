@@ -98,7 +98,7 @@ Unresolved (not claimed fixed): two single first-run failures from 2026-09-28
 "persistence unavailable" — TRX retained, exception type not captured). No deadlock was recorded at
 those times; they did not reproduce. The next occurrence is diagnosable: the module logs SQL number
 or failure type plus a safe `Origin`, and the fixture writes them to `SECUREOPS_SA_SQL_DIAGNOSTICS`.
-See PROGRESS.md.
+See PROGRESS-HISTORY.md (dated records) and PROGRESS.md (current state).
 
 Not run here: Windows toolchain, LocalDB/Integrated Security, IIS, allowed HTTP/UI journeys with the
 SQL access store, browser journey on the real composition, desktop Excel.

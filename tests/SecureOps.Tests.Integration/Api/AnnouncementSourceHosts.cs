@@ -141,6 +141,7 @@ internal sealed class AnnouncementSourceHosts : IAsyncDisposable
     public HttpClient Client(string? actor = "platform-admin")
     {
         var client = new HttpClient(new HttpClientHandler { UseProxy = false }) { BaseAddress = Address, Timeout = TimeSpan.FromSeconds(20) };
+        client.DefaultRequestHeaders.Add(Shared.Contracts.Api.ApiCsrf.HeaderName, Shared.Contracts.Api.ApiCsrf.HeaderValue);
         if (actor is not null)
         { client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", actor); }
         return client;

@@ -48,8 +48,8 @@ public sealed class ServiceAccountApiClient
             return Task.FromResult(request);
         }, ReadAsync<T>, token);
 
-    /// <summary>Uploads one file with form fields (import staging or evidence).</summary>
-    public Task<T> UploadAsync<T>(string path, string fileName, string contentType, byte[] content, IReadOnlyDictionary<string, string?> fields,
+    /// <summary>Uploads one file with form fields (import staging, evidence or a usage scan); a name may repeat (e.g. <c>accountIds</c>).</summary>
+    public Task<T> UploadAsync<T>(string path, string fileName, string contentType, byte[] content, IEnumerable<KeyValuePair<string, string?>> fields,
         CancellationToken token) =>
         ExecuteAsync(() =>
         {
@@ -104,6 +104,7 @@ public sealed class ServiceAccountApiClient
     private static async Task<SecureOpsApiException> FailureAsync(HttpResponseMessage response, CancellationToken token)
     {
         ProblemDetailsPayload? payload = null;
+        string? current = null;
         try
         {
             string body = await response.Content.ReadAsStringAsync(token);
@@ -111,6 +112,12 @@ public sealed class ServiceAccountApiClient
             {
                 payload = JsonSerializer.Deserialize<ProblemDetailsPayload>(body, ApiResponseReader.JsonOptions);
                 using var document = JsonDocument.Parse(body);
+                if (document.RootElement.ValueKind == JsonValueKind.Object && document.RootElement.TryGetProperty("current", out JsonElement extension)
+                    && extension.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
+                {
+                    current = extension.GetRawText();
+                }
+
                 if (payload is not null && payload.Fields is null && document.RootElement.TryGetProperty("field", out JsonElement field)
                     && field.ValueKind == JsonValueKind.String)
                 {
@@ -123,6 +130,6 @@ public sealed class ServiceAccountApiClient
             // A non-JSON error body (proxy HTML, empty response) still classifies by status code.
         }
 
-        return new SecureOpsApiException(UiProblemFactory.FromResponse((int)response.StatusCode, payload));
+        return new SecureOpsApiException(UiProblemFactory.FromResponse((int)response.StatusCode, payload)) { CurrentJson = current };
     }
 }

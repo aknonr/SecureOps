@@ -13,6 +13,7 @@ namespace SecureOps.Infrastructure.Identity;
 /// <param name="Enabled">Enabled state when known.</param>
 /// <param name="Locked">Locked state when known.</param>
 /// <param name="Source">Source provider name.</param>
+/// <param name="AccountTypeEvidence">Directory object class evidence, never inferred from the account name.</param>
 public sealed record DirectoryUserRecord(
     string? DisplayName,
     string SamAccountName,
@@ -23,4 +24,5 @@ public sealed record DirectoryUserRecord(
     string? ManagerDisplayName,
     bool? Enabled,
     bool? Locked,
-    string Source);
+    string Source,
+    string AccountTypeEvidence = "User");

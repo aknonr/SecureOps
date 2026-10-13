@@ -18,7 +18,11 @@ namespace SecureOps.Tests.Integration.ServiceAccounts;
 /// <see cref="ApplicationAccessService"/>) and the module registration, against the disposable database. Capabilities come
 /// only from versioned role bundles (including amended protected Admin), and data scope only from module grants. Nothing wraps or
 /// substitutes access. Not covered here: the HTTP pipeline and Integrated Security, which the API host enforces at startup.
+/// Runs in the serial collection with the other class that registers platform users through <c>EnsureUserAsync</c>: two
+/// concurrent first registrations can deadlock in the platform access store (G-34, measured 2026-10-06), which made this
+/// class fail intermittently. The defect itself is recorded for the platform owner, not hidden by a retry here.
 /// </summary>
+[Collection(ServiceAccountTeamRoleCollection.Name)]
 public sealed class ServiceAccountPersistedAccessSqlTests
 {
     private static readonly CancellationToken _token = CancellationToken.None;

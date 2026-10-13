@@ -46,7 +46,7 @@
 
     @if (Detail.Permissions.Work)
     {
-        <MudExpansionPanels Class="mt-2"><MudExpansionPanel Text="Sahiplik öner veya teyit et">
+        <SaDisclosure Class="mt-2" Title="Sahiplik öner veya teyit et">
             <MudGrid Spacing="2">
                 <MudItem xs="12" md="4">
                     <MudSelect T="Guid?" @bind-Value="_team" Label="Ekip" Clearable="true" Variant="Variant.Outlined">
@@ -69,7 +69,7 @@
             {
                 <p class="so-panel-text--sm mt-1">Sahip ekibi değiştirmek kurum düzeyinde kapsam gerektirir; ekip kapsamıyla yalnız mevcut ekipte kişi teyit edilebilir.</p>
             }
-        </MudExpansionPanel></MudExpansionPanels>
+        </SaDisclosure>
     }
 </section>
 

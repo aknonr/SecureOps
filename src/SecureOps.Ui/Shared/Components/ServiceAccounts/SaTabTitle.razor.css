@@ -1,0 +1,18 @@
+/* Looks like the header text MudTabs would print; only the focus ring is added (theme token, 2 px). */
+.sa-tab-title {
+    appearance: none;
+    background: none;
+    border: 0;
+    margin: 0;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+}
+
+.sa-tab-title:focus-visible {
+    outline: 2px solid var(--so-text);
+    outline-offset: 4px;
+}

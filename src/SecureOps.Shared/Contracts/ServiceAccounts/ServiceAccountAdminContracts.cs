@@ -34,6 +34,26 @@ public sealed record CreateScopeGrantRequest(string CorporateIdentity, string Sc
 /// <summary>Revoke a grant.</summary>
 public sealed record RevokeScopeGrantRequest(string ExpectedVersion, string Reason);
 
+/// <summary>
+/// One-time first scope grant (ADR-0026): available only while the module has never had any scope grant and the
+/// schema carries the bootstrap guard. The caller receives "All" scope; afterwards self-grants are refused again.
+/// </summary>
+/// <param name="Available">The bootstrap can still be used.</param>
+/// <param name="SchemaReady">The database has the one-time guard (candidate SA-003 / its numbered migration).</param>
+/// <param name="Used">A bootstrap grant was already made (active or revoked).</param>
+public sealed record ScopeBootstrapState(bool Available, bool SchemaReady, bool Used);
+
+/// <summary>Request the one-time first scope grant for the caller.</summary>
+public sealed record ScopeBootstrapRequest(string Reason);
+
+/// <summary>An approved application user who can receive scope (no directory lookup; only users already admitted to the application).</summary>
+/// <param name="CorporateIdentity">Exact identity sent back in <see cref="CreateScopeGrantRequest"/>.</param>
+/// <param name="Label">Display name, else login name, else identity.</param>
+/// <param name="LoginName">Login name, when known.</param>
+/// <param name="IsCaller">The current user (cannot receive a grant from themself).</param>
+/// <param name="HasServiceAccountsAccess">Holds at least the module View capability; without it a scope grant has no effect.</param>
+public sealed record ScopeGrantCandidate(string CorporateIdentity, string Label, string? LoginName, bool IsCaller, bool HasServiceAccountsAccess);
+
 /// <summary>Caller's module context for UI composition.</summary>
 public sealed record ServiceAccountMe(bool Configured, IReadOnlyList<string> Capabilities, string ScopeKind, IReadOnlyList<SaRef> Organizations,
     IReadOnlyList<SaRef> Teams, bool HasScope);

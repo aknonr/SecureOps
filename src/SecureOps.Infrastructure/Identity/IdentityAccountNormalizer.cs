@@ -36,6 +36,12 @@ public sealed class IdentityAccountNormalizer : IIdentityAccountNormalizer
             return Invalid("BulkLookupRejected", "Only one exact account can be looked up per request.");
         }
 
+        if (normalized.Any(char.IsControl) || normalized.IndexOfAny(_forbiddenCharacters) >= 0
+            || !IdentityProviderInputGuard.HasSafeDollarSuffix(normalized))
+        {
+            return Invalid("SearchPatternRejected", "Wildcard, LDAP filter, or invalid account suffix is not allowed.");
+        }
+
         if (_options.StripDomainPrefix)
         {
             int slashIndex = normalized.LastIndexOf('\\');
@@ -60,7 +66,7 @@ public sealed class IdentityAccountNormalizer : IIdentityAccountNormalizer
             return Invalid("SearchPatternRejected", "Wildcard, LDAP filter, or search-style characters are not allowed.");
         }
 
-        if (!Regex.IsMatch(
+        if (!IdentityProviderInputGuard.HasSafeDollarSuffix(normalized) || !Regex.IsMatch(
                 normalized,
                 _options.AllowedAccountPattern,
                 RegexOptions.CultureInvariant,

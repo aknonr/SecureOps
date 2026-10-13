@@ -72,7 +72,7 @@ public sealed class IdentityProviderDependencyInjectionTests
     public async Task Lookup_WithMockProvider_ResolvesSeededPamAccountInAllowedEnvironment(string environment)
     {
         using WebApplicationFactory<Program> factory = CreateFactory(environment);
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
 
         HttpResponseMessage response = await client.PostAsJsonAsync("/api/v1/identity/lookup", new { account = "pam12356" }, cancellationToken: TestContext.Current.CancellationToken);
@@ -87,7 +87,7 @@ public sealed class IdentityProviderDependencyInjectionTests
     public async Task Capabilities_WithMockProvider_AdvertisesWorkingExactUpnLookup()
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Demo", enableUpnLookup: true);
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
 
         IdentityLookupCapabilitiesResponse? capabilities = await client.GetFromJsonAsync<IdentityLookupCapabilitiesResponse>("/api/v1/identity/lookup/capabilities", cancellationToken: TestContext.Current.CancellationToken);
@@ -103,7 +103,7 @@ public sealed class IdentityProviderDependencyInjectionTests
     public async Task Capabilities_WithMockProviderAndUpnDisabled_DoesNotAdvertiseUpnLookup()
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Demo", enableUpnLookup: false);
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
 
         IdentityLookupCapabilitiesResponse? capabilities = await client.GetFromJsonAsync<IdentityLookupCapabilitiesResponse>("/api/v1/identity/lookup/capabilities", cancellationToken: TestContext.Current.CancellationToken);
@@ -115,7 +115,7 @@ public sealed class IdentityProviderDependencyInjectionTests
     public async Task Lookup_WithUnknownExactUpn_ReturnsLegitimateNotFound()
     {
         using WebApplicationFactory<Program> factory = CreateFactory("Demo");
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
 
         HttpResponseMessage response = await client.PostAsJsonAsync("/api/v1/identity/lookup", new { account = "missing.account@contoso.local", purpose = "Approved operational lookup" }, cancellationToken: TestContext.Current.CancellationToken);
@@ -134,7 +134,7 @@ public sealed class IdentityProviderDependencyInjectionTests
             "Demo",
             identityProvider: "ActiveDirectory",
             enableUpnLookup: enableUpnLookup);
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", "platform-admin");
 
         IdentityLookupCapabilitiesResponse? capabilities = await client.GetFromJsonAsync<IdentityLookupCapabilitiesResponse>("/api/v1/identity/lookup/capabilities", cancellationToken: TestContext.Current.CancellationToken);

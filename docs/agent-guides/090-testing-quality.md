@@ -17,7 +17,7 @@ dotnet format --verify-no-changes                            # repository-wide: 
 
 `global.json` pins the SDK with roll-forward disabled; if that SDK is unavailable, say so. A run with a substituted SDK or language version is diagnostic evidence only and must be labelled as such.
 
-The repository-wide format check is a required gate; a run scoped with `--include` (or limited to `style`/`analyzers`) is partial evidence. Judge it on a Windows (CRLF) checkout: a Linux LF checkout reports `ENDOFLINE` on every file because `.editorconfig` asks for CRLF.
+The repository-wide format check is a required gate and passes on master (verified 2026-10-13, `633eed9`); the 2026-10-01 baseline debt is gone. A run scoped with `--include` (or limited to `style`/`analyzers`) is partial evidence: report it as such and never as passing the gate. Judge it on a Windows (CRLF) checkout: a Linux LF checkout reports `ENDOFLINE` on every file because `.editorconfig` asks for CRLF. Before a branch is declared mergeable, run the full unit suite, not a filtered subset.
 
 ## Expectations
 

@@ -1,0 +1,80 @@
+@* Checklist of an approved plan: the approved preview's rows grouped by account and server, with the person's own marks (Yapıldı /
+   Atlandı / Başarısız / Geri alındı). The team makes the change on the server under its own change record; this system never
+   connects to a server, and "Yapıldı" is the person's statement, not a verification. Mark buttons exist only when the server's
+   plan permissions say the caller may check; the server decides again on every mark. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<MudAlert Severity="Severity.Info" Dense="true" Class="mb-3" role="note">
+    Yapıldı işareti kişinin beyanıdır, doğrulama değildir. Sistem sunucuya bağlanmaz ve değişikliği yapmaz; değişikliği kendi yetkinizle,
+    kendi değişiklik kaydınızla sunucuda siz yaparsınız, burada yaptığınızı kayda geçirirsiniz.
+    @(Plan.Permissions.Check ? "" : "İşaretleme yetkiniz görünmüyor (Çalışma yetkisi ve planın tüm hesaplarında sorumlu dayanak gerekir); liste yalnız okunur.")
+</MudAlert>
+
+@if (Plan.Checklist is { } checklist)
+{
+    <div class="sa-plan-check-counters" role="group" aria-label="Kontrol listesi özeti">
+        @foreach ((string label, int count, SoStatusBadge.BadgeTone tone, string icon) in ChangePlanPresentation.ChecklistCounters(checklist))
+        {
+            <SoStatusBadge Label="@($"{label}: {count}")" Tone="tone" Icon="@icon" />
+        }
+        @if (checklist.OutsideWindow > 0)
+        {
+            <SoStatusBadge Label="@($"Pencere dışında: {checklist.OutsideWindow}")" Tone="SoStatusBadge.BadgeTone.Caution" Icon="@Icons.Material.Filled.EventBusy" />
+        }
+    </div>
+}
+
+@if (Failed)
+{
+    <p class="so-panel-text" role="note">Satırlar okunamadı; yukarıdaki hata ve yeniden deneme düğmesi geçerlidir.</p>
+}
+else if (Items is null)
+{
+    <SoLoading Message="Kontrol listesi satırları okunuyor" />
+}
+else if (Items.Items.Count == 0)
+{
+    <SoEmptyState Title="Yapılacak satır yok" Description="Sunucu onaylanan önizleme için satır döndürmedi." />
+}
+else
+{
+    @foreach (IGrouping<Guid, ChangePlanItemView> account in Items.Items.GroupBy(i => i.AccountId))
+    {
+        <section class="sa-plan-check-account" aria-label="@($"{account.First().AccountName}: yapılacaklar")">
+            <h4 class="sa-plan-check-title">@account.First().AccountName</h4>
+            @foreach (IGrouping<string, ChangePlanItemView> server in account.GroupBy(i => i.ServerName ?? string.Empty))
+            {
+                <h5 class="sa-plan-check-server">@(server.Key.Length == 0 ? "Sunucu bilgisi yok" : server.Key)</h5>
+                <ul class="sa-plan-check-list">
+                    @foreach (ChangePlanItemView item in server)
+                    {
+                        <SaPlanCheckRow @key="item.Id" Item="item" CanCheck="Plan.Permissions.Check" Busy="Busy" OnMark="OnMark" />
+                    }
+                </ul>
+            }
+        </section>
+    }
+
+    <SaPager Label="Kontrol listesi satırları" Page="Items.Page" PageSize="Items.PageSize" Total="Items.Total" Unit="satır" Busy="Busy" OnPage="OnPage" />
+}
+
+@code {
+    /// <summary>The plan (permissions and checklist counters come from the server).</summary>
+    [Parameter, EditorRequired] public ChangePlanView Plan { get; set; } = default!;
+
+    /// <summary>The loaded page of the approved preview's rows (null while loading).</summary>
+    [Parameter] public ChangePlanItemPage? Items { get; set; }
+
+    /// <summary>Reading the rows failed.</summary>
+    [Parameter] public bool Failed { get; set; }
+
+    /// <summary>A call is running (the pager keeps focus but ignores clicks).</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Another page of rows was requested (1-based).</summary>
+    [Parameter] public EventCallback<int> OnPage { get; set; }
+
+    /// <summary>Sends one mark; true when the server saved it.</summary>
+    [Parameter, EditorRequired] public Func<PlanCheckCommand, Task<bool>> OnMark { get; set; } = default!;
+}

@@ -25,7 +25,8 @@ public sealed class DirectoryExactInputNormalizer
         if (normalized.Length > _options.MaxGroupInputLength
             || normalized.Any(char.IsControl)
             || normalized.IndexOfAny(_forbidden) >= 0
-            || !Regex.IsMatch(normalized, "^[a-zA-Z0-9._@ -]+$", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(250)))
+            || !Identity.IdentityProviderInputGuard.HasSafeDollarSuffix(normalized)
+            || !Regex.IsMatch(normalized, "^[a-zA-Z0-9._@ -]+\\$?$", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(250)))
         {
             return DirectoryInputNormalizationResult.Invalid("UnsafeExactGroup");
         }

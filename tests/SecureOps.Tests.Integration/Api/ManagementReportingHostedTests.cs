@@ -19,7 +19,7 @@ public sealed class ManagementReportingHostedTests
     public async Task Summary_RequiresSeparateManagementReportingCapability()
     {
         using WebApplicationFactory<Program> factory = CreateFactory();
-        using HttpClient anonymous = factory.CreateClient();
+        using HttpClient anonymous = factory.CreateApiClient();
         using HttpClient lead = Client(factory, DemoApiAuthentication.TeamLeadActor);
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
@@ -128,7 +128,7 @@ public sealed class ManagementReportingHostedTests
 
     private static HttpClient Client(WebApplicationFactory<Program> factory, string actor)
     {
-        HttpClient client = factory.CreateClient();
+        HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", actor);
         return client;
     }

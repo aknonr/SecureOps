@@ -1,5 +1,70 @@
 # sql/
 
+## Service Account Plan Evidence 034, 2026-10-12
+
+Inventory is 001-034 (033, the change-plan tables, is on the same unmerged branch line). **034-service-account-plan-evidence**
+requires reviewed 025 and 033 and includes `pending/service-accounts/SA-007-plan-evidence.sql` unchanged: it recreates
+`svcacct.Evidence.CK_SaEvidence_Owner` under the same name with `'ChangePlan'` added (`WITH CHECK`, trusted), so evidence of a
+gMSA conversion change plan uses the existing immutable table, file checks and download audit. No table, column, row, trigger,
+role or grant changes. It stops before any change (51396) on replay, a missing prerequisite or an owner check that is not the
+eight types of 025. Binaries with this code keep working before 034: plan evidence upload answers 503
+`ServiceAccountChangePlanEvidenceNotInstalled`, everything else works. Synthetic LocalDB only; installed TEST was not upgraded.
+DBA addendum: [DBA-034-TR.md](../docs/service-accounts/DBA-034-TR.md); harness `tests/sql/service-accounts/sa-034-guards.sql`.
+The release selector (`scripts/release/Get-ReleaseSqlPlan.ps1`) is updated separately by its owner.
+
+## Access Registration Index 032, 2026-10-06
+
+Current numbered inventory is 001-032. `032-access-request-user-index.sql` adds
+`IX_AccessRequests_UserRequested (UserId, RequestedAt DESC) INCLUDE (Status)` for
+the serializable latest-request read. It requires access objects through 019,
+refuses replay (51381), and changes no rows, guards or runtime grants. Only fresh
+synthetic LocalDB was used for this task; installed TEST was not upgraded.
+See [DBA preflight and recovery](../docs/access-registration-dba-032.md) and
+`tests/sql/access-registration/Test-AccessRegistrationSql.ps1` for the regression
+harness, captured deadlock/plan evidence and predecessor-preservation checks.
+
+## Service Account Requested gMSA Name 031, 2026-10-05
+
+Inventory is 001-031. **031-service-account-requested-gmsa-name** requires reviewed 025 and 030 and includes the retained
+`pending/service-accounts/SA-005-requested-gmsa-name.sql` unchanged: two nullable columns, `WorkRequests.RequestedGmsaName`
+and `IdentityTransitions.RequestedGmsaName` (`nvarchar(256) NULL`, no default), so existing rows are not rewritten and stay
+NULL. No grant changes: `svcacct_api_runtime` already has table-level SELECT, INSERT, UPDATE on both tables; the Worker role
+needs nothing new. Replay is refused (51370). Binaries with this code keep working before 031: names show as unavailable,
+writes without a name succeed and a write with a name is refused with `gmsaNameColumnsMissing`. 031 was reserved after
+checking every published branch (all end at 030 or earlier). Apply only after separate owner approval, first on a copy of
+the installed database. Rollback: older binaries ignore the columns; keep them and their values.
+
+## Service Account Usage Scans 030, 2026-10-04
+
+Inventory is 001-030. **030-service-account-usage-scans** (ADR-0027) requires reviewed 025/026 and includes the retained
+`pending/service-accounts/SA-004-usage-scans.sql` unchanged: five new append-only tables (`UsageScans`,
+`UsageScanServers`, `UsageScanItems`, `UsageScanLinks`, `UsageScanDecisions`) with triggers refusing UPDATE/DELETE
+(error 51307). No existing table, constraint, row, role or grant changes; no data is added. One transaction; replay is
+refused (51360). Runtime grants are separate in `pending/service-accounts/SA-004-API-permissions.sql`: SELECT and INSERT
+on the five tables for `svcacct_api_runtime` only; the Worker role gets nothing.
+
+030 was reserved after checking every published branch (all end at 029 or earlier) and depends on no other unapplied
+script. Binaries with the usage-scan code keep working before 030: the account detail reports scans as unavailable and an
+upload is refused with `scanTablesMissing`; nothing else changes. Apply only after separate owner approval, first on a copy
+of the installed database. Rollback: stop uploads (older binaries never touch the tables); keep the tables, rows and audit.
+
+## Service Accounts Scope Bootstrap 029, 2026-10-03
+
+Inventory is 001-029. **029-service-account-scope-bootstrap** (ADR-0026) requires reviewed 025/026
+and includes the retained `pending/service-accounts/SA-003-scope-bootstrap.sql` unchanged: it adds
+`svcacct.ScopeGrants.IsBootstrap` (default 0, existing rows stay 0), re-creates
+`CK_SaScopeGrants_NoSelfGrant` WITH CHECK so a self-grant is allowed only for the single "All"
+bootstrap row, and adds `UX_SaScopeGrants_OneBootstrap`. One transaction; replay is refused.
+No data, runtime grant, role member or scope is added; the API role already inserts into
+`svcacct.ScopeGrants`. Installed binaries without the bootstrap code keep working (their inserts
+take the default 0 and the old rule); new binaries before 029 report `bootstrapSchema` and change nothing.
+
+029 was reserved after checking every published branch (all end at 028 or earlier). It does not
+depend on 027/028 and touches none of their objects. Do not replay installed 001-028. Apply only
+after separate owner approval, first on a copy of the installed database. Rollback: the original
+check can be restored only while no bootstrap row exists; otherwise keep the column, index and row.
+The isolated harness applies SA-003 itself only when run with `-ThroughMigration` below 29.
+
 ## Admin Operations Successor, 2026-10-03
 
 Isolated .NET 8 successor inventory is 001-028. **028-admin-service-account-operations**

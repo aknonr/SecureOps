@@ -27,6 +27,26 @@ public sealed partial class SqlAccessRepository : IAccessRepository
     /// <inheritdoc />
     public async Task<EnsureAccessUserResult> EnsureUserAsync(CorporatePrincipal principal, bool createRequest, TimeSpan activityPersistenceInterval, CancellationToken cancellationToken)
     {
+        (Guid UserId, Guid? RequestId, bool UserCreated, bool RequestCreated) registration;
+        try
+        {
+            registration = await EnsureUserTransactionAsync(principal, createRequest, activityPersistenceInterval, cancellationToken);
+        }
+        catch (SqlException exception) when (exception.Number == 1205 && !cancellationToken.IsCancellationRequested)
+        {
+            // SQL rolled back the victim; disposal completes before a fresh transaction retries once.
+            registration = await EnsureUserTransactionAsync(principal, createRequest, activityPersistenceInterval, cancellationToken);
+        }
+
+        ApplicationUser user = (await GetUserAsync(registration.UserId, cancellationToken))!;
+        ApplicationAccessRequest? request = registration.RequestId is { } existingRequestId
+            ? await GetRequestAsync(existingRequestId, cancellationToken) : null;
+        return new EnsureAccessUserResult(user, request, registration.UserCreated, registration.RequestCreated);
+    }
+
+    private async Task<(Guid UserId, Guid? RequestId, bool UserCreated, bool RequestCreated)> EnsureUserTransactionAsync(
+        CorporatePrincipal principal, bool createRequest, TimeSpan activityPersistenceInterval, CancellationToken cancellationToken)
+    {
         bool oidcProfile = string.Equals(principal.AuthenticationSource, "oidc", StringComparison.Ordinal);
         string? loginName = oidcProfile ? principal.LoginName : null;
         string? displayName = oidcProfile ? principal.DisplayName : null;
@@ -119,10 +139,7 @@ public sealed partial class SqlAccessRepository : IAccessRepository
         }
 
         await transaction.CommitAsync(cancellationToken);
-        ApplicationUser user = (await GetUserAsync(ensuredUserId, cancellationToken))!;
-        ApplicationAccessRequest? request = requestId is { } existingRequestId
-            ? await GetRequestAsync(existingRequestId, cancellationToken) : null;
-        return new EnsureAccessUserResult(user, request, userCreated, requestCreated);
+        return (ensuredUserId, requestId, userCreated, requestCreated);
     }
 
     /// <inheritdoc />

@@ -1,0 +1,71 @@
+.sa-plan-steps {
+    list-style: none;
+    margin: 0 0 var(--so-space-4);
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr));
+    gap: var(--so-space-2);
+}
+
+.sa-plan-step {
+    border: 1px solid var(--so-border);
+    border-radius: var(--so-radius-sm);
+    background: var(--so-surface);
+    min-width: 0;
+}
+
+.sa-plan-step-link {
+    display: flex;
+    align-items: center;
+    gap: var(--so-space-2);
+    padding: var(--so-space-2) var(--so-space-3);
+    min-height: 2.75rem;
+    color: var(--so-text);
+    text-decoration: none;
+}
+
+.sa-plan-step-link:hover {
+    background: var(--so-bg-sunken);
+}
+
+.sa-plan-step-link:focus-visible {
+    outline: 2px solid var(--so-text);
+    outline-offset: 2px;
+}
+
+.sa-plan-step-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.sa-plan-step-title {
+    font-weight: 600;
+}
+
+.sa-plan-step-state {
+    font-size: 0.8125rem;
+    color: var(--so-text-muted);
+}
+
+/* The step to act on gets a thicker leading edge and weight, not colour alone. */
+.sa-plan-step--current {
+    border-width: 1px 1px 1px 4px;
+    border-left-color: var(--so-text);
+}
+
+.sa-plan-step--done .sa-plan-step-num {
+    color: var(--so-success);
+}
+
+.sa-plan-step--upcoming .sa-plan-step-title,
+.sa-plan-step--stopped .sa-plan-step-title,
+.sa-plan-step--notavailable .sa-plan-step-title {
+    font-weight: 500;
+}
+
+.sa-plan-step--stopped {
+    border-style: dashed;
+}

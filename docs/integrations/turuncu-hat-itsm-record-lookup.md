@@ -1,0 +1,179 @@
+# ITSM Record Lookup Contract (OR / OCO, read-only)
+
+Decision: ADR-0031 (Proposed) for the record lookup; ADR-0032 (Proposed) for OR tracking and exact user match
+(sections "OR tracking" and "User match" below). Code: `src/SecureOps.Infrastructure/ItsmRecords/`. Tests:
+`tests/SecureOps.Tests.Unit/ItsmRecords/`. No API endpoint, no OpenAPI entry, no SQL, no UI: modules call the
+interfaces from their service layer. Status 2026-10-12: implemented and unit-tested with synthetic responses only;
+no real Turuncu Hat call has been made.
+
+## Contract
+
+`IItsmRecordLookup.LookupAsync(ItsmRecordKind kind, string? number, CancellationToken)` returns
+`ItsmRecordLookupResult(Kind, Number, Status, Reason, Record, Provider)`.
+
+| Status | Meaning | Record |
+|---|---|---|
+| `Found` | Exactly one active record with this number | set |
+| `NotFound` | A complete, successful response held zero rows | null |
+| `Ambiguous` | Two or more rows matched (also identical duplicates); none is chosen | null |
+| `Unknown` | The source could not prove an answer. Never read as "absent" | null |
+
+`Reason` is `None` except for Unknown: `InvalidNumber`, `NotConfigured`, `Unavailable` (transport, 5xx, login
+unavailable), `Timeout`, `AuthenticationFailed` (login failed, or rejected again after one re-login), `Rejected`
+(4xx or application error in the envelope), `IncompleteResponse` (more pages, `RecordCount` above returned items,
+malformed row, missing selected key, conflicting duplicate key, keyless/positional cells, value over a limit),
+`InvalidResponse` (oversized, not JSON, outside the envelope, row for another number).
+Caller cancellation throws `OperationCanceledException`; a dependency timeout is `Unknown/Timeout`.
+
+`ItsmRecord(SourceId, Code, Title, RawStatusCode, RawStage, RawGroup, ProposedStartText, ProposedFinishText)`:
+raw source values. Title is HTML-decoded and trimmed (max 500). Status, stage and group are codes, not meanings
+(ADR-0031 decision 4). Window fields are source text, unparsed; their time zone is not proven. For OR, status,
+stage and window are always null (the OR status field is not evidenced yet). No person field exists.
+
+`Provider` is `Disabled`, `Fake` or `TuruncuHat`. Consumers store it with the result; `Fake` is synthetic.
+
+## Number allow-list
+
+`ItsmRecordNumber.Normalize(kind, value)`: outer whitespace trimmed, prefix `OR-` or `OCO-` (any case, must match
+the kind), then 1-20 ASCII digits; result is upper case. Everything else (quotes, `%`, `#`, inner spaces,
+non-ASCII digits, wrong prefix, >64 input characters) is rejected before any remote call, so the value is placed
+in the filter verbatim. Consumers can call `Normalize` to pre-validate input. The OCO number shape is taken from
+existing synthetic examples; confirm it with the Turuncu Hat team.
+
+## Turuncu Hat wire mapping
+
+One `POST {BaseUrl}/query` per lookup, same envelope and session as ADR-0012. Every ITSM read sends
+`NoEncode=true` (the vendor encodes Turkish characters otherwise; titles are still HTML-decoded defensively) and
+never sends `QueryPermissions` (the source default is SELECT). No page parameter is sent:
+
+| Kind | BaseObject (config) | Filter | Selects |
+|---|---|---|---|
+| OR | `ItsmRecordLookup:OrBaseObject` (expected `SMSS_oRFF`) | `#%m_active%#='True' AND #%p_code%#='<number>'` | `id, p_code, p_name, p_rel_group` |
+| OCO | `ItsmRecordLookup:OcoBaseObject` (expected `SMSS_Operation_Change`) | same | `id, p_code, p_name, p_def_status, p_rel_stage, p_rel_group, p_proposed_start_date_time, p_proposed_finish_date_time` |
+
+Cells are read only by exact `SET.<select>` key; `num` is ignored; extra non-conflicting keys are ignored. The
+row's `SET.p_code` must equal the requested number (case-insensitive). `m_active` only excludes retired records;
+it is not evidence of approval.
+
+Completeness (all ITSM reads): the vendor example uses a 0-based `PageNo`, `MaxPages` 0 on a single page, and
+`RecordCount` as the total across pages (690 records, 10 per page, 69 pages). A response is complete only when
+`MaxPages` and `PageNo` are at most 1 (absent counts as one page) and `RecordCount`, when present, is not above the
+returned rows; anything else is `Unknown/IncompleteResponse`, never a truncated answer. Unit tests pin the vendor
+shapes (single page, empty page, 69 pages, `RecordCount` above rows).
+
+Session: shared `ITuruncuHatSessionManager` (single-flight). On 401/403 the rejected session is invalidated and the
+query is retried once with a new login; a second rejection is `AuthenticationFailed`. A failed login
+(`"<tenant>|0"`-style result) is `AuthenticationFailed` without a query.
+
+Logging and telemetry: warnings carry only kind, reason, HTTP status or `ErrorNo`. Never the session, credentials,
+Authorization header, base URL, number or title. Metric `secureops.integration.operations` with provider
+`TuruncuHat`, operation `itsm-lookup-or|itsm-lookup-oco`, outcome `found|notfound|ambiguous|unknown-<reason>`.
+
+## Configuration
+
+```json
+"ItsmRecordLookup": {
+  "Provider": "Disabled", "OrBaseObject": "", "OcoBaseObject": "",
+  "OrStatusField": "", "OrStageField": "", "CommentMainObject": "", "CommentTimeField": "m_created_dt", "ActivityMainObject": ""
+}
+```
+
+- `Disabled` (default): every lookup is `Unknown/NotConfigured`.
+- `Fake`: Development, Demo and Test only; deterministic placeholders: `OR-000001`/`OCO-000001` Found,
+  `-000002` Ambiguous, `-000003` Unknown/Unavailable, any other valid number NotFound.
+- `TuruncuHat`: requires both base objects and the `TuruncuHat` read settings (HTTPS `BaseUrl` without embedded
+  credentials, `Authorization`, `Username`, `Password`, `TenantId`, session lifetime and HTTP bounds). It does not
+  require the OR-import mapping (`SourceBaseObject`, `RelatedGroupId`, `ExcludedDccIds`). Values come only from
+  server configuration, never from the repository.
+- Unknown provider names fail at startup. Validation runs inside `AddSecureOpsInfrastructure`, so API and Worker
+  both fail fast.
+- Tracking and user-match options (ADR-0032), all empty by default and identifier-validated at startup when the
+  provider is `TuruncuHat`: `OrStatusField` / `OrStageField` (OR source field names; empty means the field is not
+  selected), `CommentMainObject` (the `m_mob` value that identifies an OR in comments; empty makes the comment part
+  `Unknown/NotConfigured`), `CommentTimeField` (default `m_created_dt`, not yet proven for comments),
+  `ActivityMainObject` (optional `m_process.m_main_object` value; empty sends the id-only filter).
+- `Disabled` and `Fake` are chosen once for the lookup, tracking and user-match interfaces together.
+
+## OR tracking (ADR-0032)
+
+`IItsmRecordTracking.GetOrTrackingAsync(string? sourceId, CancellationToken)` takes the numeric source id of an OR
+(`ItsmRecord.SourceId` of a Found lookup; `ItsmSourceId.Normalize`: 1-20 ASCII digits, not all zeros) and returns
+`ItsmRecordTrackingResult(SourceId, Status, Reason, State, Activities, Comments, Provider)`.
+
+- `Status`/`Reason` describe the OR row: Found, NotFound, Ambiguous, Unknown (same rules as the lookup; an
+  invalid id is `Unknown/InvalidIdentifier` with no remote call). `State`, `Activities` and `Comments` are null
+  unless Found.
+- `State = ItsmOrState(LastModifiedText, RawStatusCode, RawStage)`: raw text. `m_last_mod_dt` time-zone semantics
+  are not proven. Status and stage are null unless their field names are configured.
+- `Activities` and `Comments` are `ItsmTrackingPart<T>` (`Known` or `Unknown` + `Reason`). A failed or incomplete
+  part never hides the others and is never shown as "empty".
+- `ItsmActivity(ActivityId, RawGroup, RawStatus, CreatedText, CompletedText)`, ascending by id, at most 50 rows.
+- `ItsmCommentSummary(Count, LastCommentText)`: count of a complete single-page response and the raw creation time
+  of the comment with the highest id (never a text comparison of times).
+
+| Part | BaseObject | Filter | Selects |
+|---|---|---|---|
+| OR header | `ItsmRecordLookup:OrBaseObject` | `#%m_active%#='True' AND #%id%#=<id>` | `id, m_last_mod_dt` + configured status/stage field |
+| Activities | `BPM_Actvty` | `#%m_bpe_actvty_task_model.m_action_type.m_code%#!='WorkflowSystemAction' AND #%m_process.m_main_object_id%#=<id>` (+ ` AND #%m_process.m_main_object%#=<ActivityMainObject>` when set) | `id, m_group, m_status, m_created_dt, m_completion_date` |
+| Comments | `cmn_comment` | `#%m_active%#='True' AND #%m_mob%#=<CommentMainObject> AND #%m_mid%#=<id>` | `id` + `CommentTimeField` |
+
+`m_done_by` (the completing person) and comment text are never selected. `m_group`, `m_completion_date`, the time
+field and the optional header fields may be omitted by the source when empty and read as null; every other selected
+key must be present or the row is malformed (`Unknown/IncompleteResponse`). The `!=` operator and the system-action
+exclusion come from the Turuncu Hat team's description and are unexecuted. Telemetry operations:
+`itsm-tracking-or|itsm-tracking-activities|itsm-tracking-comments`.
+
+## User match (ADR-0032)
+
+`IItsmUserMapping.MatchByUserNameAsync(string? userName, CancellationToken)` returns
+`ItsmUserMatchResult(Status, Reason, User, Provider)` with `Matched | NotMatched | Ambiguous | Unknown` and
+`ItsmUserReference(UserId, OrganizationId, HomeLocationId)`. The requested name is not echoed.
+
+- Call it only with a user name derived from the server-verified session identity. There is no search: the name must
+  pass `ItsmUserName.Normalize` (1-64 ASCII letters, digits, `.`, `_`, `-`, starting with a letter or digit; domain
+  prefix, UPN suffix, spaces, quotes and wildcards are rejected as `Unknown/InvalidIdentifier` without a remote call).
+- Wire: `cmn_user`, filter `#%m_username%#='<name>'`, selects `id, m_username, p_obs_id, m_rel_home_lbs_id`
+  (`m_username` only proves the filter was honoured, case-insensitively; a row for another name is
+  `Unknown/InvalidResponse`). `p_obs_id` and `m_rel_home_lbs_id` may be empty and read as null.
+- **`NotMatched`, `Ambiguous` and `Unknown` are all "no mapping": the consuming flow stops.** The registration
+  number (`c_registration_number`, leading zeros dropped) is deliberately not implemented because the product user
+  record holds no trusted registration number. The phone number (`m_phone_number`) is not selectable.
+- Telemetry operation: `itsm-user-match`.
+
+## Fake providers
+
+`FakeItsmRecordTracking`: source id `900001` Found (two activities, two comments), `900002` Ambiguous, `900003`
+Unknown/Unavailable, `900004` Found with the activity part `Unknown/IncompleteResponse` and zero comments, any other
+valid id NotFound. `FakeItsmUserMapping`: `synthetic.user` Matched, `synthetic.dup` Ambiguous, `synthetic.down`
+Unknown/Unavailable, any other valid name NotMatched. Source id `900001` matches the Fake OR record of the lookup.
+
+## Vendor and team evidence (2026-10-12, sanitized)
+
+Source: the vendor API document and the Turuncu Hat team's two replies (no real address, person, tenant, number or
+registration value is recorded here).
+
+- Endpoints `/login`, `/query`, `/insert`, `/update`, a separate attachment upload; Basic gateway header plus
+  `/login`; `/logout` exists and is not called (the session simply expires).
+- `/query` parameters: `BaseObject, Filters, Selects, NoEncode, Orders, PageCount, PageCounter, QueryPermissions,
+  SessionID, TenantId`. `QueryPermissions` is `SELECT` or `UPDATE`, empty means `SELECT`. `NoEncode=true` returns
+  Turkish characters unencoded.
+- Query response `QueryResult{ErrorDescription, ErrorDetails, ErrorNo, TenantId, Items, MaxPages, PageNo,
+  RecordCount}`; `SET.` is the value or id, `KEY.` the display name, `num` the row number.
+- Object codes seen: OR `SMSS_oRFF`, OCO `SMSS_Operation_Change`, process `BPM_BizPrs`, activity `BPM_Actvty`;
+  user `cmn_user`; comments `cmn_comment` (highest id = newest). Status meanings live in `ROMA_Status`; OR and OCO
+  statuses differ. Field codes can be read in the Turuncu Hat screen with Ctrl + double click.
+- `m_last_mod_dt` is the last-update field (also on OR). Time zone: "as seen in the response, may be +3" (not
+  proven; raw text is shown).
+- Insert example: `Success=true` and `InsertedId` filled while `ErrorDescription`/`ErrorDetails` are also filled
+  ("ignore them"): see `turuncu-hat-jira-contract-gaps.md` and ADR-0032 decision 6.
+
+## Open items (ask the Turuncu Hat team)
+
+1. Sanitized OR, OCO, activity, comment and user query responses for zero and one row (take them in TEST).
+2. Meanings of `p_def_status` and `p_rel_stage` codes; status and stage field names on OR records; `ROMA_Status` fields.
+3. Time zone of `m_last_mod_dt` and of `p_proposed_start_date_time` / `p_proposed_finish_date_time`.
+4. Whether `RecordCount` is the total of the filtered query (the team described it as the object total) and what
+   `PageCount`/`PageCounter` mean (page size?), so the activity and comment reads can request a bounded page.
+5. Exact OR/OCO number formats; the `m_mob` value for OR in `cmn_comment`, whether `cmn_comment` has a creation-time
+   column (default `m_created_dt` is unproven), and the `m_process.m_main_object` value for OR.
+6. Whether the `!=` filter operator with the system-action exclusion works as described.

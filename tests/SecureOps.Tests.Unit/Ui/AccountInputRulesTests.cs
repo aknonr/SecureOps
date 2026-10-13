@@ -119,4 +119,34 @@ public sealed class AccountInputRulesTests
         AccountInputRules.Validate("kullanıcı").IsValid.Should().BeFalse();
         AccountInputRules.Validate("user#1").IsValid.Should().BeFalse();
     }
+
+    [Theory]
+    [InlineData("syn.gmsa$", "syn.gmsa$")]
+    [InlineData("syn.msa$", "syn.msa$")]
+    [InlineData("SYN\\gmsa_app01$", "gmsa_app01$")]
+    public void Validate_AcceptsOneTrailingDollar_ForManagedServiceAccounts(string input, string expected)
+    {
+        // G-26: every gMSA/MSA sAMAccountName ends in '$'; the server accepts exactly one, at the end.
+        AccountValidationResult result = AccountInputRules.Validate(input);
+
+        result.IsValid.Should().BeTrue(result.Message);
+        result.NormalizedPreview.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("$")]
+    [InlineData("SYN\\$")]
+    [InlineData("gmsa$$")]
+    [InlineData("gm$sa")]
+    [InlineData("$gmsa")]
+    [InlineData("gmsa$@contoso.com")]
+    [InlineData("user@contoso$")]
+    public void Validate_RejectsADollarAnywhereElse_AsTheServerDoes(string input)
+    {
+        // Mirrors IdentityProviderInputGuard.HasSafeDollarSuffix: one '$', last, after a nonempty name, never with '@'.
+        AccountValidationResult result = AccountInputRules.Validate(input);
+
+        result.IsValid.Should().BeFalse();
+        result.Message.Should().Contain("$");
+    }
 }

@@ -1,0 +1,61 @@
+@* In-page guide for the Service Accounts pages: a compact strip that shows the page's flow as numbered steps with a gentle
+   animated highlight moving from step to step, and a "Nasıl kullanılır?" disclosure with what the page is for, what each
+   step means and what the page never does. Pure CSS animation (no script); it stops for users who prefer reduced motion.
+   No state is stored: the details start closed (or open when the page asks, e.g. on first setup). *@
+
+<section class="sa-guide" aria-label="@($"{Title}: sayfa rehberi")">
+    <div class="sa-guide-strip">
+        <span class="sa-guide-icon" aria-hidden="true"><MudIcon Icon="@Icons.Material.Filled.Route" Size="Size.Small" /></span>
+        <ol class="sa-guide-flow" style="@($"--sa-guide-steps: {Steps.Count}")" aria-label="Akış">
+            @for (int i = 0; i < Steps.Count; i++)
+            {
+                <li class="sa-guide-step">
+                    <span class="sa-guide-pill" style="@($"--sa-guide-index: {i}")">
+                        <span class="sa-guide-num" aria-hidden="true">@(i + 1)</span>
+                        <span class="sa-guide-name">@Steps[i].Title</span>
+                    </span>
+                </li>
+            }
+        </ol>
+        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => _open = !_open)" aria-expanded="@(_open ? "true" : "false")"
+                   StartIcon="@Icons.Material.Filled.HelpOutline" Class="sa-guide-toggle">@(_open ? "Rehberi kapat" : "Nasıl kullanılır?")</MudButton>
+    </div>
+    @if (_open)
+    {
+        <div class="sa-guide-body">
+            <p class="sa-guide-purpose"><strong>Bu sayfa ne işe yarar?</strong> @Purpose</p>
+            <ol class="sa-guide-details">
+                @foreach ((string title, string text) in Steps)
+                {
+                    <li><strong>@title:</strong> @text</li>
+                }
+            </ol>
+            @if (Never is { Length: > 0 })
+            {
+                <p class="sa-guide-never"><MudIcon Icon="@Icons.Material.Filled.Shield" Size="Size.Small" aria-hidden="true" /> <strong>Bu sayfa şunları yapmaz:</strong> @Never</p>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private bool _open;
+
+    /// <summary>Page or tab name, used in the accessible label.</summary>
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+
+    /// <summary>One or two sentences: what the page is for, in the operator's words.</summary>
+    [Parameter, EditorRequired] public string Purpose { get; set; } = string.Empty;
+
+    /// <summary>The flow, in order: short step name and a one-sentence explanation.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<(string Title, string Text)> Steps { get; set; } = [];
+
+    /// <summary>What the page deliberately never does (permissions, directory or server changes).</summary>
+    [Parameter] public string? Never { get; set; }
+
+    /// <summary>Start with the details open (e.g. while nothing has been set up yet).</summary>
+    [Parameter] public bool StartOpen { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnInitialized() => _open = StartOpen;
+}

@@ -23,6 +23,7 @@ public sealed record AccountValidationResult(
 /// <list type="bullet">
 ///   <item><description><c>DOMAIN\account</c> is accepted; the prefix is stripped, as the server does.</description></item>
 ///   <item><description>UPN-shaped values are accepted because <c>@</c> is inside the server allow-list.</description></item>
+///   <item><description>A gMSA/MSA name keeps its single trailing <c>$</c> (G-26); <c>$</c> elsewhere or with <c>@</c> is rejected.</description></item>
 ///   <item><description>Only genuinely unusable input is blocked: multiple accounts, wildcard and LDAP
 ///   filter characters, and characters outside the allow-list.</description></item>
 /// </list>
@@ -90,9 +91,14 @@ public static class AccountInputRules
             return Invalid("Joker karakter veya arama ifadesi kullanılamaz. Tam hesap adını girin.");
         }
 
-        if (!normalized.All(IsAllowedCharacter))
+        if (!HasSafeDollarSuffix(normalized))
         {
-            return Invalid("Hesap adı yalnızca harf, rakam ve . _ - @ karakterlerini içerebilir.");
+            return Invalid("$ yalnız gMSA/MSA hesap adının sonunda bir kez kullanılabilir (ör. gmsa_uygulama$); UPN biçiminde kullanılamaz.");
+        }
+
+        if (!normalized.TrimEnd('$').All(IsAllowedCharacter))
+        {
+            return Invalid("Hesap adı yalnızca harf, rakam ve . _ - @ karakterlerini içerebilir; gMSA/MSA adında sonda tek $ olabilir.");
         }
 
         string? advisory = null;
@@ -125,7 +131,15 @@ public static class AccountInputRules
         || value.Contains(',', StringComparison.Ordinal)
         || value.Contains(';', StringComparison.Ordinal);
 
-    // Mirrors the configured allow-list "^[a-zA-Z0-9._@-]+$" as a character predicate. A predicate
+    // Mirrors IdentityProviderInputGuard.HasSafeDollarSuffix (G-26): a gMSA/MSA sAMAccountName ends in one '$'; the '$' is
+    // allowed only there, after a nonempty name, and never together with '@' (managed-account UPN forms stay rejected).
+    private static bool HasSafeDollarSuffix(string account)
+    {
+        int index = account.IndexOf('$', StringComparison.Ordinal);
+        return index < 0 || (index > 0 && index == account.Length - 1 && !account.Contains('@', StringComparison.Ordinal));
+    }
+
+    // Mirrors the configured allow-list "^[a-zA-Z0-9._@-]+\$?$" (the optional '$' is checked above) as a character predicate. A predicate
     // avoids running operator-supplied text through a regex engine in the UI process entirely.
     private static bool IsAllowedCharacter(char candidate) =>
         candidate is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or (>= '0' and <= '9')

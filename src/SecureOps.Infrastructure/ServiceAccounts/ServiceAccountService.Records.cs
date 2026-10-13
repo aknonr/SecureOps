@@ -212,13 +212,18 @@ public sealed partial class ServiceAccountService
                 : repository!.DecideHandoverAsync(accountId, id, request, request.Decision == "Accept", caller.Actor, cancellationToken);
         }, cancellationToken);
 
-    /// <summary>Updates gMSA suitability/plan; a suitability decision needs a note and completion needs a real gMSA action.</summary>
+    /// <summary>
+    /// Updates gMSA suitability/plan and the requested gMSA name; a suitability decision needs a note and completion needs a real
+    /// gMSA action. The name follows the shared 15-character rule.
+    /// </summary>
     public Task<SaResult<AccountDetail>> UpdateTransitionAsync(ClaimsPrincipal principal, AccessOperationContext context, Guid id, TransitionUpdateRequest request,
         CancellationToken cancellationToken) =>
         EntityAsync(principal, context, "Transition", id, ServiceAccountCapabilities.Assign, p => p.AssignPerson || p.DecideHandover, (caller, _, accountId) =>
             !Enum.TryParse(request.Suitability, false, out GmsaSuitability suitability) || !ValidText(request.DecisionNote, 2000)
                 || suitability is GmsaSuitability.Eligible or GmsaSuitability.Ineligible && string.IsNullOrWhiteSpace(request.DecisionNote)
                 ? Task.FromResult(SaResult<Guid>.Fail(SaErrors.Invalid, "decisionNote"))
+                : RequestedGmsaNameError(request.RequestedGmsaName, null) is { } nameError
+                ? Task.FromResult(SaResult<Guid>.Fail(SaErrors.Invalid, nameError))
                 : repository!.UpdateTransitionAsync(accountId, id, request, caller.Actor, cancellationToken), cancellationToken);
 
     /// <summary>Stores evidence for an in-scope entity (type and size bounded, hash recorded).</summary>
@@ -244,8 +249,7 @@ public sealed partial class ServiceAccountService
                 _ => false
             };
             string safeName = SafeName(fileName);
-            if (!owned || content.Length == 0 || content.Length > _options.MaxEvidenceBytes || !_evidenceTypes.Contains(contentType, StringComparer.OrdinalIgnoreCase)
-                || !SignatureMatches(contentType, content) || !ValidText(label, 400))
+            if (!owned || !EvidenceFileAcceptable(contentType, content, label))
             {
                 return Task.FromResult(SaResult<Guid>.Fail(SaErrors.Invalid, owned ? "file" : "ownerId"));
             }
@@ -259,7 +263,11 @@ public sealed partial class ServiceAccountService
         RunAsync(principal, context, ServiceAccountCapabilities.View, async caller =>
         {
             EvidenceFile? file = await repository!.EvidenceAsync(id, cancellationToken);
-            bool visible = file is not null && (file.AccountId is { } account
+            // Plan evidence (034) is visible only to a caller whose scope covers every account of the plan; its account anchor
+            // exists only for the database constraint.
+            bool visible = file is not null && (file.OwnerEntityType == SqlServiceAccountRepository.PlanEvidenceOwner
+                ? await VisiblePlanAsync(caller, file.OwnerEntityId, cancellationToken) is not null
+                : file.AccountId is { } account
                 ? await repository.AnchorAsync(account, cancellationToken) is { } anchor && caller.Scope.Covers(anchor.Anchor)
                 : caller.Scope.CoversTeam(file.ScopeTeamId));
             if (!visible)
@@ -270,6 +278,11 @@ public sealed partial class ServiceAccountService
             await repository.AuditReadAsync("EvidenceDownloaded", new { EvidenceId = id, file!.AccountId }, caller.Actor, cancellationToken);
             return new EvidenceDownload(file.FileName, file.ContentType, file.Content);
         }, cancellationToken);
+
+    /// <summary>Shared evidence file checks (account and plan evidence): size, allowed type, signature, label length.</summary>
+    private bool EvidenceFileAcceptable(string? contentType, byte[] content, string? label) =>
+        contentType is not null && content.Length > 0 && content.Length <= _options.MaxEvidenceBytes
+        && _evidenceTypes.Contains(contentType, StringComparer.OrdinalIgnoreCase) && SignatureMatches(contentType, content) && ValidText(label, 400);
 
     private static bool SignatureMatches(string contentType, byte[] content) => contentType.ToLowerInvariant() switch
     {

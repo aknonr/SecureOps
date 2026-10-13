@@ -49,7 +49,7 @@ async function capture(page, out, name) {
 }
 
 async function apiContext(request, api, actor = 'platform-admin') {
-    return request.newContext({ baseURL: api.href, extraHTTPHeaders: { 'X-SecureOps-Demo-Actor': actor } });
+    return request.newContext({ baseURL: api.href, extraHTTPHeaders: { 'X-SecureOps-Demo-Actor': actor, 'X-SecureOps-Csrf': '1' } });
 }
 
 async function json(client, route, options = {}) {

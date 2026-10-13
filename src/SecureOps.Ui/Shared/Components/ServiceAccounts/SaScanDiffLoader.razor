@@ -1,0 +1,49 @@
+@* Loads the server-side comparison of one scan with the previous scan of the same purpose (G-33) only when the person asks,
+   so opening the scan tab costs no extra calls. Loading, failure and "no older scan" are distinct states; a failure is
+   shown by the page's problem panel and the button stays available. Read only. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+
+@if (_diff is null)
+{
+    <p class="so-panel-text--sm">Sunucu, bu taramayı aynı türdeki bir önceki taramayla tüm eşleşmeler üzerinden karşılaştırır; sayfalanan liste karşılaştırmayı etkilemez.</p>
+    <MudButton Size="Size.Small" Variant="Variant.Outlined" Disabled="@(Busy || _loading)" StartIcon="@Icons.Material.Filled.CompareArrows" OnClick="@(() => LoadAsync(1))">
+        @(_loading ? "Karşılaştırılıyor…" : "Önceki taramayla karşılaştır")
+    </MudButton>
+    @if (_failed)
+    {
+        <p class="so-panel-text--sm mt-1" role="status">Karşılaştırma okunamadı; sayfanın üstündeki hata açıklamasına bakın ve yeniden deneyin.</p>
+    }
+}
+else
+{
+    <SaScanDiffView Diff="_diff" Busy="@(Busy || _loading)" OnPage="LoadAsync" />
+}
+
+@code {
+    private UsageScanDiffView? _diff;
+    private bool _loading, _failed;
+
+    /// <summary>The linked scan to compare.</summary>
+    [Parameter, EditorRequired] public Guid LinkId { get; set; }
+
+    /// <summary>Loads one page of the comparison (null when the call failed).</summary>
+    [Parameter, EditorRequired] public Func<Guid, int, Task<UsageScanDiffView?>> Load { get; set; } = default!;
+
+    /// <summary>A page call is in flight.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    private async Task LoadAsync(int page)
+    {
+        (_loading, _failed) = (true, false);
+        try
+        {
+            UsageScanDiffView? result = await Load(LinkId, page);
+            _failed = result is null;
+            _diff = result ?? _diff;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

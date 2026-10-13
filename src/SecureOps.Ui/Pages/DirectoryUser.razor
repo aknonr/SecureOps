@@ -224,6 +224,8 @@
                         <SoField Label="Departman">@DisplayText(user.Department)</SoField>
                         <SoField Label="Ünvan">@DisplayText(user.Title)</SoField>
                         <SoField Label="Yönetici">@DisplayText(user.ManagerDisplayName)</SoField>
+                        @* G-26: the object class the directory reported, not a verdict about how the account is used. *@
+                        <SoField Label="Dizin nesne türü">@DirectoryView.AccountTypeEvidenceLabel(user.AccountTypeEvidence)</SoField>
                         <SoField Label="Hesap Durumu">
                             <div class="so-inline-badges">
                                 <SoStatusBadge Label="@EnabledText(user.Enabled)" Tone="@EnabledTone(user.Enabled)" />

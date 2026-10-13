@@ -79,7 +79,7 @@ public sealed class OidcApiAuthenticationTests
     {
         using WebApplicationFactory<Program> factory = CreateFactory(demoEnabled: true);
         using HttpClient oidc = Client(factory, Token("synthetic-subject", "operator.one"));
-        using HttpClient demo = factory.CreateClient();
+        using HttpClient demo = factory.CreateApiClient();
         demo.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
 
         IAuthenticationSchemeProvider schemes = factory.Services.GetRequiredService<IAuthenticationSchemeProvider>();
@@ -331,7 +331,7 @@ public sealed class OidcApiAuthenticationTests
 
     private static HttpClient Client(WebApplicationFactory<Program> factory, string token)
     {
-        HttpClient client = factory.CreateClient();
+        HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return client;
     }

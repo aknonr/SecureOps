@@ -76,7 +76,7 @@
 
     @if (Detail.Permissions.CanWorkAnyRequest)
     {
-        <MudExpansionPanels Class="mt-2"><MudExpansionPanel Text="İşlem bildir">
+        <SaDisclosure Class="mt-2" Title="İşlem bildir">
             <MudGrid Spacing="2">
                 <MudItem xs="12" md="4">
                     <MudSelect T="string" @bind-Value="_report.ActionType" Label="İşlem" Variant="Variant.Outlined">
@@ -118,7 +118,7 @@
                 <MudItem xs="12" md="4"><MudTextField @bind-Value="_report.EvidenceNote" Label="Kanıt notu" MaxLength="2000" Variant="Variant.Outlined" /></MudItem>
             </MudGrid>
             <MudButton OnClick="ReportAsync" Disabled="@(Busy || !Detail.Permissions.Work && _report.RequestId is null)" Variant="Variant.Filled" Color="Color.Primary" Class="mt-2">Bildirimi kaydet</MudButton>
-        </MudExpansionPanel></MudExpansionPanels>
+        </SaDisclosure>
     }
 </section>
 

@@ -105,7 +105,7 @@ public sealed class AccessModuleHostedTests
 
     private static HttpClient Client(WebApplicationFactory<Program> factory, string actor)
     {
-        HttpClient client = factory.CreateClient();
+        HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", actor);
         return client;
     }

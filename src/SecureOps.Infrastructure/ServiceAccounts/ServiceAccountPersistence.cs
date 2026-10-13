@@ -48,6 +48,18 @@ public static class SaErrors
     public const string AlreadyImported = "ServiceAccountImportAlreadyCommitted";
     /// <summary>Idempotency key missing or invalid.</summary>
     public const string IdempotencyKey = "ServiceAccountIdempotencyKeyRequired";
+    /// <summary>Usage-scan upload refused (the field names the stable reason; nothing from the file is stored).</summary>
+    public const string UsageScanFile = "ServiceAccountUsageScanRejected";
+    /// <summary>A matched scan component already has a decision for this account (decisions are kept, never replaced).</summary>
+    public const string AlreadyDecided = "ServiceAccountUsageScanAlreadyDecided";
+    /// <summary>Change plan tables (migration 033) are not installed on this database.</summary>
+    public const string ChangePlansNotInstalled = "ServiceAccountChangePlansNotInstalled";
+    /// <summary>One or more accounts of a plan request were refused; nothing was written (per-account results in <c>current</c>).</summary>
+    public const string ChangePlanAccountsRefused = "ServiceAccountChangePlanAccountsRefused";
+    /// <summary>The plan is not in the state the command needs, or the approved preview is no longer the current one.</summary>
+    public const string ChangePlanState = "ServiceAccountChangePlanStateConflict";
+    /// <summary>Plan evidence (migration 034: Evidence owner type ChangePlan) is not installed on this database.</summary>
+    public const string ChangePlanEvidenceNotInstalled = "ServiceAccountChangePlanEvidenceNotInstalled";
 }
 
 /// <summary>Scope inputs loaded for one caller.</summary>

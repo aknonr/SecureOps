@@ -1,0 +1,76 @@
+@* "Sıradaki adım": what is open on this account, ordered from the loaded detail only (no new data, no write). A step the
+   caller may not take is shown as waiting for someone else; missing data is shown as unknown, never as "not used"; an empty
+   list says only that this screen knows of nothing pending. The server still decides every command. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<section class="so-panel sa-next" aria-labelledby="sa-next-title">
+    <div class="so-panel-head">
+        <h2 id="sa-next-title" class="so-panel-title">Sıradaki adım</h2>
+        @if (_steps.Count > 1) { <span class="so-panel-text--sm">+@(_steps.Count - 1) bekleyen daha</span> }
+    </div>
+    @if (_steps.Count == 0)
+    {
+        <p class="so-panel-text">Bu ekranın bildiği verilere göre bekleyen bir adım görünmüyor. Bu, hesabın kapandığı veya doğrulandığı anlamına gelmez.</p>
+    }
+    else
+    {
+        <ol class="sa-next-list" aria-label="Bekleyen adımlar, önem sırasıyla">
+            @foreach ((SaNextStep step, int index) in _steps.Select((s, i) => (s, i)))
+            {
+                <li class="@(index == 0 ? "sa-next-first" : null)">
+                    <div>
+                        <SoStatusBadge Label="@KindLabel(step.Kind)" Tone="@Tone(step.Kind)" Icon="@Icon(step.Kind)" />
+                        <strong class="sa-next-title">@step.Title</strong>
+                        <div class="so-panel-text--sm">@step.Reason</div>
+                    </div>
+                    <MudButton Size="Size.Small" Variant="@(index == 0 ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" OnClick="@(() => OnOpen.InvokeAsync((int)step.Tab))"
+                               aria-label="@($"{step.Title}: {TabName(step.Tab)} sekmesini aç")">@TabName(step.Tab) sekmesi</MudButton>
+                </li>
+            }
+        </ol>
+    }
+</section>
+
+@code {
+    private IReadOnlyList<SaNextStep> _steps = [];
+
+    /// <summary>The loaded account detail; steps are recomputed whenever it is replaced.</summary>
+    [Parameter, EditorRequired] public AccountDetail Detail { get; set; } = default!;
+
+    /// <summary>Opens the tab where the step is worked on (tab index).</summary>
+    [Parameter] public EventCallback<int> OnOpen { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet() => _steps = ServiceAccountNextStep.Compute(Detail);
+
+    private static string TabName(SaTab tab) => tab switch
+    {
+        SaTab.Work => "İşler",
+        SaTab.Usage => "Kullanım ve kural",
+        SaTab.Scan => "Kullanım taraması",
+        SaTab.Ownership => "Sahiplik",
+        _ => "Devir ve gMSA"
+    };
+
+    private static string KindLabel(SaNextStepKind kind) => kind switch
+    {
+        SaNextStepKind.Act => "Sizden bekleniyor",
+        SaNextStepKind.Wait => "Başkasından bekleniyor",
+        _ => "Bilgi eksik"
+    };
+
+    private static SoStatusBadge.BadgeTone Tone(SaNextStepKind kind) => kind switch
+    {
+        SaNextStepKind.Act => SoStatusBadge.BadgeTone.Caution,
+        SaNextStepKind.Wait => SoStatusBadge.BadgeTone.Neutral,
+        _ => SoStatusBadge.BadgeTone.Info
+    };
+
+    private static string Icon(SaNextStepKind kind) => kind switch
+    {
+        SaNextStepKind.Act => Icons.Material.Filled.PriorityHigh,
+        SaNextStepKind.Wait => Icons.Material.Filled.HourglassEmpty,
+        _ => Icons.Material.Filled.HelpOutline
+    };
+}

@@ -71,3 +71,21 @@ Rejected. It creates unnecessary directory browsing risk and conflicts with the 
 ADR-0025 adds one bounded, prefix-only name search inside the Service Accounts module (3+ letters, at most 10 results,
 three returned fields, `Identity.Lookup` plus module View, same rate limit, name-free audit). Exact lookup described
 above is unchanged and remains the only platform-wide identity endpoint. Broad wildcard search stays rejected.
+
+## Clarification (2026-10-07): Exact managed service accounts (G-26)
+
+The owner's G-26 request includes gMSA and standalone MSA in the existing exact account lookup.
+One trailing `$` is allowed on a nonempty sAMAccountName; `$` elsewhere and UPN-shaped managed
+account input are rejected. These accounts use an exact sAMAccountName LDAP filter restricted to
+`msDS-GroupManagedServiceAccount` or `msDS-ManagedServiceAccount`, with exact-name and class
+checks on the result, a two-result ambiguity bound, time limits and no referral chasing.
+Ordinary computer accounts are excluded. Normal user/UPN resolution is unchanged.
+
+Only explicitly projected operational metadata may be read. Password material, including
+`msDS-ManagedPassword`, `unicodePwd`, `dBCSPwd` and password history, must never be requested,
+returned or logged. `AccountTypeEvidence` uses the existing Directory Explorer values and is
+added to the identity response. No general search or new endpoint is introduced. The optional
+`msDS-GroupMSAMembership` name projection is deferred; it is not read in this implementation.
+
+Schema references: Microsoft [gMSA class](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adsc/219549d4-39eb-4771-bb8c-b3593ff6be48)
+and [MSA class](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adsc/8a8a0e72-5f59-46b3-b181-bd0185813d36).

@@ -96,7 +96,9 @@ public sealed partial class SqlServiceAccountRepository
         parameters.AddDynamicParams(new { Id = key, Name = clean, Key = ServiceAccountText.LabelKey(clean), now, actor.UserId, RowVer = Version(expectedVersion) });
         await using SqlConnection connection = await OpenAsync(cancellationToken);
         await using SqlTransaction transaction = await BeginWriteAsync(connection, cancellationToken, IsolationLevel.Serializable);
-        if (await connection.ExecuteScalarAsync<int>(Cmd($"SELECT COUNT(*) FROM svcacct.{table} WHERE NormalizedName = @Key AND Id <> @Id;", parameters, transaction, cancellationToken)) > 0)
+        // UPDLOCK turns the serializable range lock of this check into an update-range lock, so two concurrent saves wait for
+        // each other instead of both holding a shared range and deadlocking on the insert (seen on fresh, empty tables).
+        if (await connection.ExecuteScalarAsync<int>(Cmd($"SELECT COUNT(*) FROM svcacct.{table} WITH (UPDLOCK, HOLDLOCK) WHERE NormalizedName = @Key AND Id <> @Id;", parameters, transaction, cancellationToken)) > 0)
         {
             return SaResult<Guid>.Fail(SaErrors.Invalid, "name");
         }
@@ -148,7 +150,7 @@ public sealed partial class SqlServiceAccountRepository
         string? upn = ServiceAccountText.Clean(request.Upn)?.ToLowerInvariant();
         string? objectId = ServiceAccountText.Clean(request.DirectoryObjectId);
         if (await connection.ExecuteScalarAsync<int>(Cmd("""
-            SELECT COUNT(*) FROM svcacct.People WHERE Id <> @id AND ((@upn IS NOT NULL AND Upn = @upn) OR (@objectId IS NOT NULL AND DirectoryObjectId = @objectId));
+            SELECT COUNT(*) FROM svcacct.People WITH (UPDLOCK, HOLDLOCK) WHERE Id <> @id AND ((@upn IS NOT NULL AND Upn = @upn) OR (@objectId IS NOT NULL AND DirectoryObjectId = @objectId));
             """, new { id, upn, objectId }, transaction, cancellationToken)) > 0)
         {
             return SaResult<Guid>.Fail(SaErrors.Invalid, "upn");
@@ -179,7 +181,7 @@ public sealed partial class SqlServiceAccountRepository
         await using SqlTransaction transaction = await BeginWriteAsync(connection, cancellationToken, IsolationLevel.Serializable);
         int inserted = await connection.ExecuteAsync(Cmd("""
             IF EXISTS (SELECT 1 FROM svcacct.People WHERE Id = @id)
-               AND NOT EXISTS (SELECT 1 FROM svcacct.PersonAliases WHERE PersonId = @id AND AliasNormalized = @key)
+               AND NOT EXISTS (SELECT 1 FROM svcacct.PersonAliases WITH (UPDLOCK, HOLDLOCK) WHERE PersonId = @id AND AliasNormalized = @key)
                 INSERT INTO svcacct.PersonAliases(Id, PersonId, Alias, AliasNormalized, Evidence, CreatedAt, CreatedBy)
                 VALUES(NEWID(), @id, @alias, @key, @evidence, @now, @UserId);
             """, new { id, alias, key = ServiceAccountText.LabelKey(alias), evidence = request.Evidence.Trim(), now, actor.UserId }, transaction, cancellationToken));
@@ -220,6 +222,7 @@ public sealed partial class SqlServiceAccountRepository
         DateTimeOffset now = DateTimeOffset.UtcNow;
         await using SqlConnection connection = await OpenAsync(cancellationToken);
         await using SqlTransaction transaction = await BeginWriteAsync(connection, cancellationToken, IsolationLevel.Serializable);
+        await LockScopeGrantsAsync(connection, transaction, cancellationToken);
         if (await connection.ExecuteScalarAsync<int>(Cmd("""
             SELECT COUNT(*) FROM svcacct.ScopeGrants WITH (UPDLOCK, HOLDLOCK) WHERE UserId = @userId AND RevokedAt IS NULL AND ScopeKind = @Kind
               AND ISNULL(OrganizationId, '00000000-0000-0000-0000-000000000000') = ISNULL(@organizationId, '00000000-0000-0000-0000-000000000000')
@@ -237,6 +240,78 @@ public sealed partial class SqlServiceAccountRepository
         await AuditAsync(connection, transaction, "ScopeGranted", new { Id = id, TargetUserId = userId, Kind = kind.ToString(), organizationId, teamId }, actor, now, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return id;
+    }
+
+    /// <summary>Whether the one-time bootstrap guard exists and whether any grant (active or revoked) or bootstrap row was ever recorded.</summary>
+    public async Task<(bool SchemaReady, bool AnyGrant, bool BootstrapUsed)> ScopeBootstrapStateAsync(CancellationToken cancellationToken)
+    {
+        await using SqlConnection connection = await OpenAsync(cancellationToken);
+        bool ready = await connection.ExecuteScalarAsync<int>(Cmd(
+            "SELECT CASE WHEN COL_LENGTH(N'svcacct.ScopeGrants', N'IsBootstrap') IS NULL THEN 0 ELSE 1 END;", null, null, cancellationToken)) == 1;
+        bool any = await connection.ExecuteScalarAsync<int>(Cmd("SELECT CASE WHEN EXISTS (SELECT 1 FROM svcacct.ScopeGrants) THEN 1 ELSE 0 END;",
+            null, null, cancellationToken)) == 1;
+        bool used = ready && await connection.ExecuteScalarAsync<int>(Cmd(
+            "SELECT CASE WHEN EXISTS (SELECT 1 FROM svcacct.ScopeGrants WHERE IsBootstrap = 1) THEN 1 ELSE 0 END;", null, null, cancellationToken)) == 1;
+        return (ready, any, used);
+    }
+
+    /// <summary>
+    /// The one-time first grant (ADR-0026): "All" scope to the caller, only while no grant row exists at all. Serializable
+    /// and range-locked, and the schema allows a single bootstrap row ever, so two concurrent attempts commit at most once.
+    /// </summary>
+    public async Task<SaResult<Guid>> BootstrapGrantAsync(Guid userId, string reason, SaActor actor, CancellationToken cancellationToken)
+    {
+        var id = Guid.NewGuid();
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        await using SqlConnection connection = await OpenAsync(cancellationToken);
+        await using SqlTransaction transaction = await BeginWriteAsync(connection, cancellationToken, IsolationLevel.Serializable);
+        await LockScopeGrantsAsync(connection, transaction, cancellationToken);
+        if (await connection.ExecuteScalarAsync<int>(Cmd(
+            "SELECT CASE WHEN COL_LENGTH(N'svcacct.ScopeGrants', N'IsBootstrap') IS NULL THEN 0 ELSE 1 END;", null, transaction, cancellationToken)) == 0)
+        {
+            return SaResult<Guid>.Fail(SaErrors.Forbidden, "bootstrapSchema");
+        }
+
+        if (await connection.ExecuteScalarAsync<int>(Cmd("SELECT COUNT(*) FROM svcacct.ScopeGrants WITH (UPDLOCK, HOLDLOCK);", null, transaction,
+            cancellationToken)) > 0)
+        {
+            return SaResult<Guid>.Fail(SaErrors.Forbidden, "bootstrapClosed");
+        }
+
+        try
+        {
+            await connection.ExecuteAsync(Cmd("""
+                INSERT INTO svcacct.ScopeGrants(Id, UserId, ScopeKind, OrganizationId, TeamId, Reason, GrantedBy, GrantedAt, IsBootstrap)
+                VALUES(@id, @userId, 'All', NULL, NULL, @reason, @userId, @now, 1);
+                """, new { id, userId, reason, now }, transaction, cancellationToken));
+        }
+        catch (SqlException ex) when (ex.Number is 2601 or 2627 or 547)
+        {
+            return SaResult<Guid>.Fail(SaErrors.Forbidden, "bootstrapClosed");
+        }
+
+        await HistoryAsync(connection, transaction, "ScopeGrant", id, null, "Bootstrapped", new { userId, Kind = "All" }, reason, actor, now, cancellationToken);
+        await AuditAsync(connection, transaction, "ScopeBootstrapped", new { Id = id, TargetUserId = userId, Kind = "All" }, actor, now, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return id;
+    }
+
+    /// <summary>
+    /// Serializes scope-grant writers. The bootstrap range-locks the whole table while ordinary grants range-lock one key;
+    /// without a common lock taken first the two can deadlock on the insert's range conversion.
+    /// </summary>
+    private static async Task LockScopeGrantsAsync(SqlConnection connection, SqlTransaction transaction, CancellationToken cancellationToken)
+    {
+        int result = await connection.ExecuteScalarAsync<int>(Cmd("""
+            DECLARE @result int;
+            EXEC @result = sys.sp_getapplock @Resource = N'SecureOps.ServiceAccounts.ScopeGrants.v1', @LockMode = 'Exclusive', @LockOwner = 'Transaction',
+                @LockTimeout = 10000;
+            SELECT @result;
+            """, null, transaction, cancellationToken));
+        if (result < 0)
+        {
+            throw new TimeoutException("Scope grant lock unavailable.");
+        }
     }
 
     /// <summary>Revokes a grant (history kept).</summary>

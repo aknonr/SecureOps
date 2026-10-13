@@ -39,6 +39,55 @@ Open UI ↔ API contract gaps: [`docs/26-ui-backend-contract-gaps.md`](../../doc
 Below this point: reference sections (Layout to Testing) and dated handoff logs, kept with their source SHAs and
 evidence paths. Search for the feature or date you need rather than reading top to bottom.
 
+## gMSA change plan UI (d, PR 3), 2026-10-12
+
+Branch `feature/service-accounts-change-plan-ui-20261012`, cut from the API branch `feature/service-accounts-change-plan-api-20261007`
+(`db56856`, contract `0400d58`); not merged. Routes `/service-accounts/plans` and `/service-accounts/plans/{id}` (table above), written only
+against the pinned contract; no backend, SQL or DTO change.
+
+- Honest states: loading / empty / error / denied / unknown are separate. A 409 adopts the plan the server returned in `current` and says nothing
+  was saved; a refused create/update shows each account's answer next to its row and keeps what was typed (an answer disappears from a row once its
+  name is edited); a failure is shown next to the action that raised it, not only at the top of a long page.
+- Server decides: edit, preview, approve and cancel appear only when `permissions` allow; the approval form is not shown to a planner, a previewer or an
+  editor (`approveBlockedReason` is explained instead). Approval carries the preview version and SHA-256 and a confirmation that names them.
+- Wording: `NothingFound` is "Taramada bulunamadı" and never "kullanılmıyor"; "Bilgi yok" for no scan; IIS site/application/virtual-directory
+  rows are "Elle yapılacak" in the work list; "Yapıldı kişinin beyanıdır, doğrulama değildir".
+- (Superseded by the F3 section below: checklist marking, plan evidence and closing are now in the UI.)
+- Focus: the module's four hand-written pagers now use one component, `SaPager`. Its buttons are never `disabled` (they use `aria-disabled` and
+  ignore the click while busy or at an edge), so keyboard focus is not dropped to the page when a page changes or the last page is reached.
+- OCO number (F2, 2026-10-12): the server validates and upper-cases it (max 64, A-Z 0-9 - _ . /, starts with a letter or digit, at least one
+  digit; else 400 field `ocoNumber`). The form only describes the rule as a hint, has no client-side rule, and shows the server's refusal under the
+  field (the draft stays); after approval the text says the server validated and upper-cased it, and that ITSM was not queried.
+- Dates in the approval window are native `datetime-local` inputs plus an explicit UTC offset (default: the UI host's offset), sent as
+  `DateTimeOffset`; every window is displayed with its offset.
+- Tests: `ServiceAccountChangePlanUiTests` (27 cases: step flow per status, flag wording, counters/rows, work list, pager focus, approval form
+  gating through the real page against a canned API, 404 state, no password field, focus-ring CSS, every pager uses `SaPager`).
+
+## gMSA change plan UI (d, PR 4 = F3): checklist, plan evidence, closing, 2026-10-12
+
+Branch `feature/service-accounts-change-plan-checklist-ui-20261012`, cut from master `d3eed21` (PR 2 routes merged in #36); UI/docs/tests only,
+no backend, SQL or DTO change. Closes [G-36](../../docs/26-ui-backend-contract-gaps.md) item 1.
+
+- Checklist (step 4): per preview row the latest mark (text + icon: Yapıldı / Atlandı / Başarısız / Geri alındı / İşaretlenmedi), author, time and
+  note, a "Pencere dışında" label when the server says so, and counters from `checklist`. Marking is a native `details` form per row
+  (`SaPlanCheckRow`) with radio states and a note; it exists only when `permissions.check` is true. Not-Done states need a note (hint, the button
+  waits for it; the server decides); "Geri alındı" is offered only when the latest state is Done or Failed (hint; the server answers 409
+  `nothingToRollBack`). Each mark sends `expectedCheckId`; 409 `checkStale` (or any 409) adopts the plan the server returned, re-reads the rows and
+  keeps the typed note, and says nothing was saved. A saved mark clears only its own form.
+- "Yapıldı kişinin beyanıdır, doğrulama değildir" stays on the checklist, the closing form and the closed plan; no text says a server was changed or an
+  account verified. The pre-approval step and the expired-window note are unchanged (the label itself comes from the server).
+- Plan evidence (`SaPlanEvidence`): list (name, size, time, download through the existing `GET evidence/{id}` route) and upload (multipart
+  `POST change-plans/{id}/evidence`) only with `permissions.uploadEvidence`. File type/size hints are shared with account evidence
+  (`SaEvidenceFileRules`; the server checks the signature). 503 without migration 034 is shown as "Plan kanıtı bu ortamda kurulu değil", file not saved.
+- Closing (`SaPlanComplete`): form only with `permissions.complete`; a confirmation names that Yapıldı is a statement, that no account is verified and
+  no request is closed, then `POST complete` with `expectedVersion`. Otherwise the page says what is missing (N rows unmarked, or no right). After
+  closing, the account table shows the server's `outcomeLabel` per account; "Performed" says an unverified action record exists and verification is
+  done separately on the account page.
+- `PlanStepState.NotAvailable` is gone (nothing produces it any more); step 4 is "Sırada" from Approved on, "Tamamlandı" when closed.
+- Verified live on the local Demo (see PROGRESS.md "PR 4"); the server's own `stateLabel` ("Yapıldı (kişinin beyanı, doğrulama değil)") is shown as sent.
+- Tests: `ServiceAccountChangePlanUiTests` grew to 49 cases (checklist read-only vs. with form, radio counts, window label/counters, offered states,
+  field wording, evidence list/upload gating and file hints, closing gating, completed page outcome).
+
 ## PR #4 Windows Verification, 2026-10-02
 
 The Resources/personal shift-group source from 286fac7 was verified on Windows
@@ -407,10 +456,12 @@ have to be invented.
 | `/resources` | Uygulama Bağlantıları: search, favourites, add to a personal group | `Resources.View` |
 | `/resources/sets` | Bağlantı Gruplarım: personal ordered groups, preferred group, opening | `Resources.View` |
 | `/admin/resources` | Bağlantı Yönetimi: shared categories and links | `Resources.View` and `Resources.Manage` |
-| `/service-accounts` | Servis Hesapları: entry work summary, scoped list and filters; bounded directory name search panel (ADR-0025) | `ServiceAccounts.View` and scope grant; the name search also needs `Identity.Lookup` |
+| `/service-accounts` | Servis Hesapları: entry work summary, scoped list and filters; selected accounts take one mail record or one usage-scan file; bounded directory name search panel (ADR-0025) | `ServiceAccounts.View` and scope grant; the name search also needs `Identity.Lookup` |
 | `/service-accounts/{id}` | Account detail, work, usages with the explained knowledge-base rule, evidence and history | `ServiceAccounts.View`; commands require their own capability (rule exception: `ServiceAccounts.Verify`) |
 | `/service-accounts/work` | Entry work summary, in-app reminders and unsent coordinator drafts | `ServiceAccounts.View` |
-| `/service-accounts/imports` | Import preview, decisions and idempotent commit | `ServiceAccounts.Import` and organization scope |
+| `/service-accounts/plans` | gMSA change plans: scoped list (only plans whose every account is in scope), status filter, `?accountId=` filter, create a Draft plan from searched accounts | `ServiceAccounts.View`; creating needs `ServiceAccounts.Work` |
+| `/service-accounts/plans/{id}` | One plan as five steps (Plan → Önizleme → Onay → Kontrol listesi → Doğrulama): account editor, preview with flag counters and paged rows, approval bound to one preview version and digest, read-only work list, cancel, event history | `ServiceAccounts.View`; edit, preview and cancel offered only when the server's `permissions` say so; approval form only when `permissions.approve` |
+| `/service-accounts/imports` | Import guide (tracking workbook once, weekly list, DBA list), preview, decisions and idempotent commit; without organization scope it explains how another module administrator grants it | `ServiceAccounts.Import` and organization scope |
 | `/service-accounts/reports` | Live report (directorate view, rules, gMSA funnel, trend, risk candidates), immutable snapshots, snapshot comparison, XLSX/PDF | `ServiceAccounts.Report` |
 | `/service-accounts/admin` | Scope grants, dictionaries and gMSA routing team roles | `ServiceAccounts.Administer` |
 | `/in-use`, `/in-use/{id}` | In Use local review workspace | `InUse.View`; review, assign, refresh and completion need their own capability |
@@ -2301,6 +2352,26 @@ Migrations 001-010 and the reviewed object grants must be applied, and an API bu
 happened yet. `ResourceCurator` is assigned by an existing Admin through
 `PUT /api/v1/access/users/{id}/roles`; no migration or task assigns it.
 
+## Service Accounts multi-account scan upload (2026-10-06)
+
+On `/service-accounts`, selecting accounts (Work capability) offers "Tek tarama dosyasını bu hesaplara bağla":
+`SaUsageScanBatchForm` sends one file, the run statement and the selected ids (repeated `accountIds` field) to
+`POST /api/v1/service-accounts/usage-scans` and shows the server's answer per account: a short text badge (Bağlandı, Zaten
+bağlıydı, Aranmamış, Belirsiz, Bulunamadı / yetki yok, Kaydedilemedi; never colour alone) plus the server's own wording.
+An account the server returns without a name is shown as "Bulunamadı veya kapsamınızda değil" (or "Hesap bilgisi okunamadı"
+for a `Failed` row whose account could not be read, since 2026-10-07), never with the list label.
+A refused file uses the existing usage-scan problem texts; nothing is stored. The selection stays after an upload so a
+failed row can be retried. Tests: `tests/SecureOps.Tests.Unit/Ui/ServiceAccountUsageScanBatchUiTests.cs`.
+
+2026-10-07 review fixes: the badge for `NotInScan` reads "Aranmamış" (the file did not search the account; earlier "Dosyada
+yok"). A new upload clears the previous answer first; a failed upload is shown inside the form (`Problem` parameter, shared
+`SaProblem`) and its "Tekrar dene" repeats the upload with the current file, statement and selection — the page-level
+problem panel (whose retry reloads the list) is kept only for session/access problems. The send button is never
+`disabled`: while not ready it is `aria-disabled="true"`, stays in the tab order (typing the statement and pressing Tab
+reaches it even before the server re-renders), does nothing when activated, and points with `aria-describedby` to a line
+that says what is missing (selection, more than 20, file, statement of at least 5 characters, upload in progress). The
+"Tek e-posta kaydını…" and "Tek tarama dosyasını…" toggles carry `aria-expanded`.
+
 ## HTTPS offload behind the corporate load balancer
 
 TLS terminates at the F5 and the backend hop to IIS is cleartext HTTP. Antiforgery and the session
@@ -2389,6 +2460,11 @@ See `docs/agent-guides/060-ui.md`. Highlights:
 
 ## Running locally
 
+All shared server-side API clients send the public `X-SecureOps-Csrf: 1` request
+intent header (ADR-0029). Browser Origin/Fetch Metadata is not forwarded. Direct
+unsafe API scripts need this header too; a headerless client receives 403. The UI's
+existing antiforgery, authentication and API session transport remain required.
+
 Two hosts. Start the API first:
 
 ```powershell
@@ -2439,6 +2515,40 @@ open the exact owned draft; access/synthetic/historical limitations stay visible
 An unavailable response retains the previous cut and restores its applied filters.
 This is not target activation or an employee productivity ranking. See
 `docs/integrated-test-activation.md` and `docs/integrated-activation-tr.md`.
+## Service Accounts scan comparison (2026-10-06)
+
+Every usage scan section offers "Önceki taramaya göre fark" when the account has more than one scan. `SaScanDiffLoader` asks the
+server only when the person presses "Önceki taramayla karşılaştır" (no extra calls when the tab opens) and `SaScanDiffView`
+shows the answer of `GET /api/v1/service-accounts/accounts/{id}/usage-scans/{linkId}/diff` (G-33): changed servers, a
+paged list of component changes with counts, and a changed gMSA conclusion. The server compares every matched component, so
+the paged item list (PR #12) never changes the answer; the former client-side diff (`ServiceAccountScanDiff`) is removed.
+Wording comes from the server's change codes and texts: "not found" only on a fully scanned server and never "not used";
+what the newer scan did not cover is "unknown", never "gone"; "no older scan" and "no difference" are separate states and
+neither is a usage verdict. The gap alert keeps "Yeniden taranacak sunucu listesini indir (.txt)"
+(`ServiceAccountRescanList`, collector `-ComputerListPath` format, built in the browser from the full server list).
+Tests: `tests/SecureOps.Tests.Unit/Ui/ServiceAccountScanDiffUiTests.cs`, domain rules
+`tests/SecureOps.Tests.Unit/ServiceAccounts/UsageScanDiffTests.cs`, SQL `ServiceAccountUsageScanSqlTests.Diff_*`.
+
+## gMSA/MSA lookup input (G-26 UI, 2026-10-07)
+
+`AccountInputRules` accepts a gMSA/MSA `sAMAccountName` with one trailing `$` (e.g. `syn.gmsa$`, also after `DOMAIN\`),
+mirroring the server guard: `$` anywhere else, alone, twice or together with `@` is refused with its own message, and the
+character list is otherwise unchanged. The identity result's Genel tab shows "Dizin nesne türü" from the server's
+`accountTypeEvidence` (gMSA / MSA / standart kullanıcı nesnesi), worded as what the directory object is, never how it is
+used. Tests: `AccountInputRulesTests`, `IdentityLookupManagedAccountUiTests`.
+
+## Service Accounts next-step card (2026-10-06)
+
+`SaNextStepCard` on `/service-accounts/{id}` lists what is open, most important first, from the already loaded
+`AccountDetail` (`ServiceAccountNextStep.Compute`; UI only, no API or contract change). Order: ownership proposal or missing
+owner, overdue requests, scan matches awaiting a decision (server total `UsageScanPending` since PR #12 paged the items), performed actions awaiting verification, rule conformance
+(`Unplanned`, `ManualReviewPending`, `IncompleteInformation`), handover proposals, unknown usage. Each step carries a text kind
+(Sizden bekleniyor / Başkasından bekleniyor / Bilgi eksik; never colour alone) and a button that only switches the tab. A step
+the server-computed `AccountPermissions` does not allow is shown as waiting for someone else. An empty list says only that
+this screen knows of nothing pending, not that the account is closed or verified. Tests:
+`tests/SecureOps.Tests.Unit/Ui/ServiceAccountNextStepTests.cs`. Checked locally (Demo API + UI, synthetic LocalDB) at
+390 px, light and dark, no horizontal scroll.
+
 ## E-08 In Use activity review
 
 The primary action submits only the eligible WASAS activity, not overall OR

@@ -10,6 +10,8 @@ public sealed class MockDirectoryGroupProvider : IDirectoryGroupProvider
         new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
         {
             ["pam12356"] = ["primary-domain-users", "ops-read", "dist-universal"],
+            ["syn.gmsa$"] = ["primary-domain-users", "ops-read"],
+            ["syn.msa$"] = ["primary-domain-users", "ops-read"],
             ["zero.groups"] = []
         };
 

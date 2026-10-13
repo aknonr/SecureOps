@@ -1,11 +1,20 @@
 @* Manual account registration. The server normalizes the identity and refuses duplicates; the reason is audited. *@
 @using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
 
 <EditForm Model="_model" OnValidSubmit="SubmitAsync">
     <DataAnnotationsValidator />
     <MudGrid Spacing="2">
         <MudItem xs="12" md="4">
-            <MudTextField @bind-Value="_model.AccountName" For="@(() => _model.AccountName)" Label="Hesap adı" MaxLength="256" Required="true" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_model.AccountName" For="@(() => _model.AccountName)" Label="Hesap adı" MaxLength="256" Required="true" Variant="Variant.Outlined"
+                Immediate="true" />
+            @* Advice only (gMSA names are limited to 15 characters); registration stays possible and the server decides. *@
+            <div role="status" aria-live="polite">
+                @if (ServiceAccountUiText.GmsaNameHint(_model.AccountName) is { } hint)
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-1">@hint</MudAlert>
+                }
+            </div>
         </MudItem>
         <MudItem xs="12" md="3">
             <MudTextField @bind-Value="_model.Domain" Label="Domain (bilinmiyorsa boş)" MaxLength="100" Variant="Variant.Outlined" />

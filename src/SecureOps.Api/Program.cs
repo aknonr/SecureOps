@@ -33,6 +33,7 @@ OperationalRecordConfigurationValidator.Validate(builder.Configuration, builder.
 PlatformSecurityConfigurationValidator.Validate(builder.Configuration, builder.Environment.EnvironmentName);
 SqlPersistenceConfigurationValidator.Validate(builder.Configuration);
 DataProtectionConfiguration.Validate(builder.Configuration, builder.Environment.EnvironmentName);
+builder.Services.AddSingleton(new ApiCsrfPolicy(builder.Configuration));
 
 bool demoAuthEnabled = DemoApiAuthentication.IsEnabled(
     builder.Environment.EnvironmentName,
@@ -101,6 +102,8 @@ builder.Services.AddSwaggerGen(options =>
     options.SchemaFilter<LegacyIdentityEventReferenceSchemaFilter>();
     options.SchemaFilter<SdmEvaluationSchemaFilter>();
     options.OperationFilter<AnnouncementOperationFilter>();
+    options.OperationFilter<ServiceAccountUploadOperationFilter>();
+    options.OperationFilter<ApiCsrfOperationFilter>();
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "SecureOps API",
@@ -181,8 +184,9 @@ app.UseMiddleware<ApplicationSessionMiddleware>();
 app.UseMiddleware<AccessDeniedProblemDetailsMiddleware>();
 app.UseMiddleware<AuthorizationDeniedAuditMiddleware>();
 app.UseAuthorization();
-app.UseRateLimiter();
 app.UseMiddleware<SafeExceptionHandlingMiddleware>();
+app.UseMiddleware<ApiCsrfMiddleware>();
+app.UseRateLimiter();
 
 if (swaggerEnabled)
 {

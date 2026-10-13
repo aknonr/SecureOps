@@ -158,7 +158,8 @@ public sealed class IdentityLookupService : IIdentityLookupService
                     user.Title,
                     user.ManagerDisplayName,
                     user.Enabled,
-                    user.Locked));
+                    user.Locked,
+                    user.AccountTypeEvidence));
 
             bool successAuditWritten = await TryWriteAuditAsync(
                 AuditActions.IdentityLookupSucceeded,

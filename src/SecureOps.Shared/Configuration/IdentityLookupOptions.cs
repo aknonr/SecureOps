@@ -38,7 +38,7 @@ public sealed class IdentityLookupOptions
     /// <summary>
     /// Regex pattern allowed for normalized account values.
     /// </summary>
-    public string AllowedAccountPattern { get; set; } = "^[a-zA-Z0-9._@-]+$";
+    public string AllowedAccountPattern { get; set; } = "^[a-zA-Z0-9._@-]+\\$?$";
 
     /// <summary>
     /// Regex timeout in milliseconds.

@@ -23,6 +23,13 @@ public sealed class ActiveDirectoryLookupClient : IActiveDirectoryLookupClient
 
     private DirectoryUserRecord? Find(string value, IdentityType identityType)
     {
+        IdentityProviderInputGuard.EnsureSafeExactAccount(value, _options);
+        if (value.EndsWith('$'))
+        {
+            return identityType == IdentityType.SamAccountName
+                ? ManagedServiceAccountLookup.Find(value, _options)?.Identity : null;
+        }
+
         using PrincipalContext context = string.IsNullOrWhiteSpace(_options.Container)
             ? new PrincipalContext(ContextType.Domain, _options.DomainName)
             : new PrincipalContext(ContextType.Domain, _options.DomainName, _options.Container);

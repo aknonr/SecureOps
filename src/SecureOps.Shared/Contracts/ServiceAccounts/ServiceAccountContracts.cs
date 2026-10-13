@@ -67,7 +67,10 @@ public sealed record AccountSummaryView(
 public sealed record OwnershipView(Guid Id, SaRef? Team, SaRef? Person, string State, string Source, DateOnly? EffectiveFrom,
     DateOnly? EffectiveTo, string? EvidenceNote, DateTimeOffset ProposedAt, DateTimeOffset? DecidedAt, string? DecisionReason, string Version);
 
-/// <summary>Request (expected work) row; each open request is shown separately.</summary>
+/// <summary>
+/// Request (expected work) row; each open request is shown separately. <c>RequestedGmsaName</c> is the gMSA name the
+/// conversion will use (gMSA work types only; null when none is recorded or migration 031 is not applied).
+/// </summary>
 public sealed record RequestView(
     Guid Id,
     Guid AccountId,
@@ -91,7 +94,8 @@ public sealed record RequestView(
     IReadOnlyList<SaExternalRef> References,
     string? LegacyDisplayId,
     string? CloseReason,
-    string Version);
+    string Version,
+    string? RequestedGmsaName = null);
 
 /// <summary>Action row: plan, reported action and verification on one identity.</summary>
 public sealed record ActionView(
@@ -153,9 +157,9 @@ public sealed record ObservationView(Guid Id, Guid BatchId, string SourceProfile
 public sealed record HandoverView(Guid Id, Guid AccountId, string AccountName, SaRef? SourceTeam, SaRef TargetTeam, SaRef? ConsumerTeam,
     string? CohortLabel, DateOnly? ProposedOn, string Status, DateOnly? DecidedOn, string? DecisionNote, string? SourceNote, string Version);
 
-/// <summary>gMSA transition tracking; independent from handover acceptance.</summary>
+/// <summary>gMSA transition tracking; independent from handover acceptance. <c>RequestedGmsaName</c> is the planned gMSA name.</summary>
 public sealed record TransitionView(Guid Id, Guid AccountId, Guid? HandoverId, string Target, string Suitability, string? DecisionNote,
-    DateOnly? PlannedOn, Guid? CompletedActionId, string Version);
+    DateOnly? PlannedOn, Guid? CompletedActionId, string Version, string? RequestedGmsaName = null);
 
 /// <summary>Business timeline entry.</summary>
 public sealed record HistoryView(string EntityType, Guid EntityId, string Action, string? ChangesJson, string? Reason, string Actor, DateTimeOffset OccurredAt);
@@ -195,7 +199,11 @@ public sealed record AccountPermissions(bool Work, bool AssignPerson, bool Assig
     public bool CanWorkAnyRequest => Work || ParticipantRequestIds is { Count: > 0 };
 }
 
-/// <summary>Complete scoped account detail.</summary>
+/// <summary>
+/// Complete scoped account detail. <c>UsageScans</c> holds the newest page of attached scans (each with the first page of its
+/// items); <c>UsageScanTotal</c> counts every attached scan and <c>UsageScanPending</c> every matched component still
+/// waiting for a decision across all of them. <c>RequestedGmsaNameAvailable</c> is false until migration 031 is applied.
+/// </summary>
 public sealed record AccountDetail(
     AccountSummaryView Summary,
     IReadOnlyList<OwnershipView> Ownership,
@@ -211,7 +219,11 @@ public sealed record AccountDetail(
     IReadOnlyList<HistoryView> History,
     AccountPermissions Permissions,
     IReadOnlyList<UsageView>? Usages = null,
-    RuleEvaluationView? Rule = null);
+    RuleEvaluationView? Rule = null,
+    IReadOnlyList<UsageScanView>? UsageScans = null,
+    int UsageScanTotal = 0,
+    int UsageScanPending = 0,
+    bool RequestedGmsaNameAvailable = false);
 
 /// <summary>Create an account manually (no automatic provisioning from names).</summary>
 public sealed record CreateAccountRequest(string AccountName, string? Domain, Guid? ReportOrganizationId, string Reason);
@@ -228,7 +240,7 @@ public sealed record OwnershipChangeRequest(string ExpectedVersion, Guid? TeamId
 /// <summary>Decide a proposed ownership.</summary>
 public sealed record OwnershipDecisionRequest(string ExpectedVersion, string Decision, string Reason);
 
-/// <summary>Create a request (expected work).</summary>
+/// <summary>Create a request (expected work). <c>RequestedGmsaName</c> is accepted for gMSA work types only (at most 15 counted characters).</summary>
 public sealed record CreateWorkRequest(
     string ActionType,
     Guid? TargetTeamId = null,
@@ -241,9 +253,10 @@ public sealed record CreateWorkRequest(
     DateOnly? FirstSentOn = null,
     DateOnly? LastReplyOn = null,
     string? Notes = null,
-    IReadOnlyList<SaExternalRef>? References = null);
+    IReadOnlyList<SaExternalRef>? References = null,
+    string? RequestedGmsaName = null);
 
-/// <summary>Partial request update; null means unchanged, ClearFields clears with a reason.</summary>
+/// <summary>Partial request update; null means unchanged, ClearFields clears with a reason (<c>requestedGmsaName</c> included).</summary>
 public sealed record UpdateWorkRequest(
     string ExpectedVersion,
     string? ActionType = null,
@@ -259,10 +272,31 @@ public sealed record UpdateWorkRequest(
     string? Notes = null,
     IReadOnlyList<string>? ClearFields = null,
     string? Reason = null,
-    IReadOnlyList<SaExternalRef>? AddReferences = null);
+    IReadOnlyList<SaExternalRef>? AddReferences = null,
+    string? RequestedGmsaName = null);
 
 /// <summary>Explicitly close one request.</summary>
 public sealed record CloseWorkRequest(string ExpectedVersion, string Outcome, string? Reason = null);
+
+/// <summary>
+/// Why a request can or cannot be closed with an outcome, computed by the same server rule the close command uses
+/// (EVENT-GUIDANCE-DESIGN §6). Information only: it can go stale and the close command always revalidates. A close
+/// reason is typed at close time, so a non-Completed outcome always lists <c>CloseReasonRequired</c>.
+/// </summary>
+/// <param name="CanClose">True when nothing is missing.</param>
+/// <param name="Status">Request status: Open or Closed.</param>
+/// <param name="Outcome">The evaluated outcome: Completed, NotNeeded or Cancelled.</param>
+/// <param name="Missing">Every missing condition; the first one is the code the close command would return.</param>
+public sealed record CloseReadiness(bool CanClose, string Status, string Outcome, IReadOnlyList<CloseMissing> Missing);
+
+/// <summary>One missing close condition.</summary>
+/// <param name="Code">Stable rule code: NoMatchingPerformedAction, VerifiedClosureRequired, OwnershipNotConfirmed, CloseReasonRequired or RequestAlreadyClosed.</param>
+/// <param name="Remedy">The step that clears it: ReportAction, VerifyAction, ConfirmOwnership, GiveReason or None.</param>
+/// <param name="SubCodes">VerifiedClosureRequired only: unmet conditions of the closest candidate action (NotVerified, NotClosureKind, ActualDateRequired,
+/// VerificationBeforeAction, VerifierRequired, EvidenceRequired, OrRequiredForDeletion); null when there is no candidate or no breakdown.</param>
+/// <param name="ExpectedActionType">NoMatchingPerformedAction only: the request's action type (a gMSA handover also accepts a gMSA conversion; an evaluation accepts any type).</param>
+/// <param name="RelatedActionId">VerifiedClosureRequired only: the candidate action the sub-codes describe.</param>
+public sealed record CloseMissing(string Code, string Remedy, IReadOnlyList<string>? SubCodes = null, string? ExpectedActionType = null, Guid? RelatedActionId = null);
 
 /// <summary>Report a planned or performed action. Adding an action never closes a request.</summary>
 public sealed record ReportActionRequest(
@@ -336,9 +370,9 @@ public sealed record HandoverDecisionRequest(string ExpectedVersion, string Deci
 public sealed record CreateHandoverRequest(Guid TargetTeamId, Guid? SourceTeamId = null, Guid? ConsumerTeamId = null,
     string? CohortLabel = null, DateOnly? ProposedOn = null, string? Note = null, bool TrackGmsa = false);
 
-/// <summary>Update gMSA suitability/plan; a decision needs a note.</summary>
+/// <summary>Update gMSA suitability/plan; a decision needs a note. A blank requested gMSA name leaves the stored one unchanged.</summary>
 public sealed record TransitionUpdateRequest(string ExpectedVersion, string Suitability, string? DecisionNote = null,
-    DateOnly? PlannedOn = null, Guid? CompletedActionId = null);
+    DateOnly? PlannedOn = null, Guid? CompletedActionId = null, string? RequestedGmsaName = null);
 
 /// <summary>One open request in the caller's entry summary (nearest due first).</summary>
 public sealed record WorkSummaryItem(Guid RequestId, Guid AccountId, string AccountName, string ActionType, string ActionLabel, DateOnly? Due,

@@ -95,4 +95,39 @@ public static class ServiceAccountText
 
     /// <summary>Normalizes an external record number; types are never mixed.</summary>
     public static string? RecordNumber(string? number) => Clean(number)?.ToUpperInvariant();
+
+    /// <summary>
+    /// Stored and displayed name of an uploaded file: the last path segment (either separator) without control, format (zero-width, bidi
+    /// embedding/override/isolate, byte-order mark), line/paragraph separator or invisible filler characters, so a name can
+    /// neither hide nor visually reorder its extension; other Unicode spaces become a plain space. At most 200 characters;
+    /// an empty result becomes a fixed placeholder.
+    /// </summary>
+    public static string FileName(string? fileName)
+    {
+        StringBuilder builder = new();
+        foreach (Rune rune in Path.GetFileName((fileName ?? string.Empty).Replace('\\', '/')).EnumerateRunes())
+        {
+            UnicodeCategory category = Rune.GetUnicodeCategory(rune);
+            if (category is UnicodeCategory.Control or UnicodeCategory.Format or UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator
+                || InvisibleFiller(rune.Value) || rune.Value is '/' or '\\' or '"')
+            {
+                continue;
+            }
+
+            builder.Append(category == UnicodeCategory.SpaceSeparator ? " " : rune.ToString());
+        }
+
+        string name = builder.ToString().Trim();
+        if (name.Length > 200)
+        {
+            name = name[..(char.IsHighSurrogate(name[199]) ? 199 : 200)];
+        }
+
+        return name.Length == 0 ? "yuklenen-dosya" : name;
+    }
+
+    /// <summary>Default-ignorable code points outside the format category (grapheme joiner, Hangul and Khmer fillers, variation selectors).</summary>
+    private static bool InvisibleFiller(int value) =>
+        value is 0x034F or 0x115F or 0x1160 or 0x17B4 or 0x17B5 or 0x3164 or 0xFFA0 or (>= 0x180B and <= 0x180F) or (>= 0xFE00 and <= 0xFE0F)
+            or (>= 0xE0100 and <= 0xE01EF);
 }

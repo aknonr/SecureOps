@@ -1,0 +1,106 @@
+@* The plan's current preview as the server returned it: version and SHA-256, the flag counters and the rows page by page. A flag is a
+   note about what the scan knows, never a verdict: "bulunamadı" is not "kullanılmıyor", "bilgi yok" is not "yok". No flag blocks the
+   plan; the approver reads the counts. Colour is never the only signal (every flag has an icon and a text). *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<div class="sa-plan-preview">
+<SoFieldGrid>
+    <SoField Label="Önizleme sürümü" Value="@Preview.Version.ToString()" />
+    <SoField Label="Özet (SHA-256)"><code class="sa-plan-sha" title="@Preview.Sha256">@ChangePlanPresentation.ShortDigest(Preview.Sha256)…</code> <span class="so-panel-text--sm">onay bu özete bağlanır</span></SoField>
+    <SoField Label="Üreten" Value="@Preview.CreatedBy" />
+    <SoField Label="Üretildi" Value="@ChangePlanPresentation.Instant(Preview.CreatedAt)" />
+    <SoField Label="Satır sayısı" Value="@Preview.ItemCount.ToString()" />
+    <SoField Label="Tarama tazeliği" Value="@($"{Preview.ScanFreshDays} gün")" />
+</SoFieldGrid>
+
+<h3 class="sa-plan-subheading" id="sa-plan-counters">Satır işaretleri</h3>
+<ul class="sa-plan-counters" aria-labelledby="sa-plan-counters">
+    @foreach (string flag in ChangePlanPresentation.Flags)
+    {
+        int count = ChangePlanPresentation.Count(Preview.Flags, flag);
+        <li class="@(count == 0 ? "sa-plan-counter sa-plan-counter--zero" : "sa-plan-counter")">
+            <SoStatusBadge Label="@ChangePlanPresentation.FlagShortLabel(flag)" Tone="@ChangePlanPresentation.FlagTone(flag)" Icon="@ChangePlanPresentation.FlagIcon(flag)" />
+            <span class="sa-plan-counter-count" aria-label="@($"{count} satır")">@count</span>
+        </li>
+    }
+</ul>
+@if (Preview.Flags.NothingFound > 0)
+{
+    <p class="so-panel-text--sm" role="note">
+        <strong>Taramada bulunamadı (@Preview.Flags.NothingFound):</strong> son tarama cevap verdi ama hesabı taranan hiçbir sunucuda bulamadı.
+        Bu, hesabın <em>kullanılmadığı</em> anlamına gelmez; tarama yalnız bulamadı.
+    </p>
+}
+<SaDisclosure Title="İşaretler ne demek?" Class="mb-3">
+    <dl class="sa-plan-legend">
+        @foreach (string flag in ChangePlanPresentation.Flags)
+        {
+            <dt>@ChangePlanPresentation.FlagShortLabel(flag)</dt>
+            <dd>@ChangePlanPresentation.FlagExplanation(flag)</dd>
+        }
+    </dl>
+</SaDisclosure>
+
+<h3 class="sa-plan-subheading" id="sa-plan-rows">Bileşen satırları</h3>
+@if (Failed)
+{
+    <p class="so-panel-text" role="note">Satırlar okunamadı; yukarıdaki hata ve yeniden deneme düğmesi geçerlidir. Özet ve sayılar planın kaydından gelir.</p>
+}
+else if (Items is null)
+{
+    <SoLoading Message="Önizleme satırları okunuyor" />
+}
+else if (Items.Items.Count == 0)
+{
+    <SoEmptyState Title="Önizlemede satır yok" Description="Sunucu bu önizleme için gösterecek satır döndürmedi." />
+}
+else
+{
+    <MudTable Items="Items.Items" Dense="true" Hover="true" Breakpoint="Breakpoint.Md" T="ChangePlanItemView" Class="sa-plan-table" aria-labelledby="sa-plan-rows">
+        <HeaderContent>
+            <MudTh>Hesap</MudTh>
+            <MudTh>Sunucu</MudTh>
+            <MudTh>Bileşen</MudTh>
+            <MudTh>Kimlik (şimdi → hedef)</MudTh>
+            <MudTh>İşaret</MudTh>
+            <MudTh>Tarama</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Hesap">@context.AccountName</MudTd>
+            <MudTd DataLabel="Sunucu">@(context.ServerName ?? "Bilgi yok")</MudTd>
+            <MudTd DataLabel="Bileşen">
+                @if (context.ComponentName is null) { <span>—</span> }
+                else { <div><span>@context.ComponentName</span><div class="so-panel-text--sm">@(context.ComponentType ?? "tür bilgisi yok")</div></div> }
+            </MudTd>
+            <MudTd DataLabel="Kimlik">@(context.CurrentIdentity ?? "şimdiki bilgi yok") → @context.TargetIdentity</MudTd>
+            <MudTd DataLabel="İşaret">
+                <div>
+                    <SoStatusBadge Label="@ChangePlanPresentation.FlagShortLabel(context.Flag)" Tone="@ChangePlanPresentation.FlagTone(context.Flag)"
+                                   Icon="@ChangePlanPresentation.FlagIcon(context.Flag)" Title="@context.FlagLabel" />
+                    <div class="so-panel-text--sm">@context.FlagLabel</div>
+                </div>
+            </MudTd>
+            <MudTd DataLabel="Tarama">@(context.ScanAt is { } at ? ChangePlanPresentation.Instant(at) : "Tarama yok")</MudTd>
+        </RowTemplate>
+    </MudTable>
+    <SaPager Label="Önizleme satırları" Page="Items.Page" PageSize="Items.PageSize" Total="Items.Total" Unit="satır" Busy="Busy" OnPage="OnPage" />
+}
+</div>
+
+@code {
+    /// <summary>The plan's current preview summary.</summary>
+    [Parameter, EditorRequired] public ChangePlanPreviewView Preview { get; set; } = default!;
+
+    /// <summary>The loaded page of rows (null while loading).</summary>
+    [Parameter] public ChangePlanItemPage? Items { get; set; }
+
+    /// <summary>Reading the rows failed.</summary>
+    [Parameter] public bool Failed { get; set; }
+
+    /// <summary>A call is running (the pager keeps focus but ignores clicks).</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Another page of rows was requested (1-based).</summary>
+    [Parameter] public EventCallback<int> OnPage { get; set; }
+}

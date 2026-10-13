@@ -3,15 +3,17 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^[A-Za-z0-9_]{1,40}$')]
     [string]$DatabaseSuffix,
-    [ValidateRange(26, 28)]
-    [int]$ThroughMigration = 28,
+    [ValidateRange(26, 34)]
+    [int]$ThroughMigration = 34,
     [switch]$SkipRoleScripts
 )
 
 # Windows counterpart of sa-sql-harness.sh (NOT executed in the Linux container that produced it).
 # Creates a NEW database SecureOps_Sa<suffix> on the isolated per-user LocalDB instance, applies the reviewed
-# numbered migrations in order (now 001-028), verifies module replay refusal, and
-# (unless -SkipRoleScripts) the two unnumbered role scripts. No role member is assigned. Never targets a
+# numbered migrations in order (now 001-034; 029 numbers SA-003, 030 numbers SA-004, 031 numbers SA-005, 032 is Access,
+# 033 numbers SA-006, 034 numbers SA-007), verifies module replay refusal, the 033 and 034 database guards
+# (sa-033-guards.sql, sa-034-guards.sql) and
+# (unless -SkipRoleScripts) the module role scripts. No role member is assigned. Never targets a
 # shared or corporate server and never reuses an existing database.
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))
@@ -54,12 +56,81 @@ try {
     & $sqlcmd -S $server -d $database -E -I -b -i 'SA-002-usage-rules.sql' | Out-Null
     if ($LASTEXITCODE -eq 0) { throw 'Candidate 2 replay was not refused.' }
     Write-Host 'candidate 2 replay refused as expected'
+    $hasBootstrap = (& $sqlcmd -S $server -d $database -E -I -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CASE WHEN COL_LENGTH(N'svcacct.ScopeGrants', N'IsBootstrap') IS NULL THEN 0 ELSE 1 END" | Select-Object -First 1).Trim()
+    if ($hasBootstrap -eq '0') {
+        Invoke-SaSql -Database $database -File 'SA-003-scope-bootstrap.sql'
+        Write-Host 'applied SA-003-scope-bootstrap.sql (candidate 3)'
+    } else { Write-Host 'Scope bootstrap installed through a numbered migration' }
+    & $sqlcmd -S $server -d $database -E -I -b -i 'SA-003-scope-bootstrap.sql' | Out-Null
+    if ($LASTEXITCODE -eq 0) { throw 'Candidate 3 replay was not refused.' }
+    Write-Host 'candidate 3 replay refused as expected'
+    $hasScans = (& $sqlcmd -S $server -d $database -E -I -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CASE WHEN OBJECT_ID(N'svcacct.UsageScans', N'U') IS NULL THEN 0 ELSE 1 END" | Select-Object -First 1).Trim()
+    if ($hasScans -eq '0') {
+        Invoke-SaSql -Database $database -File 'SA-004-usage-scans.sql'
+        Write-Host 'applied SA-004-usage-scans.sql (candidate 4)'
+    } else { Write-Host 'Usage scans installed through numbered 030' }
+    & $sqlcmd -S $server -d $database -E -I -b -i 'SA-004-usage-scans.sql' | Out-Null
+    if ($LASTEXITCODE -eq 0) { throw 'Candidate 4 replay was not refused.' }
+    Write-Host 'candidate 4 replay refused as expected'
+    # -ThroughMigration 30 leaves the database like an installed 030 system (no requested gMSA name columns).
+    $hasGmsaName = if ($ThroughMigration -ge 31) { (& $sqlcmd -S $server -d $database -E -I -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CASE WHEN COL_LENGTH(N'svcacct.WorkRequests', N'RequestedGmsaName') IS NULL THEN 0 ELSE 1 END" | Select-Object -First 1).Trim() } else { 'skip' }
+    if ($hasGmsaName -eq 'skip') { Write-Host 'Requested gMSA name (031) left out: -ThroughMigration below 31' }
+    elseif ($hasGmsaName -eq '0') {
+        Invoke-SaSql -Database $database -File 'SA-005-requested-gmsa-name.sql'
+        Write-Host 'applied SA-005-requested-gmsa-name.sql (candidate 5)'
+    } else { Write-Host 'Requested gMSA name installed through numbered 031' }
+    if ($hasGmsaName -ne 'skip') {
+        & $sqlcmd -S $server -d $database -E -I -b -i 'SA-005-requested-gmsa-name.sql' | Out-Null
+        if ($LASTEXITCODE -eq 0) { throw 'Candidate 5 replay was not refused.' }
+        Write-Host 'candidate 5 replay refused as expected'
+    }
+    # -ThroughMigration 32 leaves the database like an installed 032 system (no change-plan tables).
+    $hasPlans = if ($ThroughMigration -ge 33) { (& $sqlcmd -S $server -d $database -E -I -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CASE WHEN OBJECT_ID(N'svcacct.ChangePlans', N'U') IS NULL THEN 0 ELSE 1 END" | Select-Object -First 1).Trim() } else { 'skip' }
+    if ($hasPlans -eq 'skip') { Write-Host 'Change plans (033) left out: -ThroughMigration below 33' }
+    elseif ($hasPlans -eq '0') {
+        Invoke-SaSql -Database $database -File 'SA-006-change-plans.sql'
+        Write-Host 'applied SA-006-change-plans.sql (candidate 6)'
+    } else { Write-Host 'Change plans installed through numbered 033' }
+    if ($hasPlans -ne 'skip') {
+        & $sqlcmd -S $server -d $database -E -I -b -i 'SA-006-change-plans.sql' | Out-Null
+        if ($LASTEXITCODE -eq 0) { throw 'Candidate 6 replay was not refused.' }
+        Write-Host 'candidate 6 replay refused as expected'
+    }
     if (-not $SkipRoleScripts) {
         Invoke-SaSql -Database $database -File 'SA-API-permissions.sql'
         Invoke-SaSql -Database $database -File 'SA-Worker-permissions.sql'
         Invoke-SaSql -Database $database -File 'SA-002-API-permissions.sql'
-        Write-Host 'applied SA-API-permissions.sql, SA-Worker-permissions.sql and SA-002-API-permissions.sql (no role member assigned)'
+        Invoke-SaSql -Database $database -File 'SA-004-API-permissions.sql'
+        Write-Host 'applied SA-API-permissions.sql, SA-Worker-permissions.sql, SA-002-API-permissions.sql and SA-004-API-permissions.sql (no role member assigned)'
+        if ($hasPlans -ne 'skip') {
+            Invoke-SaSql -Database $database -File 'SA-006-API-permissions.sql'
+            Write-Host 'applied SA-006-API-permissions.sql (no role member assigned)'
+        }
+    }
+    if ($hasPlans -ne 'skip') {
+        # Database guards for the change plan (design T2, T3, T8); the runtime-role part needs the role scripts. The temporary
+        # role member it creates is removed again, so the role stays without members.
+        $withRole = if ($SkipRoleScripts) { '0' } else { '1' }
+        & $sqlcmd -S $server -d $database -E -I -b -v WithRole=$withRole -i (Join-Path $PSScriptRoot 'sa-033-guards.sql')
+        if ($LASTEXITCODE -ne 0) { throw "Service Accounts 033 guard check failed; database $database retained for inspection." }
+    }
+    # -ThroughMigration 33 leaves the database like an installed 033 system (no 'ChangePlan' evidence owner type).
+    $hasPlanEvidence = if ($ThroughMigration -ge 34) { (& $sqlcmd -S $server -d $database -E -I -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CASE WHEN EXISTS (SELECT 1 FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(N'svcacct.Evidence') AND name = N'CK_SaEvidence_Owner' AND definition LIKE N'%''ChangePlan''%') THEN 1 ELSE 0 END" | Select-Object -First 1).Trim() } else { 'skip' }
+    if ($hasPlanEvidence -eq 'skip') { Write-Host 'Plan evidence (034) left out: -ThroughMigration below 34' }
+    elseif ($hasPlanEvidence -eq '0') {
+        Invoke-SaSql -Database $database -File 'SA-007-plan-evidence.sql'
+        Write-Host 'applied SA-007-plan-evidence.sql (candidate 7)'
+    } else { Write-Host 'Plan evidence installed through numbered 034' }
+    if ($hasPlanEvidence -ne 'skip') {
+        & $sqlcmd -S $server -d $database -E -I -b -i 'SA-007-plan-evidence.sql' | Out-Null
+        if ($LASTEXITCODE -eq 0) { throw 'Candidate 7 replay was not refused.' }
+        Write-Host 'candidate 7 replay refused as expected'
+        & $sqlcmd -S $server -d $database -E -I -b -i (Join-Path $PSScriptRoot 'sa-034-guards.sql')
+        if ($LASTEXITCODE -ne 0) { throw "Service Accounts 034 guard check failed; database $database retained for inspection." }
     }
 } finally { Pop-Location }
 
 Write-Host "SECUREOPS_SA_SQL_TEST_CONNECTION=Server=$server;Database=$database;Integrated Security=True;TrustServerCertificate=True;Connect Timeout=15"
+# Every failure above throws. The intentionally refused replays leave $LASTEXITCODE at 1, and `powershell -File`
+# would return it when nothing runs afterwards (-SkipRoleScripts), so a successful run ends explicitly.
+exit 0

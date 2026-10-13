@@ -322,6 +322,7 @@ static void ConfigureApiClient(IServiceProvider serviceProvider, HttpClient clie
 
     client.BaseAddress = options.BaseAddress;
     client.Timeout = options.Timeout;
+    client.DefaultRequestHeaders.Add(SecureOps.Shared.Contracts.Api.ApiCsrf.HeaderName, SecureOps.Shared.Contracts.Api.ApiCsrf.HeaderValue);
 }
 
 // Redirects to a caller-supplied path, which is sanitized because it originates from the request.

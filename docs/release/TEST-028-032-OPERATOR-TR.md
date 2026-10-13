@@ -1,0 +1,155 @@
+# TEST 028–032 operatör kontrol listesi
+
+Tarih: 2026-10-12 (D2, sahip kararı A). Tek güncel operatör girişi. Bu belge ve paket **gözden geçirme adayıdır**;
+`readyForInstallation=false`. Kurulu TEST'e uygulanmamıştır. Sentetik LocalDB kanıtı hedef kabulü değildir.
+
+Bu teslimin tabanı **028**: sahibin 2026-10-07 tarihinde çalıştırdığı envantere göre 025–028 uygulanmış,
+029–032 uygulanmamıştır. Paket hazırlayan oturum TEST'e veya kurumsal SQL'e bağlanmaz; bu beyan bağımsız
+hedef doğrulaması değildir. Bu aday 028'i içermez; aşağıdaki 027 seçeneği yalnız farklı bir aday içindir.
+
+Yeni adayın API/UI ürün kaynağı güncel `origin/master` (en az `b64068a`) olmalıdır. Eski
+`review-029-032-20261007-master-78a94b1-from028` adayı artık yayın için kullanılmaz; yalnız SQL
+bayt karşılaştırması referansıdır. 029–032 wrapper/schema/include/SA-004 izin dosyalarının tamamı
+eski adayla baytı baytına aynı olmalıdır. Güncel kaynak 033/034 içerse de ana pakete eklenmez.
+
+## 1. Salt okunur envanter ve durma noktası
+
+- DBA, doğru veritabanında `DBA/Get-InstalledMigrationInventory025To032.sql` çalıştırır.
+  Repo karşılığı: `scripts/diagnostics/Get-InstalledMigrationInventory025To032.sql`.
+  Yalnız metadata ve 027/028 için sabit Admin yetkileri/audit işaretleri okunur; kişi veya iş verisi döndürülmez.
+  `VIEW DEFINITION` ve ilgili iki tabloda SELECT gerekir. Yetki hatasında durun; eksik görünürlüğü yokluk saymayın.
+- 025 ve 026 bütün işaretleriyle uygulanmış, 027 yetki/audit işaretleriyle uygulanmış olmalı.
+  028 ya tamamen uygulanmış ya tamamen eksik olmalı. 029–032 bütün işaretleriyle eksik olmalı.
+  Kısmi, çelişkili veya beklenmeyen sonuçta durun. “uygulanmamış” yanında yeniden çalıştırma engeli varsa çalıştırmayın.
+- 027/028 nesne eklemez: yetki ve audit işaretleri birlikte değerlendirilir. İşaretlerin bulunması tam DDL,
+  izin, veri korunumu veya change onayı kanıtı değildir. DBA tanımları ayrıca karşılaştırır.
+- `svcacct_api_runtime` rolü ve önceki onaylı runtime izinleri mevcut olmalı. Bu paket eski rol/grant dosyalarını,
+  rol üyeliğini, 001–027'yi veya Hangfire kurulumunu tekrar çalıştırmaz.
+- Envanter sonucu ve DBA incelemesi özel kanıt dosyasına kaydedilir. Kurulu taban bilinmiyorsa paket kuruluma geçemez.
+- **Kurulumdan önce API SQL kimliği ve izin kontrolü:** sunucu sahibi gerçek API havuzunun SQL'e
+  hangi kimlikle bağlandığını doğrular. Onaylı salt okunur `Get-ApiSqlPermissions028To032.sql`
+  dosyasının özel kopyasında `@ApiLogin` doldurulur; repo için beklenen yol
+  `scripts/diagnostics/Get-ApiSqlPermissions028To032.sql` henüz master'da yoktur. Mevcut incelenmiş
+  kaynak `C:\SecureOpsBuild\api-permissions-028-032-20261007\scripts\diagnostics\Get-ApiSqlPermissions028To032.sql`;
+  D2 özel handoff'unda doldurulmamış, hash'li kopyası verilir. Dolu kopya/gerçek kimlik repoya girmez.
+  DBA kendi `db_owner` oturumunu API hesabının etkin izin kanıtı saymaz. Etkin izin satırları için
+  current/original login `@ApiLogin` ile eşleşmelidir; bu da API sürecinin gerçek bağlantı kimliğini
+  tek başına kanıtlamaz. Eksik metadata/belirsiz eşleme/fazla yetkide durulur; izinler değiştirilmez.
+  030 henüz kurulu olmadığından beş yeni tablonun yokluğu beklenir; DDL + SA-004 sonrasında izin
+  kontrolü ayrıca tekrarlanır. İlk kontrolün çıktısı kurulum onayı değildir.
+
+## 2. Kaynağa bağlı aday ve onaylar
+
+- Temiz, commit edilmiş kaynak `ExpectedSource` ile birebir eşleşir. Ürün kaynağı `TestedProductSource`,
+  doğrulanmış `origin/master` SHA'sıdır; hazırlık kaynağı ondan türemeli ve ürün girdileri aynı olmalıdır.
+  API/UI ProductVersion bu ürün SHA'sını; SQL, belgeler ve inceleme hash'leri hazırlık kaynağını belirtir.
+- `candidate.json`, payload manifestleri ve `supportingFiles` SHA-256 değerleri teslim edilen dosyalarla karşılaştırılır.
+  Aday yeniden etiketlenmez veya mevcut çıktı üzerine yazılmaz. Kaynak değişirse inceleme ve hash'ler yeniden hazırlanır.
+- Özel `wasas.sql-upgrade-review.v1` kaydı: `Source=ExpectedSource`; boolean `Baseline027Verified` veya
+  `Baseline028Verified`, `Inventory025To032Verified`, `Unapplied029To032Verified`, `RuntimeApiRoleVerified`,
+  `Delta029To032Reviewed=true`; dolu `InstalledInventoryEvidenceReference`, `Delta029To032ReviewReference`.
+  027 tabanında ayrıca `Baseline028AbsentVerified`, `AdminOperations028Reviewed=true` ve
+  `AdminOperations028ReviewReference` gerekir. `Files` seçilen delta, include ve SA-004 izin dosyalarının tam
+  Path/Sha256 kümesidir. LocalDB kanıtı yalnız aday üretimi için kullanılabilir; hedefin görüldüğünü iddia etmez.
+- Proje sahibi ve DBA: gerçek taban, 028 yetki değişikliği (gerekirse), 029 ilk kapsam, 030/izinler,
+  031 istenen gMSA adı ve 032 indeks için ayrı uygulama onayı/change kaydı gerekir.
+  DBA yedek/geri yükleme kanıtını, kapasite ve geri dönüş noktasını kendi sürecinde hazırlar.
+  Change kaydına yedek referansı, geri yükleme doğrulaması, önceki API/UI çiftinin kimliği ve
+  geri dönüş kararını verecek kişi yazılmadan kurulum başlamaz.
+
+## 3. DBA sırası
+
+API/UI yayınından önce, yalnız onaylı change kapsamında:
+
+1. Taban 027 ise ve 028 bütün işaretleriyle eksikse: **028**; yetki paketi, access version ve audit doğrulanır, dur/onay noktası.
+2. **029**; IsBootstrap varsayılanı, tek bootstrap indeksi ve güvenilir self-grant kısıtı doğrulanır, dur/onay noktası.
+3. **030**; beş tablo, değişmezlik tetikleyicileri ve güvenilir kısıtlar doğrulanır, dur/onay noktası.
+4. **SA-004-API-permissions.sql**; yalnız API rolüne beş tabloda SELECT/INSERT, üyelik yok; dur/onay noktası.
+5. **031**; iki `RequestedGmsaName nvarchar(256) NULL` sütunu, varsayılan yok, mevcut değerler NULL; dur/onay noktası.
+6. **032**; `(UserId ASC, RequestedAt DESC) INCLUDE (Status)` etkin, nonunique, unfiltered indeks; dur/onay noktası.
+
+`candidate.json.sqlSequence` aynı sırayı gösterir. Numaralı wrapper'lar `DBA/sql/migrations` çalışma dizininden
+SQLCMD `-I -b` ile çalışır; `:r` include'ları bu dizine göre çözülür. SA-004 izin dosyası kendi dizininden çalışır.
+Include/schema dosyaları bağımlılıktır: wrapper'a ek olarak çalıştırılmaz. Her adımda sıfır olmayan çıkışta durun.
+Kurulu migration tekrar çalıştırılmaz; replay reddi yalnız sentetik harness'te denenir.
+
+**033/034 bu sıraya eklenmez.** Her biri `SONRA-KURULACAK` adlı ayrı klasörde, kendi
+manifest/hash'i ve `readyForInstallation=false` ile tutulur; bu teslimde **KURULMAZ**.
+029–032 hedef kabulünden ve ayrı d kabul/onayından sonra önce 033 → `SA-006-API-permissions.sql`
+ayrı change kapsamında değerlendirilir; 033 doğrulanmadan 034 değerlendirilmez. 034 yalnız kendi
+wrapper'ını çalıştırır; 033 veya eski grant'ler tekrar oynatılmaz. Ayrı selector incelemeleri
+sentetik/offline olabilir; typed-true seçim bayrakları hedefin gözlendiğini veya onaylandığını göstermez.
+
+DBA ayrıntıları: [029–031 notu](../service-accounts/DBA-029-030-TR.md),
+[032 notu](../access-registration-dba-032.md). Eski DBA notundaki toplu komut sırası yerine bu listenin
+030 → SA-004 izinleri → 031 sırası geçerlidir. 032 normal indeks oluşturur; blocking, log ve alan ihtiyacı hedefte değerlendirilir.
+
+## 4. UI ve API birlikte yayın
+
+- API ve UI aynı doğrulanmış ürün SHA'sından **birlikte** yayınlanır; eski UI/yeni API karışımı kabul edilmez.
+  ADR-0029: tüm POST/PUT/PATCH/DELETE ve diğer unsafe istemciler tam bir `X-SecureOps-Csrf: 1` başlığı gönderir.
+  Yetkili fakat başlıksız unsafe istemci 403 `ApiCsrfRejected` alır; denial audit saklanamazsa 503 olur.
+  Başlık kimlik veya yetki sağlamaz. GET/HEAD/OPTIONS mevcut davranışını korur.
+- API süreç yapılandırmasında `ApiCsrf__AllowedOrigins__0`, `ApiCsrf__AllowedOrigins__1`, … tam dış tarayıcı
+  origin'leri olarak tanımlanır: yalnız şema/host/gerekirse port. Sentetik örnek `https://ui.example.invalid`.
+  Wildcard, path, query, fragment veya userinfo kullanılmaz. Boş liste tarayıcı origin'lerini reddeder;
+  hatalı değer başlangıcı durdurur. UI sunucu HttpClient çağrısı Origin taşımadığı için origin kaydı gerektirmez,
+  fakat CSRF başlığı zorunludur. Gerçek origin'ler pakete yazılmaz; sunucu sahibi onaylı yapılandırmada tutar.
+- [ ] Sunucu sahibi aşağıdaki boş alanları **özel change kaydında** doldurur; gerçek değerler repoya veya
+  paylaşılan pakete eklenmez. Ayarlar API sürecine aittir; dış tarayıcı origin'i backend HTTP adresi değildir.
+
+  | Ayar / kayıt | Sunucu sahibinin dolduracağı alan |
+  |---|---|
+  | `ApiCsrf__AllowedOrigins__0` | `<onaylı dış tarayıcı origin'i: şema + host + gerekiyorsa port>` |
+  | `ApiCsrf__AllowedOrigins__1` (gerekiyorsa) | `<ikinci onaylı dış tarayıcı origin'i veya kullanılmıyor>` |
+  | Ek origin'ler (gerekiyorsa) | `<ardışık indekslerle ayrı kayıtlar veya kullanılmıyor>` |
+  | Ayar sahibi / change referansı | `<özel kayıtta doldur>` |
+  | IIS/F5 başlık koruma ve CSRF kabul kanıtı | `<ayrı hedef kabulünden sonra özel kayıtta doldur>` |
+
+  Boş alanlar kurulum onayı değildir. Yalnız server-side UI çağrıları kullanılıyorsa boş origin listesi
+  bilinçli seçim olarak kaydedilebilir; doğrudan tarayıcı unsafe çağrıları bu durumda reddedilir.
+- F5/IIS Origin, Referer ve Sec-Fetch-* başlıklarını korur; cross-site daima reddedilir.
+  Bu ayar CORS izni değildir. CLI/operatör/API istemcileri de başlık sözleşmesine geçirilir.
+- Paket `web.config` ve `appsettings*.json` taşımaz. Sunucuya ait yapılandırma, proxy güveni, dış yazma/no-send
+  korumaları korunur. IIS/app pool/servis/LB değişikliği bu adayın yetkisi değildir.
+
+## 5. Geri dönüş ve ilk kabul
+
+- Sorunda yayın durdurulur; önceki eşleşen API/UI çifti ve önceki onaylı yapılandırma birlikte geri alınır.
+  Eklenen tablolar/sütunlar/032 indeksi ve audit korunur; otomatik down migration veya kayıt silme yoktur.
+  028 yetki geri dönüşü, audit/AccessVersion etkileri nedeniyle ayrı incelenmiş işlemdir; sessiz JSON geri yazımı yapılmaz.
+  DBA restore yalnız önceden onaylı geri dönüş planıyla; yeni audit/iş verisinin kaybı ayrıca değerlendirilir.
+- **029 sonrası sahibin ilk kapsam adımı:** 029 doğrulanıp tüm DBA sırası tamamlandıktan ve eşleşen API/UI
+  birlikte yayınlandıktan sonra yapılır. 029 tek başına kapsam vermez. Bu işlem ürün veritabanına kapsam,
+  geçmiş ve audit kaydı yazar; ayrı hedef uygulama/kabul onayı kapsamındadır, paket hazırlayan oturum yapmaz.
+  Sahip `ServiceAccounts.Administer` yetkisiyle Servis Hesapları → Modül yönetimi → Kapsam yetkileri
+  (`/service-accounts/admin`) ekranını açar. Modülde **hiç kapsam kaydı oluşmamışsa** gerekçeyi girip
+  **“İlk kapsamı al (bir kez)”** işlemini yapar; kendi kapsamı `All` olur. Başarı sonrası “Kapsamımı yeniden
+  kontrol et” ile erişimi yeniden okur ve ilk kapsamın geçmiş/audit kaydını kontrol eder.
+  Eski veya geri alınmış bir kapsam kaydı varsa bootstrap kapalıdır; başka bir modül yöneticisi “Kişi”
+  listesinden onaylı kullanıcıyı seçip kapsam verir. Sonraki kapsamlar da başka yönetici tarafından verilir.
+  Düğme yoksa, şema hazır değilse veya yetki reddedilirse durun; SQL'den kendine kapsam vermeyin.
+- İlk kabul, ayrı onaylı hedef kabulünde ve yalnız sentetik kayıtla, aşağıdaki sırayla kaydedilir.
+  Bu kutular paket hazırlığı sırasında işaretlenmez:
+  - [ ] **Giriş:** onaylı hesapla giriş; Erişimim ekranında gerekli modül yetkileri, Servis Hesapları'na
+    erişim ve mevcut kayıtların okunması kontrol edilir. Giriş başarısı tek başına veri kapsamı değildir.
+  - [ ] **Kapsam:** yukarıdaki ilk-kapsam adımı veya başka yöneticiyle kapsam ataması tamamlanır;
+    içe aktarma için `All` veya kurum düzeyi gerekir, yalnız ekip düzeyi yeterli değildir.
+  - [ ] **İçe aktarma önizlemesi:** `/service-accounts/imports` ekranında yalnız sentetik dosya yüklenir;
+    profil, sütun eşlemesi, kurum/kapsam, uyarılar ve satır kararları gözden geçirilir, önizleme alınır.
+    Önizleme aşaması kayıtların uygulanması değildir; uygulama ayrıca onaylanır.
+  - [ ] **Rapor:** `/service-accounts/reports` ekranında kapsam filtresi ve sentetik kayıtların beklenen
+    durumu doğrulanır; rapor anlık görüntüsü ile PDF/XLSX çıktıları açılarak içerik ve Türkçe karakterler
+    kontrol edilir. Önizleme tek başına yeni hesap oluşturmadığı için raporda aktarılmış sayılmaz.
+  - [ ] **Ek iş akışları:** talep/gMSA adı, tarama yükleme ve karar; başarılı unsafe UI çağrısı,
+    başlıksız yetkili istemci için 403, cross-site red ve denial audit kontrol edilir.
+    Reddedilen istekte business/provider işlemi yoktur; güvenlik session/identity/audit yazıları ayrı tutulur.
+  - [ ] **Değişiklik planları kurulu değil:** 033/034 uygulanmadığından `/service-accounts/plans`
+    ekranı dürüstçe "kurulu değil" göstermelidir. Yetkili plan çağrısı 503, `change-plan-schema`
+    kategorisi ve `ServiceAccountChangePlansNotInstalled` kodu döndürür; plan kanıtı da kaydedilmez.
+    033 mevcut fakat 034 yoksa plan kanıtı 503 `ServiceAccountChangePlanEvidenceNotInstalled` olur.
+    Normal hesap/kapsam/içe aktarma/rapor akışları yukarıdaki hedef kabulünde ayrıca doğrulanır;
+    fake/controller testleri şema-032 üzerinde tüm modülün çalıştığı kanıtı değildir.
+- SQL sonrası envanter, 030 izinleri, 031 sütun tipleri, 032 plan/indeks ve hedef deadlock kanıtı kontrol edilir.
+  Gerçek AD/JEA, kurumsal SQL/OIDC/Negotiate/IIS/F5, e-posta/Jira ve kurulu TEST kabulü yerel kanıtla kapanmaz.
+  Herhangi bir kurumsal bağlantı veya uygulama için ayrı yetki gerekir. Bu aday `readyForInstallation=false` kalır.

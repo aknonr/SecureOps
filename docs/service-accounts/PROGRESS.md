@@ -1,383 +1,222 @@
-# Service Accounts — Progress, Verification and Handoff
+# Service Accounts — Current State (start here)
 
-Single progress record for the module (design: [README.md](README.md), rules: [SPEC.md](SPEC.md)).
-Branch `feature/service-accounts-20260928`, temporary baseline `a3037175bb0bb9ecc7ab5c36c7c28607726469ce`
-(verified UI handoff commit). The integrated branch was published afterwards:
-`feature/sdm-integrated-test-20260928` at `e997c5b68cebcd23716860a9b06fdc25ebbb4493`, tested product
-`deda8486b57c04a23aba203c0e79f96b746102e9` (an ancestor of that head). `a3037175` is **not** an
-ancestor of the integrated head, so this branch needs **reconciliation by Codex, not replacement**;
-it has not been merged or rebased here. Not deployed, no release package, no live flag, no SQL
-activation, no corporate SQL/source/Jira/AD/SMTP call.
+Short on purpose: current state, open work, how to verify. Dated session records and older evidence are in
+[PROGRESS-HISTORY.md](PROGRESS-HISTORY.md) (newest first); read it only when a question needs the history.
+Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WINDOWS-ACCEPTANCE.md](WINDOWS-ACCEPTANCE.md).
 
-## Continuation on master and directory name search (2026-10-02)
+## Context
 
-Branch `feature/service-accounts-continuation-20261002`, cut from master `e670617` (SDK 9.0.317/C# 12, migration 025,
-concurrency and authorization fixes unchanged); the knowledge-base delta `7e227ed..4e6a4ef` (delivery checkpoint,
-bundle unchanged) is applied exactly once. Harness conflict resolved on master's harness; no textual conflict with
-the open PR branches for Resources UI and agent guidance (`git merge-tree`). Added the bounded directory name search
-(ADR-0025, ADR-0008 amendment): API `POST .../directory/name-search`, AD and synthetic providers, scoped record links,
-name-free audit, UI panel, unit/SQL/composition/UI tests. SA-002 stays unnumbered; the LocalDB role tests now cover
-its two tables. Windows rows 29–38 in `WINDOWS-ACCEPTANCE.md`.
+- PR #11 (scope setup, guided import, reports, usage scan) is merged into master (`fb87c20`, 2026-10-05); its branch state is
+  in PROGRESS-HISTORY.md. Current branch `feature/service-accounts-gmsa-name-scan-paging-20261005` from master `fb87c20`.
+- Owner decision 2026-10-03: Claude owns the module end to end (backend/API/UI, migration numbering, Windows
+  verification); the owner merges and deploys. Rules: `AGENTS.md` + `CLAUDE.md`.
+- SDK 9.0.317 exactly (`global.json`, `rollForward: disable`, no `LangVersion` override). On the owner's workstation it is
+  a user-local install: `$env:LOCALAPPDATA\Microsoft\dotnet` (Program Files has 9.0.318/10.x only).
+- Synthetic data only (`syn.*`, `SYN_*`); no corporate SQL/AD/Jira/SMTP writes; nothing applied to the installed TEST
+  system without the owner's explicit approval; no write/automatic-conversion code (Phase 8); report in Turkish.
+- Push on the owner's workstation: Git Credential Manager holds two GitHub accounts, so name the owner's:
+  `git -c credential.https://github.com.username=aknonr push origin <branch>`.
 
-## Knowledge-base rules and report v2 (2026-10-01)
+## Close readiness OLAY-2a (branch `feature/service-accounts-close-readiness-20261013`, from master `633eed9` + OLAY-1 design merged in, not merged)
 
-On top of the follow-up line: usage records and the explained knowledge-base rule engine, owner decision 2026-10-01
-(SQL-team accounts are evaluated as gMSA by the configured executing team, routed automatically on import), gMSA funnel,
-12-week trend, risk candidates, directorate view, snapshot comparison, SQL candidate SA-002 and ADR-0024 (proposed,
-read-only discovery). Completed 2026-10-02: Oracle corrected to an unverified manual review, duplicate gMSA routing
-fixed, persisted-access verification, browser boundary journey on the real composition (allowed journeys blocked on
-Linux, see Windows rows 17–28), master conflict analysis. Details, hashes and results:
-[KB-RULES-20261001.md](KB-RULES-20261001.md). Module integration 39/39 under the restricted role (SDK 9.0.317, no override).
+- `ServiceAccountRules.EvaluateClose` lists every missing close condition (`CloseGap`: code, remedy, sub-codes of the closest deletion
+  candidate, expected action type, related action); `ValidateClose` returns its first code (equivalence to the previous implementation
+  is a unit test). New read-only `GET requests/{id}/close-readiness?outcome=` (View, account-detail scope, 404 out of scope, strict
+  outcome names, no write/audit); OpenAPI snapshot additive only (one path, `CloseReadiness`, `CloseMissing`). No migration, no UI.
+- Not in this PR: `RequestView.closeReadiness` (detail lacks the verifier/evidence facts; see EVENT-GUIDANCE-DESIGN §6 note) and
+  `EvaluateVerification`.
 
-## Follow-up 2026-09-30 (after the pinned handoff)
+## Event guidance design OLAY-1 (branch `docs/service-accounts-event-guidance-design-20261013`, from master `633eed9`, not merged)
 
-The Codex handoff stays pinned at `b4fdf8d`. Module-only follow-up changes, results and what to
-integrate afterwards: [FOLLOWUP-20260930.md](FOLLOWUP-20260930.md). Scenario 4 completed (closure
-reviews never close accounts), reporting chain and export cap verified, Windows pilot journey now
-requires normal authentication with approved TEST identities (BLOCKED without them).
+- Design only, no code: [EVENT-GUIDANCE-DESIGN.md](EVENT-GUIDANCE-DESIGN.md) ("Ne oldu?" flow, event-to-record table, preview/commit contract,
+  close-readiness, deterministic mail hints, migration 036 reserved, threat table E1-E14, split OLAY-2a/2b/2c/3). Owner questions S1-S8 open.
+  Reported is not verified: the flow never writes Verified. OLAY-3 (UI) waits for F4.
 
-## Pilot-readiness iteration 2026-09-29 (pinned handoff)
+## First TEST acceptance — UI fixes (F4; branch `feature/service-accounts-first-acceptance-ui-20261013`, merged #42 → master `101c1f5`)
 
-Integration source, results and Windows commands: [HANDOFF.md](HANDOFF.md) (supersedes the
-`55ab73e` bundle). Windows runner: [WINDOWS-ACCEPTANCE.md](WINDOWS-ACCEPTANCE.md) — **not executed**.
-This round: pooled isolation leak fixed (`cd51dbf`); stale reminder job no-op, unused grants removed,
-reverse gate test (`4c27bbb`); HTTP composition tests through the real `Program` (`b8aad7e`). At
-`b8aad7e`: build 0/0, unit 1566/1568 (2 baseline), integration failing set identical to `e997c5b`,
-module 33/33 on a new database under the restricted role. The two first-run failures remain
-unexplained (see below). The tables in the next section describe the previous round.
+- List shortcut buttons did nothing while the list was open (Blazor updates parameters, `OnParametersSet` only set `_status`). Now a changed
+  query string re-applies exactly that shortcut's filter (all other filters cleared), returns to page 1 and re-reads; no change, no re-read.
+- Counts: the list says what its total counts ("kapsamınızdaki tüm hesaplar" vs the applied filter) and, for `status=proposed` from the card,
+  whether it equals the card's number. Cards carry hints ("farklı hesap", "talep/bildirim sayısı, hesap değil"); the shortcut shows the count.
+  Both numbers count distinct in-scope accounts with a Proposed ownership; no API gap.
+- List search field is "Hesap adı" (the API never searched SID); filters apply on Listele/Enter, said on the page. Directory name search has
+  distinct states: waiting, could not search (unknown, may be not set up or unreachable), no match for the searched name, matches, truncated.
+- Usage-scan texts: the system does not scan; read-only JEA scanning is a separate capability without Information Security approval (ADR-0024 R2).
+- Short guide fix (list "Bul" step). Import rows: "Excel satırı N", a one-line reason for Conflict/Invalid/OutOfScope, error lines name sheet and row,
+  and a missing server detail is stated. The event-oriented guide ("Ne oldu?") is OLAY-1, not here.
+- Gaps recorded: `docs/26-ui-backend-contract-gaps.md` G-37. Tests: `ServiceAccountFirstAcceptanceUiTests` (renders the real list page with a
+  synthetic API; reverting the fix makes the shortcut tests fail). Not verified: the real browser journey and corporate TEST.
 
-## Continuation 2026-09-29 (sole implementation owner)
+## Change plan d, PR 2 (branch `feature/service-accounts-change-plan-checklist-20261012`, from the PR 1 branch `db56856`, not merged)
 
-Codex stopped Service Accounts edits; this module is continued by one owner. Final platform
-integration remains with Codex. Everything below is local only: no push, merge, deployment,
-package, flag, migration number, corporate SQL/source/Jira/AD/SMTP call.
+- Contract first (`a737d2b`, pushed for F and G): `GET/POST change-plans/{id}/items/{itemId}/checks`, `POST .../evidence`,
+  `POST .../complete`; additive DTO members (latest mark per row, checklist summary, plan evidence, completion outcome,
+  `Check/Complete/UploadEvidence` permissions). Design section "Kontrol listesi, kanıt ve kapanış", threat rows T4b–T13.
+- Migration 034 (SA-007, `DBA-034-TR.md`): only `CK_SaEvidence_Owner` gains `'ChangePlan'` (same name, `WITH CHECK`); 51396
+  on replay/missing 033/unexpected definition. Harness 001–034 + `sa-034-guards.sql`.
+- Marks are the person's statement (`Done/Skipped/Failed/RolledBack`, note required except Done, `expectedCheckId` against
+  lost updates, outside-window accepted and flagged). Completion records one unverified `GmsaConversion` Performed action per
+  account whose rows say Done with nothing Failed/RolledBack; never verifies, never closes the linked request, never touches
+  the transition record. Plan evidence: whole-plan scope for download, never listed on one account.
+- Open: release selector must learn 034 too (Codex, H); `sa-sql-harness.sh` (Linux counterpart) still ends at 032.
 
-| Item | Value |
-|---|---|
-| Handoff source | branch `feature/service-accounts-sdm-integration-20260929` at `e997c5b68cebcd23716860a9b06fdc25ebbb4493` + WIP patch (SHA-256 `4C1B5F50…D276D`, bundle `99AB894D…6ADD`, both verified) |
-| Restore | fresh clone of the bundle; patch applied after CRLF→LF normalization (lossless); 127 paths = handoff inventory (OpenAPI intentionally absent) |
-| Continuation branch | `feature/service-accounts-continuation-20260929` (new, local) |
-| Checkpoint commit | `c63d1bcd413189705e3b4caf8c3d90111e639492` (WIP exactly as handed over) |
-| Codex evidence carried as prior results (not rerun) | combined build 0/0; Worker composition 3/3; SA SQL 20/20 on two fresh DBs; injected install failure left no module objects |
+## Change plan d, PR 1 (branch `feature/service-accounts-change-plan-api-20261007`, from master `78a94b1`, not merged)
 
-Changes after the checkpoint (each commit below the 1 000-line review cap, OpenAPI excluded):
+- Contract first (`0400d58`, pushed for the UI (F) and security-test (G) sessions): `/api/v1/service-accounts/change-plans` list/detail/
+  items, create, PATCH (full account list), preview, approve, cancel; DTOs in `ServiceAccountChangePlanContracts.cs`.
+- Migration 033 (SA-006, `DBA-033-TR.md`): seven tables, append-only guards, approval separation trigger, `UQ(PreviewId)`;
+  grants SELECT/INSERT (+UPDATE ChangePlans), no DELETE. Harness 001–033 + `sa-033-guards.sql`. Design deviations and threat
+  test names: `CHANGE-PLAN-DESIGN.md`. Added flag `NothingFound` (scan answered, account found nowhere).
+- Open: release tool `Get-ReleaseSqlPlan.ps1` refuses a 001–033 chain (by design, needs a reviewed update before merge);
+  `Evidence.OwnerEntityType` cannot hold plan evidence without changing an existing CHECK (PR 2 question).
 
-| Commit | Change |
-|---|---|
-| `53641a7` | VerifyAction root cause (deadlock 1205 with import commit) fixed by a shared write gate; deterministic reproduction test |
-| `8c2e995` | Explicit import coverage (Unknown/Partial/Complete + validated population); absence only from a complete list |
-| `bca5375` | Participant write boundary (visibility ≠ authority); manual accounts stay provisional; safe failure origin logging |
-| `fbe4cb7` | Entry work summary ("Takibinizdeki işler") on the list and team work pages; OpenAPI regenerated from the combined app |
-| `d42ede5` | Least-privilege runs as synthetic API/Worker role members; gate error 51312 |
-| `444b7f7` | Persisted-access composition test without access wrappers |
-| `761cb20` | Monthly/custom report periods; scoped, capped, audited, rate-limited account-list XLSX export |
-| `faa0815` | On-demand directory observation tab reusing the platform component and permission |
+## Change plan d, PR 4 — UI checklist, plan evidence, closing (F3; branch `feature/service-accounts-change-plan-checklist-ui-20261012`, from master `d3eed21`, not merged)
 
-Actual results in this container (Linux, SDK 10.0.112 with `-p:LangVersion=13`, SQL Server 2022 container):
+- Replaces the "Henüz sunulmuyor" states with the real flow against the routes merged in #36: per-row marks (`expectedCheckId`; 409 `checkStale`
+  adopts the server's plan, re-reads rows, keeps the draft), "pencere dışında" label, counters, plan evidence upload/download (503 without 034 shown as
+  "kurulu değil"), closing form with the "Yapıldı is a statement, not a verification" confirmation, per-account closing outcome. Buttons follow
+  `permissions` only. UI/docs/tests only; [G-36](../26-ui-backend-contract-gaps.md) item 1 closed. Details: `src/SecureOps.Ui/README.md` ("F3").
+- Verified 2026-10-12 on the local Demo (API :5430, UI :5431, synthetic DB `SecureOps_SaF31012` on LocalDB `SecureOpsResourcesV1`, migrations 001–034 by the
+  harness, no role scripts; the second demo actor got the Admin role by a direct insert into the synthetic DB): mark Yapıldı / Atlandı (note required,
+  button waits); a mark made by another actor in between → 409 `checkStale`, row refreshed to the other mark, nothing saved, "Geri alındı" now offered;
+  evidence listed (uploaded through the API with curl; the browser file picker was NOT driven); close with the confirmation → outcome per account
+  ("eylem kaydedilmedi" for Failed/Skipped, "gMSA geçiş eylemi 'yapıldı' olarak kaydedildi, doğrulama ayrı" for an all-Done plan); 390 px and 320 px
+  without horizontal overflow. Not verified: light appearance and 200 % zoom by eye, the outside-window label against a real window (unit-tested only),
+  Windows/IIS, corporate TEST (034 is not installed there), a Playwright journey (none written).
+- Found by that run and fixed: the child forms call back through plain delegates, so the page was not re-rendered after a save (marks reached the server
+  but the screen stayed stale); the page now renders after each command.
 
-| Check | Result |
-|---|---|
-| `dotnet build SecureOps.sln -c Release` | 0 warnings, 0 errors |
-| Unit (all) | 1563/1565; the 2 failures (`AuditConfigurationValidatorTests.Validate_WhenProductionFailOpen_Throws`, `SccmFailureEvidenceTests.StagedInvocations…` PowerShell on Linux) also fail on clean `e997c5b` |
-| Module unit | 55/55 (incl. Worker composition 3/3) |
-| Integration (all) | 299 pass / 61 skip / 12 fail; failing set identical to clean `e997c5b` on this host (DPAPI key ring, image codec) |
-| Module SQL | 28/28 on fresh `SecureOps_SaCont2`, first run, repository connected as a member of `svcacct_api_runtime` only; negative control with one denied grant fails with SQL 229 |
-| Worker role | Worker statements succeed as a synthetic `svcacct_worker_runtime` member; History read denied |
-| OpenAPI | regenerated; semantic diff vs `e997c5b`: 0 removed/changed, 44 module paths added |
-| Not run | Windows toolchain, LocalDB/Integrated Security, IIS, HTTP pipeline with real auth, browser journey against the real composition, desktop Excel |
+## Change plan d, PR 3 — UI (branch `feature/service-accounts-change-plan-ui-20261012`, from the API branch `db56856`, not merged)
 
-The persisted-access test composes the production registrations (`AddSecureOpsInfrastructure` with
-`Access:RepositoryProvider=SqlServer`, SQL audit, `ApplicationAccessService`) and the module; roles are
-reviewed bundles created by a synthetic platform administrator, scope comes from module grants, and a
-bundle change is effective on the next call. It does not exercise HTTP or Integrated Security: the API
-host refuses SQL logins at startup and Linux has no Windows authentication. The earlier browser
-harness is not reused as authorization proof.
+- `/service-accounts/plans` (scoped list, status and `?accountId=` filter, create a Draft plan from searched accounts) and
+  `/service-accounts/plans/{id}` (Plan → Önizleme → Onay → Kontrol listesi → Doğrulama). Details and wording rules:
+  `src/SecureOps.Ui/README.md` ("gMSA change plan UI"). Checklist marking, evidence and closing are **not offered** (no API until PR 2: G-36).
+- F2 (2026-10-12): PR 1 branch (E-fix `2c245ad`) merged into this branch without conflict; OCO text corrected to the server rule
+  (validated, upper-cased; 400 `ocoNumber` shown under the field). Verified on a fresh 001–033 DB: invalid OCO refused under the field with the
+  draft kept, `oco-9000124` saved as `OCO-9000124`; build 0/0, unit 2052 passed / 1 existing skip, scoped format clean.
+- Shared pager `SaPager` replaces the four hand-written pagers (keyboard focus no longer falls to the page when a page changes).
+- Verified 2026-10-12 on the local Demo (API :5330, UI :5331/:5332, synthetic LocalDB `SecureOps_SaPlanUi1012`, migrations 001–033 applied
+  by the harness without role scripts): create refused → per-account answers and draft kept; create; preview (counters 2/0/1/0/1/2/0:
+  found, stale, no info, partial, manual, not found, long name); planner sees the server's `approverIsPlanner` reason and no form; a second actor
+  approves; approving a version the planner had just replaced → 409 `previewStale`, current plan adopted, nothing saved; PATCH rename; cancel;
+  390 px and 320 px without horizontal overflow, light and dark; account-list pager keeps focus on the last page (31 accounts).
+  Build 0/0, unit 2035 passed / 1 skipped (existing), scoped format clean.
+- Not verified: integration/SQL suites (no backend change), repo-wide format, real 200 % browser zoom (narrow viewports used), screen reader,
+  full Tab traversal of every control, Windows/IIS/corporate TEST, Playwright journey (not written).
 
-Shared changes needing Codex coordination: regenerated `docs/contracts/secureops-api-v1.openapi.json`;
-two `src/SecureOps.Ui/README.md` route descriptions. No change to `Program.cs` files, platform
-policies, rate-limit policies, In Use, SDM/OR, OCO, SCCM, Windows Service lifecycle or process locking.
-The export rate limit is a new module-owned policy registered from `AddServiceAccountsApi`.
+## Ops-research UI work (2026-10-06, separate branches from master, not merged)
 
-Backlog decisions (not implemented, by design):
+Order c, b, a, d from `ops-research/05-yol-haritasi.md`. **c merged** (PR #14, `87df0c3`):
+"Sıradaki adım" card on the account page, computed in the UI from the loaded detail only (no API change); missing data reads
+"bilgi eksik", never "not used"; a step the caller may not take reads "başkasından bekleniyor".
+**b** (branch `feature/service-accounts-scan-diff-20261006`, no PR yet): server-side scan comparison (G-33,
+`GET accounts/{id}/usage-scans/{linkId}/diff`, read only, no migration) and the "Önceki taramaya göre fark" UI. Verified
+2026-10-07 at `b2d02b3` (contains master): build 0/0, format clean, unit 1972 + 1 intentional skip, integration 434/434
+(67 skipped) twice on fresh `SecureOps_SaDiff1007a`, local Demo WINDOWS-ACCEPTANCE row 88.
 
-- **Custom fields** (admin-defined, for accounts and requests): only `ServiceAccounts.Administer`
-  defines them; values are data, never authority or ownership. Needs a schema addition in the
-  unnumbered candidate and a review slice of its own.
-- **ML.NET / "yapay zeka önerisi"**: first explainable, rule-based suggestions (overdue, no reply
-  after N days, missing owner, plan without date), each showing its rule. ML.NET only through an
-  ADR on the Phase 7 track, local models on synthetic/approved data, no external AI service, and a
-  suggestion never changes data by itself.
+## Multi-account scan upload (branch `feature/service-accounts-multi-account-scan-20261006`, from master `50c0528`)
 
-### Reconciliation preview (read-only, nothing merged)
+- `POST usage-scans` (multipart `file`, `runStatement`, 1–20 distinct `accountIds`), no migration: file validated once (secret
+  guard first), then each account on its own (scope, responsible basis, searched by the file); outcomes Attached /
+  AlreadyAttached / NotInScan / Ambiguous / Unavailable (no name out of scope) / Failed. UI: list selection → "Tek tarama
+  dosyasını bu hesaplara bağla". Rules: SPEC "Usage scans" 9, ADR-0027 §4. Windows row 86.
+- Verified 2026-10-06: build 0/0, unit 1919 + 1 intentional skip, integration 361 / 62 skipped with module SQL on fresh
+  `SecureOps_SaBatch1006a` (harness 001–031 exit 0), format clean, OpenAPI additions only (+261/−0). One integration run of five
+  had one failure that did not repeat; its name and cause were not captured (Open work 9).
+- Review fixes 2026-10-07 (two independent reviews of PR #18): per-account failure boundary, names from the scope read (no
+  separate name query); per-server account list must equal the bundle's set; scope and basis re-checked inside the link's
+  write transaction (both routes); `ServiceAccount.UsageScanBatchRefused` audit (reason and counts only); OpenAPI form
+  schema for both uploads; UI: error in the form with retry, old answer cleared, focusable `aria-disabled` send button with
+  its reason, `aria-expanded` toggles, badge "Aranmamış", "Hesap bilgisi okunamadı" for an unread failed row. Verified:
+  build 0/0, format clean, unit 1933 + 1 intentional skip; before merging master `304788f`: integration 365 / 62 skipped on
+  fresh `SecureOps_SaFix1007b` (harness 001–031 exit 0; the 030-copy test 3/3 on `SecureOps_SaFix1007b030`); after the
+  merge: five full runs, 419 / 67 skipped in four (two on fresh databases), one failed run (Open work 9). Windows row 87.
+  Not run: module SQL as the least-privilege runtime principal (`SECUREOPS_SA_SQL_RUNTIME_CONNECTION`).
+- PR #12 (031 + scan paging) is merged (`50c0528`); the section below is its record.
 
-- Merge base with the integrated head: `5c986a96f1f6639e47bf1432a87c3ac55e98054d`; the integrated
-  side has 7 commits after it.
-- Both sides changed the Jira-only UI files because this branch starts after the three Jira UI
-  commits (`6075ca8`, `db3be19`, `a303717`) that the integrated branch carries in its own form.
-  Those files are not Service Accounts work and must follow the integrated side.
-- `git merge-tree --write-tree HEAD e997c5b` reports conflicts only in
-  `docs/contracts/secureops-api-v1.openapi.json` (generated; regenerate after reconciliation with
-  `SECUREOPS_UPDATE_OPENAPI=1`) and `src/SecureOps.Ui/README.md` (six added route rows).
-- `src/SecureOps.Worker/Program.cs` changed on both sides without a textual conflict; the
-  `AddServiceAccountsWorker` line must be re-checked against the integrated composition.
+## On this branch (done, 2026-10-05)
 
-### Push status
+- **Requested gMSA name (migration 031, SA-005).** `RequestedGmsaName` on gMSA requests (create, update, reasoned clear) and
+  on transitions; one shared 15-character rule (`ServiceAccountGmsaName`) for the registration hint, the new hint and the
+  server; the server refuses a longer name or a name on other work; history and the report list ("İstenen gMSA adları")
+  carry it; before 031 the screens say so and a name is refused with nothing written. Rules: SPEC "Requested gMSA name".
+  031 adds two nullable columns, refuses replay (51370) and needs no new grant. DBA note: [DBA-029-030-TR.md](DBA-029-030-TR.md).
+- **Usage scan paging.** The account page carries the newest 5 scans and 25 matches per role (undecided first); counts,
+  coverage and outcomes are aggregated in SQL over every match; read-only GET pages for older scans and further matches
+  under the detail's scope rule; "Yalnız karar bekleyenleri göster"; server totals in the tab title. SPEC "Usage scans" 8.
+- **Fixes found while verifying:** a deadlocked scoped read (list/export, detail, report facts) runs once more instead of a
+  503 (`33c6500`); keyboard dismissal of a scan match; the report trend table no longer clipped at 390 px (`ecb1294`).
+- Tools: harness 001–031 (`-ThroughMigration 30` stands in for an installed 030 system), `sa-031-copy-rehearsal.ps1`.
 
-`git push -u origin feature/service-accounts-20260928` was refused: `The requested URL returned
-error: 403` (GitHub App access for the repository is not granted to this session). Push attempts
-are stopped; the branch is preserved in the session workspace and in a verified Git bundle outside
-the repository.
+## Verified (Windows workstation, 2026-10-05, SDK 9.0.317, LocalDB)
 
-## Stages
+Build 0/0 · unit 1901 passed, 1 intentional skip · integration 303 passed / 117 skipped (SQL-gated and opt-in) · format clean ·
+OpenAPI snapshot additions only · harness 001–031 exit 0 on fresh `SecureOps_SaGmsaPage1005c`, module SQL 62/62 on the first
+run, no `Number=1205` (the first fresh run, `…1005b`, had one; root cause and fix in WINDOWS-ACCEPTANCE row 79) · 031 rehearsed
+on two copies at 030 (rows 80) · new binaries before 031 (row 81) · local Demo (identity bridge, not OIDC): requested name with
+warning, server refusal and saved value, transition, report list, scan paging with keyboard, 390 px light and dark
+(rows 82–85).
 
-| Stage | Result | Commit |
-|---|---|---|
-| S0 design note, sanitized spec | Done | `291c7f0` |
-| S1 SQL candidate, domain rules, scope | Done | `291c7f0` |
-| S2 import pipeline + API | Done | `0e71d3f` |
-| S3 accounts, workflow commands, evidence | Done | `486fd32` |
-| S4 reports, immutable snapshots, XLSX/PDF | Done | `746a2fa` |
-| S5 reminder outbox, drafts, Hangfire schedule | Done | `571196e` |
-| S6 Blazor UI | Done | `db1444f` |
-| S7 verification fixes (harness browser run, reconciliation) | Done | `502e66c`, `f32515c`, `cf83a3e` |
+## Open work
 
-Defects found by verification and fixed on this branch: case-colliding Dapper parameters in
-scope-grant insert; READPAST claim failing on pooled SERIALIZABLE connections; handover cohort
-double count (source row + handover row); legacy projection using confirmed persons only; UI
-list fetch dropped by a concurrent access refresh; missing accessible names on MudBlazor 6
-fields; import provenance autocomplete not binding; spec-inconsistent UI labels ("OR required"
-for any deletion report, "date required" for performed reports).
+1. **Owner approval for 031** on any installed system (after 029/030 and `SA-004-API-permissions.sql`): DBA note above.
+2. **Row 58 / 75 / 80:** 029, 030 and 031 on a restored copy of the installed TEST database — waiting for the owner's `.bak`;
+   `sa-031-copy-rehearsal.ps1` runs on such a copy without `-SeedSynthetic`.
+3. **Row 64:** open the synthetic snapshot PDF in Edge and Adobe; Properties → Fonts shows both fonts as embedded. The new
+   report section was not opened in a generated XLSX/PDF (unit test only).
+4. **Rows 60–61:** browser check of the landing redirect and the three `sa-*` roles with synthetic TEST users.
+5. **Rows 1–38:** blocked until approved TEST OIDC identities (and TEST AD for 29–38) are available.
+6. **Rows 67–68 (lab server):** collector where the synthetic account runs a service, a scheduled task and an app pool with a
+   stored password, also as a non-administrator; check whether it silently skips scheduled tasks it cannot see.
+7. Not re-walked in the browser: the keyboard dismissal after its fix (row 85a, source test only) and the request-update
+   name field with "temizle" (SQL tests only).
+8. Low priority: the usage-scan attach (both routes) now re-checks scope and basis inside its write transaction
+   (2026-10-07); the module's other writes still check before their transaction (unchanged, not this branch); the warning colour is 4.37:1 on the page background (4.92:1 on the form surface where it is used); secret words written
+   with Cyrillic look-alike letters are not caught; at 390 px a focused tab header can be partly outside the MudTabs scroll
+   strip; the app shell brand link and "Hesap menüsü" have no focus ring (outside the module); the server list of a scan
+   (up to 500 rows) is not paged (it sits in a closed section).
+9. **Unexplained integration failure (2026-10-06):** on the multi-account scan branch one of five full integration runs
+   (module SQL on, `SecureOps_SaBatch1006a`) reported 1 failed / 360 passed; the next four runs passed 361/361 and the failing
+   test's name and message were not captured. Cause unknown. Next: run the integration suite repeatedly with a trx logger
+   and `SECUREOPS_SA_SQL_DIAGNOSTICS`, record the test name and SQL number, then decide.
+   2026-10-07 (trx captured, five runs after merging master `304788f`): the first run on fresh `SecureOps_SaFix1007d` took
+   3 m 43 s; `ServiceAccountImportSqlTests.ConfirmingOwnershipInImport_RequiresAssignCapability` passed but took 2 m 16 s
+   (normally 0.5 s). This is the whole test duration, not a measured commit duration: that test stages a workbook and
+   checks assignment denial; it never calls commit. The original gate holder was not captured. Two writes failed:
+   `ServiceAccountWorkflowSqlTests.ClosureVerification_DuringImportCommit_WaitsInsteadOfDeadlocking` (SqlClient timeout)
+   and `ManualAccounts_StayProvisional_EvenWithATypedDomain` (persistence unavailable). system_health had no deadlock in
+   that window; the gated access-registration tests were skipped. The next four runs (one on fresh `…1007e`) passed
+   419/419, about 1 min each. Also found and fixed that day: the new middle-account test held a raw row lock outside the
+   write gate and deadlocked (1205) with a parallel serializable import commit; its class now runs in the serial
+   "Service Accounts write gate" collection. Cause of the slow test still unknown.
+   2026-10-07 follow-up from master `13b5703`: 21 full integration runs on 21 fresh synthetic LocalDB databases,
+   432 passed / 68 gated skips each; eleven runs also correlated SQL SPIDs with exact test names. No unexpected failure
+   or deadlock reproduced. Controlled deadlock capture verified separately. No scheduling, module, UI or migration
+   fix inferred. **Open work 9 remains open**; evidence and limitations: [INTERMITTENT-LOCK-20261007.md](INTERMITTENT-LOCK-20261007.md).
 
-## Verification (Linux container, 2026-09-28)
+## Decisions (owner, 2026-10-04)
 
-Toolchain: .NET SDK 10.0.112 building `net8.0` with `-p:LangVersion=13` (the SDK's C# 14 default
-changes `Reverse()` overload resolution in existing code; the Windows toolchain should be checked
-by Codex). SQL: disposable SQL Server 2022 container, databases created by
-`tests/sql/service-accounts/sa-sql-harness.sh` (001–024 + candidate, replay refused).
+- ADR-0024 read-only discovery: shelved on 2026-10-04; **Revision 2 accepted as an owner decision on 2026-10-06**
+  (read-only JEA scan; no server writes, ADR-0028 stays Proposed). Bilgi Güvenliği and server-owner approval are NOT
+  obtained and are required before a pilot; the Worker access path (direct WinRM+Kerberos or BeyondTrust) is open.
+  Replaced for now by the person-run scan of ADR-0027 (no JEA, no Worker). A product-side fan-out over the default WinRM
+  endpoint would be an exception to AGENTS.md rule 3 and is not built.
+- JEA allow-list finding (raw `Get-WebConfigurationProperty`/`Get-Content` can return IIS-stored service account
+  passwords / any file): decision with the owner and Bilgi Güvenliği; needs its own ADR.
+- Automatic password or gMSA change: Phase 8, separate ADR and approval; until then the team changes by hand and the
+  module keeps plan, OR/OCO/Jira reference, evidence and verification.
+- PDF font subsetting (~350 KB per PDF today): later, only if size becomes a problem.
 
-| Check | Result |
-|---|---|
-| `dotnet build SecureOps.sln -c Release` | 0 warnings, 0 errors |
-| Unit tests (all) | 1477/1478; the 1 failure (`AuditConfigurationValidatorTests.Validate_WhenProductionFailOpen_Throws`) also fails on the baseline |
-| Module unit tests | 49/49 (domain, parser, metrics, reminders, export, UI transport/wording) |
-| Integration tests (all) | 286 passed, 56 skipped, 12 failed; the failing set (DPAPI key ring, image codec) is identical to the baseline run on this host |
-| Module SQL tests (`SECUREOPS_SA_SQL_TEST_CONNECTION`) | 19/19 in the recorded runs; one earlier run had 3 failures. Cause established on 2026-09-29 as an import-commit/VerifyAction deadlock and fixed (see below) |
-| OpenAPI snapshot | regenerated with `SECUREOPS_UPDATE_OPENAPI=1`; purely additive (`git diff --histogram`: +10 558 / −0) |
-| Browser journey `tests/browser/service-accounts.cjs` — **temporary harness, not the production API composition** | 13/13 steps against the harness below, Chromium, 1440 px / 390 px, dark scheme, 200 % zoom (720×450 @2x), no page errors, no unnamed module fields. Not yet run against the real Demo/Test API |
-| Private reconciliation (supplied package + workbook, private DB, results outside the repository) | see scenarios 1–5 below |
+## Verify each change
 
-### Temporary browser harness (not production composition)
+```powershell
+$env:PATH = "$env:LOCALAPPDATA\Microsoft\dotnet;$env:PATH"; $env:DOTNET_ROOT = "$env:LOCALAPPDATA\Microsoft\dotnet"
+dotnet build SecureOps.sln
+dotnet test tests\SecureOps.Tests.Unit --no-build
+dotnet test tests\SecureOps.Tests.Integration --no-build
+dotnet format SecureOps.sln --verify-no-changes
+powershell -NoProfile -File tests\sql\service-accounts\sa-sql-harness.ps1 -DatabaseSuffix <new>   # 001-031; then WINDOWS-ACCEPTANCE section 3
+```
 
-The API refuses SQL logins (`Integrated Security` is enforced) and the Linux container has no
-Windows authentication, so the real API could not be started against SQL here. The browser run
-used an **uncommitted** scratch host (kept outside the repository, source included in the handoff
-folder, `DemoHost.cs`):
-
-1. `WebApplicationFactory<Program>` of the real API, additionally bound to Kestrel on
-   `http://localhost:5000`, environment `Demo`, `DemoAuth:Enabled=true`,
-   `Access:DemoCompatibilityEnabled=true`, `Audit:Provider=InMemory` (platform access and sessions
-   stay in memory), `ServiceAccounts:Provider=SqlServer` with a disposable database connection
-   supplied through the `SA_DEMO_DB` environment variable.
-2. `IApplicationAccessService` is wrapped: for `demo:platform-admin` it adds all seven
-   `ServiceAccounts.*` actions, for `demo:team-lead` View/Work/Assign/Verify/Report; the user id is
-   mapped to (or inserted as) a `security.Users` row in the disposable database.
-3. `IAccessRepository.GetUserAsync(identity)` is wrapped to return that persisted id, so scope
-   grants reference the same user.
-4. UI: two Demo UI hosts on `https://localhost:5100` (`DemoMode:ApiDemoActor=platform-admin`) and
-   `https://localhost:5101` (`team-lead`) with a local development certificate.
-5. Database: `SA_PASSWORD=… tests/sql/service-accounts/sa-sql-harness.sh <container> SecureOps_SaDemo`,
-   then `sa-demo-bootstrap.sql -v Identity="demo:platform-admin"` after one API call as that actor.
-6. `node tests/browser/service-accounts.cjs <playwright> https://localhost:5100/ https://localhost:5101/
-   http://localhost:5000/ <evidence dir>` — all names are generated (`SYN_*`, suffix per run).
-
-What this does **not** prove: the production access store, role bundles and approval flow, API
-session cookies against a persisted session store, Integrated Security SQL, IIS hosting. Target run:
-normal Demo/Test API with `Access:RepositoryProvider=SqlServer`, a reviewed role containing the
-module actions, and the bootstrap fixture — not done.
-
-### SQL test failure: VerifyAction deadlock (cause established 2026-09-29)
-
-History: one early run of the module SQL tests had 3 failures without captured messages
-(`SecureOps_SaTest2`), and Codex later saw 18/19 on a fresh LocalDB with
-`MultipleRequests_ActionVerification_AndClosureRules` returning `ServiceAccountPersistenceUnavailable`
-at VerifyAction. Passing reruns were never treated as a fix.
-
-Evidence: the SQL Server `system_health` session of the disposable container retained one
-`xml_deadlock_report` (synthetic database `SecureOps_SaTest2`, 2026-09-28 19:50:31 UTC). Victim:
-VerifyAction's closure statement `UPDATE svcacct.Accounts SET LifecycleState = 'ClosureVerified' …`
-(READ COMMITTED, holding U/X on the account key). Other side: the import commit (SERIALIZABLE)
-`UPDATE a SET LastObservedOn … FROM svcacct.Accounts a JOIN svcacct.AccountObservations o …`,
-holding RangeS-S from its in-transaction re-plan and requesting RangeS-U on the same key. Error
-1205 was mapped to `ServiceAccountPersistenceUnavailable`. xUnit runs the import and workflow test
-classes in parallel on one database, and on a small fresh table the commit's re-plan reads ranges
-that cover other tests' synthetic accounts — so the failure is timing-dependent, and it is also a
-production defect (any account write overlapping an import commit could deadlock).
-
-Cause: the import commit takes the exclusive application lock `svcacct:import-commit`, but no other
-module write took that lock, so they could hold row locks inside the commit's serializable range.
-
-Fix: `BeginWriteAsync` takes the same lock in **Shared** mode as the first statement of every other
-module write transaction on tables the commit reads or writes (account/work mutations, communications,
-administration, import staging and re-plan). Consistent lock order means a write waits for a running
-commit before locking any row, and a commit waits for running writes. No retry, sleep or weakened
-assertion. A gate wait above 25 s throws 51312 (distinct from the install-time 51311) and is reported as persistence unavailable with nothing
-written. Reminder outbox, report snapshots and audit-only reads touch disjoint tables and are unchanged.
-`sp_getapplock` needs only `public`; the role scripts are unchanged.
-
-Proof: `ClosureVerification_DuringImportCommit_WaitsInsteadOfDeadlocking` reproduces the recorded lock
-order deterministically (synthetic data). Without the fix: 3/3 runs fail with error 1205. With the fix:
-3/3 pass, and the full module SQL filter passes (21/21). The early 3-failure run and Codex's 18/19 run
-kept no deadlock graph, so they are **consistent with** this cause but not proven identical. The test
-fixture now also records the failure type of non-SQL exceptions that are reported as persistence
-unavailable.
-
-### Other single failures after a fresh build (still unexplained, not reproduced)
-
-Two single failures occurred, each on the first module SQL run right after a build (2026-09-28):
-
-1. `SentSnapshotNeverChanges_LiveReportPlacesLateActionInItsWeek_ExportsReconcile` — message lost
-   (my console filter dropped it; no TRX was written). No retained evidence beyond that fact.
-2. `ParticipantTeam_WorksOnlyOnItsOwnRequest_AndLosesAccessWhenItCloses` — retained TRX
-   (`participant-c2b.trx`, 23:39:06 UTC): a participant's `CreateRequest` returned
-   `ServiceAccountPersistenceUnavailable` instead of `AccessDenied` on a path that only reads before
-   denying. The exception type and operation were not captured (the origin logging came later).
-
-What is known: `system_health` recorded no deadlock at either time, so neither is the 1205 cause
-above. The service reports SQL errors and `DbException`/`IOException`/`InvalidOperationException`/
-`TimeoutException` as "persistence unavailable"; the module log now names SQL number/state/class or
-failure type plus a safe `Origin` (type and method only), and the SQL fixture writes every such entry
-to `SECUREOPS_SA_SQL_DIAGNOSTICS`.
-
-Reproduction attempts (2026-09-29), all with TRX and diagnostics retained under the session evidence
-folder: 5 cycles of *new database* (harness + both role scripts) → `dotnet build --no-incremental` →
-first module SQL run: 28/28 each; earlier 8 warm runs and 10 rebuild-then-run cycles: 24/24 each. The
-only diagnostic ever captured is the intentional 51091 of the audit-rollback test. **Not reproduced;
-cause unknown; no fix is claimed for these two failures.**
-
-Demonstrated defect found while investigating (fixed, not claimed as the cause): SqlClient pools by
-connection string and a pooled session keeps the isolation level of its last transaction. The
-module's SERIALIZABLE transactions (import commit/re-plan, administration, communications) used the
-platform's `ConnectionStrings:SecureOpsDb` pool, so the next platform or module user of that session
-ran autocommit reads at SERIALIZABLE (and READPAST queries would be rejected). Fix: the module derives
-its own pool (`Application Name` + " / Service Accounts") and sets READ COMMITTED on every open.
-`ModuleSerializableWork_DoesNotLeakIsolationIntoPlatformPooledConnections`: without the fix 3/3 fail
-(next platform session isolation 4 = SERIALIZABLE), with the fix 3/3 pass. DBAs will see the module's
-sessions under that program name.
-
-## Acceptance mapping (SPEC scenarios)
-
-| # | Requirement | Evidence | Result |
-|---|---|---|---|
-| 1 | 390 accounts after first migration; earlier accounts preserved | Private reconciliation: package → 390 accounts; `LegacyPackageThenWorkbook_…` | Passed (357/1 split needs the unavailable previous baseline — not claimed) |
-| 2 | Re-import does not increase counts; older observation never moves latest back | Reconciliation: workbook 933 same / 0 new, package replay detected, counts unchanged; `CoordinationList_NewPeriodObservations_…`, `LegacyPackageThenWorkbook_…`, `Absence_IsInferredOnlyFromAValidatedCompleteList` (absence only from a declared complete list) | Passed |
-| 3 | Handover flag OK → exactly 81; no acceptance/gMSA without evidence | Reconciliation: cohort 81, reported 81, accepted 0, gMSA completed 0; `FindingsAndHandover_AreNotCompletedWork_…` | Passed |
-| 4 | Linux cohort: 8 dated password plans (30 Sep–30 Dec 2026), 2 closure reviews; completed totals unchanged | Synthetic: `LinuxCohort_EightPlansAndTwoClosureReviews_…` (open state) and `LinuxCohort_TwoClosureReviews_ReachSeparateOutcomes_WithoutClosingAccounts` (evidence review verified, both review requests completed, ownership confirmed only by its own decision, deletion stays planned, 0 verified closures, 0 performed password/deletion); `OnlyDeletionOrGmsaConversion_CanBeAVerifiedAccountClosure`. Private reconciliation: 8 open password plans, verified closures 0 | Synthetic passed; the two real reviews in corporate data are not identified here (no names) |
-| 5 | Ownership stays proposed; mail senders never become owners | Reconciliation: 321 proposals, 0 confirmed; `ConfirmingOwnershipInImport_RequiresAssignCapability`; harness journey ownership step | Passed |
-| 6 | Turkish case variants of one verified person map to one; same name + different UPN stay two | `LabelKey_TurkishCase…`, `LabelKey_AccentFolded…`, `Identity_DomainsAreDistinct_AndSameNamedVerifiedPeopleAreAmbiguous` | Passed |
-| 7 | Same name in two domains → two AccountIds; no automatic merge | `IdentityKey_SameNameInTwoDomains…`, `Identity_DomainsAreDistinct_…`; reconciliation doubled-letter variant needed an explicit decision | Passed |
-| 8 | Blank source value never erases; ownership conflicts are audited decisions | `ConcurrentUpdates_OneWins_…` (blank does not erase), import decision flow tests | Passed |
-| 9 | Several open requests visible; closing one leaves others | `MultipleRequests_ActionVerification_AndClosureRules`; harness journey | Passed |
-| 10 | Week boundaries, timed Sunday, cutoff; undated counted separately; no 1900-01-01 | `WeekBoundaries_UseIstanbulMondayToMondayAndCutoff`, `LateHistoricalAction_…`, `InvalidBusinessDate_IsARowError_…`; reconciliation placements reconcile | Passed |
-| 11 | Performed→Verified same identity; deletion without OR not a verified closure; verification before action rejected | `Verification_OnSameAction_…`, `DeletionClosure_WithoutOr_…`, `PerformedThenVerified_IsOneAction_…`; harness journey (undated verify refused, deletion closure verify refused) | Passed |
-| 12 | One mail → N accounts counts once; provider ID dedupes; same-subject mails kept | `OneMailLinkedToTenAccounts_…`, `OneMailManyAccounts_CountsOnce_…`; harness journey (one mail, three accounts) | Passed |
-| 13 | Findings / failed scans are not completed work; gaps visible | `Plans_AwaitingDates_Overdue_Handover_AndFindingsDoNotCountAsWork`, `FindingsAndHandover_…` | Passed |
-| 14 | Other team refused on account/API/export/attachment; backend-scoped filters; visibility through an assigned request is not account-wide authority | `OtherTeam_CannotReadUpdateListOrDownload`, `ReportFiltersAreBackendScoped_…`, `ScopeIsEnforced_…`, `ParticipantTeam_WorksOnlyOnItsOwnRequest_…`, `AccountListExport_IsScopedFilteredAndAudited`, `PersistedRoleBundlesAndScopeGrants_…`; harness journey (temporary harness) | Passed |
-| 15 | Concurrent rowversion: one wins, other 409; commit/job twice → one result | `ConcurrentUpdates_OneWins_…`, `StalePreviewAndDecisionConflicts_…`, `RepeatedRunsCreateEachReminderOnce_…`, `ConcurrentClaims_…`; reconciliation repeated commits | Passed |
-| 16 | Invalid rows visible; failed transaction leaves nothing half-written; file/formula-injection tests | `AuditFailure_RollsBackTheWholeCommit`, parser rejection tests (macro, ratio, signature, missing header), `Xlsx_…NeutralizesFormulaText…` | Passed |
-| 17 | Sent snapshot unchanged; late action in the correct live week | `SentSnapshotNeverChanges_LiveReportPlacesLateActionInItsWeek_ExportsReconcile`, `WeeklyImports_Reports_SentSnapshot_Periods_AndExport_WorkTogetherWithinScope` (two weekly imports incl. a replayed duplicate, live report, sent snapshot with late entry, month and date-range reports, filtered export, scope, actor/audit), `AccountExport_RowLimitIsExact_AndRefusalIsNotAudited` (5 000 export, 5 001 refused) | Passed |
-| 18 | XLSX opens in desktop Excel without repair; PDF and XLSX reconcile | Structure (no formulas/macros/links, date serials, deterministic), PDF xref and value reconciliation tests; harness journey downloads (`PK`, `%PDF`) | Structural checks passed; **desktop Excel open not run** (no Excel on Linux) |
-
-Legacy ownership control: the labelled projection now reproduces 40 named accounts / 7 people +
-13 follow-up fallback = 53 accounts / 9 people on the supplied package; confirmed ownership is 0
-until someone confirms.
-
-## Shared touchpoints (all additive; `git diff a3037175 --histogram` shows no deletions)
-
-| File | Change |
-|---|---|
-| `src/SecureOps.Api/Program.cs` | `using` + `AddServiceAccountsApi(configuration)` |
-| `src/SecureOps.Infrastructure/Access/AccessActionCatalog.cs` | spread of the 7 module actions (no role changed or seeded) |
-| `src/SecureOps.Worker/Program.cs` | `using` + `AddServiceAccountsWorker(configuration)` |
-| `src/SecureOps.Ui/Program.cs` | one `AddSecureOpsApiClient<ServiceAccountApiClient>` registration |
-| `src/SecureOps.Ui/Shared/NavMenu.razor` | one entry gated on `ServiceAccounts.View` |
-| `src/SecureOps.Ui/Services/UiProblemFactory.cs` | one delegation line to `ServiceAccountProblems` |
-| `src/SecureOps.Ui/Pages/_Host.cshtml` | label binding limited to `.sa-page` fields (accessibility) |
-| `src/SecureOps.Ui/README.md` | six route rows |
-| `docs/contracts/secureops-api-v1.openapi.json` | regenerated snapshot, additive |
-
-Not touched: In Use, SDM/OR, OCO/announcements (including mail send intents), SCCM, release
-scripts, historical packages, security validators, the canonical integrated delivery register,
-migrations 001–024.
-
-## SQL candidate
-
-`sql/pending/service-accounts/SA-001-service-accounts.sql` — unnumbered, outside release discovery.
-Requires 001; refuses replay; one new schema `svcacct`; no existing object/role/grant/row changed;
-no seed of real users. Runtime grants are listed at the end of the file (DBA applies to the
-existing approved principal; DELETE only on uncommitted `ImportRows`). Rollback: disable the module
-(`ServiceAccounts:Provider=Disabled` → every endpoint 503, no SQL touched); the schema and its data
-are retained, there is no down script. **Codex must reserve a migration number** (025 is not
-assumed) before promotion.
-
-Configuration (all off by default): `ServiceAccounts:Provider` (`Disabled`/`SqlServer`),
-`MaxImportBytes`, `MaxEvidenceBytes`, `Reminders:Enabled`, `Cron` (UTC), `PlanEndLeadDays`,
-`NoReplyAfterDays`, `MaxAttempts`, `LeaseSeconds`, `HolidayCalendar` (empty keeps business-day rules off).
-
-## Review size
-
-About 18 900 hand-written lines plus the generated OpenAPI snapshot — far above the 1 000-line
-review cap. **No exception has been granted** and the quality rule is unchanged. Proposed bounded
-review slices (each below 1 000 added lines, each with its own tests; counts from
-`git diff a3037175 --histogram --numstat`):
-
-| # | Slice | Paths (under the module folders unless shared) | Lines |
-|---|---|---|---|
-| 1 | Specification and design | `docs/service-accounts/SPEC.md`, `README.md`, `PROGRESS.md` | ≈ 520 |
-| 2 | SQL candidate and SQL fixtures | `sql/pending/service-accounts/SA-001…`, `tests/sql/service-accounts/*` | 667 |
-| 3 | Domain identity, vocabulary, scope, calendar | `ServiceAccountVocabulary/Text/Scope`, `ReportCalendar` + `ServiceAccountDomainTests` | 723 |
-| 4 | Domain rules, metrics, reminders | `ServiceAccountRules/Metrics/Report`, `ReminderRules` + metrics and reminder rule tests | 747 |
-| 5 | Contracts, capabilities, persistence types | `Shared/Contracts/ServiceAccounts/*`, `ServiceAccountAccessActions`, `ServiceAccountPersistence`, `ServiceAccountOptions`, shared `AccessActionCatalog` line | 751 |
-| 6 | Safe spreadsheet reading | `Import/SpreadsheetReader`, `ImportValues`, `ImportHeaders`, `StagedRow` + unit `SyntheticWorkbook` | 899 |
-| 7 | Import parser | `Import/ImportParser` + `ServiceAccountImportParserTests` | 752 |
-| 8 | Import planning | `Import/ImportPlan`, `ImportContext`, `ImportPlanner`, `.Resolve`, `.Rows` | 871 |
-| 9 | Import records and import service | `Import/ImportPlanner.Records`, `ServiceAccountService.Import` | 697 |
-| 10 | SQL repository core and import persistence | `SqlServiceAccountRepository`, `.Import`, `.ImportWrite` | 822 |
-| 11 | Import API and SQL tests | `ServiceAccountImportsController`, `ServiceAccountsApiModule`, `ServiceAccountImportSqlTests`, fixture, synthetic legacy/workbook | 789 |
-| 12 | Accounts and work persistence | `SqlServiceAccountRepository.Accounts/.Detail/.Work`, `ServiceAccountService`, `ServiceAccountsModule` | 844 |
-| 13 | Account commands and records | `ServiceAccountService.Accounts/.Records`, `SqlServiceAccountRepository.Records` + `ServiceAccountWorkflowSqlTests` | 917 |
-| 14 | Administration and account API | `.Admin` repository/service, admin and accounts controllers, `ServiceAccountAdminSqlTests`, shared API `Program.cs` lines | 755 |
-| 15 | Reports and exports | `Reporting/*`, `.Reports` repository/service, reports controller + export and report SQL tests | 963 |
-| 16 | Reminders and Worker schedule | `.Reminders` repository/service/controller, `ServiceAccountReminderJob`, Worker module, shared Worker `Program.cs` lines + reminder SQL tests | 536 |
-| 17 | UI foundation and shared UI touchpoints | UI client/page base/problems/text/commands, `SaProblem`, `SaModuleLinks`, `SaPersonPicker`, shared UI `Program.cs`, `NavMenu`, `UiProblemFactory`, `_Host.cshtml`, UI README rows + `ServiceAccountUiTests` | 727 |
-| 18 | UI list and administration | `ServiceAccountList`, `ServiceAccountAdmin`, create/communication/people components | 866 |
-| 19 | UI account detail: work and ownership | `ServiceAccountDetail`, edit form, requests, actions, ownership panels | 805 |
-| 20 | UI records, reminders page, reports page | findings, handover, evidence, sources panels, `ServiceAccountWork`, `ServiceAccountReports`, `SaReportView` | 814 |
-| 21 | UI import wizard | `ServiceAccountImports`, import rows/mapping/result components | 662 |
-| 22 | Browser journey (harness evidence) | `tests/browser/service-accounts.cjs` | 340 |
-| 23 | Generated OpenAPI snapshot | `docs/contracts/secureops-api-v1.openapi.json` — review by regeneration and semantic diff, not line by line | generated |
-
-Slices 2→16 follow the dependency order (SQL, domain, contracts, infrastructure, API); UI slices
-17→21 depend on 5; slice 22 depends on all. Whether this slicing, a split into several branches or
-another approach is acceptable is the reviewer's decision.
-
-## Outstanding inputs (actionable, not invented)
-
-- Migration number and final platform integration (Codex); corporate role bundles and first scope grants.
-- Role bundles containing the module actions and the first scope grants (corporate decision; the
-  demo fixture is for local testing only).
-- Verified directory identities for people/accounts; approved evidence retention.
-- Approved holiday calendar and reminder periods; any future mail sender and recipient scope.
-- Team return (PAAS) file sample — generic mapping until then.
-- Windows host run: LocalDB/SQL with Integrated Security, IIS, desktop Excel open, Windows
-  toolchain build.
-
-## Proposed register entry (for Codex to place in the canonical register)
-
-> Service Accounts module (continuation branch `feature/service-accounts-continuation-20260929`,
-> checkpoint `c63d1bc` on `e997c5b`): VerifyAction deadlock cause fixed (shared write gate),
-> explicit import coverage, participant write boundary, provisional manual identity, entry work
-> summary, monthly/custom periods, scoped export, on-demand directory observation. Linux: build 0/0,
-> unit 1563/1565 (2 baseline env failures), integration failing set identical to baseline, module SQL
-> 28/28 on a fresh DB under the least-privilege API role, persisted-access composition test passing.
-> Pending: migration number, corporate role bundles/scope grants, Windows/LocalDB/IIS/HTTP/Excel
-> checks, browser journey on the real composition, review of the bounded slices (no size exception).
+OpenAPI snapshot only when the API changes (`SECUREOPS_UPDATE_OPENAPI=1`, additions only). Linux: module SQL through
+`tests/sql/service-accounts/sa-sql-harness.sh` with a disposable SQL Server container.

@@ -1,0 +1,40 @@
+.sa-next-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.sa-next-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--so-border);
+    border-radius: 6px;
+}
+
+/* The first step is the one to do now; weight and a thicker edge mark it, not colour alone. */
+.sa-next-first {
+    border-width: 1px 1px 1px 4px !important;
+    border-left-color: var(--so-text) !important;
+}
+
+.sa-next-title {
+    margin-left: 0.5rem;
+}
+
+.sa-next-list li > div {
+    min-width: 0;
+    flex: 1 1 18rem;
+}
+
+/* MudBlazor 6.16 text and outlined buttons draw no keyboard focus ring of their own. */
+.so-panel ::deep .mud-button-root:focus-visible {
+    outline: 2px solid var(--so-text);
+    outline-offset: 2px;
+}

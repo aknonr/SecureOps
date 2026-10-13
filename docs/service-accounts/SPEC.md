@@ -11,8 +11,9 @@ one historical migration package, never production constants.
 Import preview and approved merge, account list, account detail timeline, team-scoped
 authorization, request/action/communication/finding records, handover and gMSA-transition
 tracking, and weekly/manager reporting. The module manages plans, external references and
-evidence. It never deletes AD accounts, rotates passwords, converts to gMSA, scans servers,
-collects secrets or analyses mail with AI.
+evidence. It never deletes AD accounts, rotates passwords, converts to gMSA, scans servers itself,
+collects secrets or analyses mail with AI. A usage scan a person ran under their own authority can be uploaded as
+evidence (ADR-0027, "Usage scans" below).
 
 Account owner team, executing team, consuming team, follow-up person, contact person and the
 coordinator are different roles and must never be collapsed into one "responsible" field.
@@ -94,6 +95,13 @@ with not-yet-seen headers (generic bounded mapping only), and the legacy trackin
 migration package. The user enters the source report date and scope; upload time is never the
 source date. Files are validated for type, signature, size, decompression, rows and cells;
 formulas, macros and external links are never executed or refreshed.
+
+Operator order (shown on the import page): the legacy tracking workbook once (initial migration), then each weekly
+coordination list with its source report date and date provenance, and DBA handover lists when they arrive. Import
+requires the Import capability **and** organization-level data scope (All or an organization); scope is granted by a
+different module administrator and never by the operator to themself, with one exception: while the module has never had
+any scope grant, a module administrator may take "All" scope once (ADR-0026). Before the first import no organization
+exists, so the first grant is "All" and can be narrowed later.
 
 Preview classes: new / existing-observation update / same / conflict / invalid / not seen in
 this batch. Old and proposed values are shown side by side. Source observation fields become
@@ -200,6 +208,69 @@ department, same-name flag, truncation flag). A result links to a Service Accoun
 with that account name is in the caller's scope. Selecting a result grants nothing, confirms no ownership and changes
 nothing in the directory. The audit keeps a query hash and counts, never the name. Exact lookup is unchanged.
 
+## Usage scans (ADR-0027)
+
+A person runs the read-only collector on each server under their own authority, combines the per-server documents with
+the planned server list on their own workstation and uploads the file on the account page. The module never connects to a
+server and never starts a scan. Operator guide: [USAGE-SCAN-TR.md](USAGE-SCAN-TR.md).
+
+1. **Evidence, not a decision.** Attaching a scan changes nothing else: no ownership, request, action, finding, closure,
+   suitability or report figure. Scan matches are not counted as open findings.
+2. **Honest coverage.** Every planned server is kept. "Not found" exists only after a complete scan (all three sources read)
+   and is shown as "not found in the scanned sources", never "not used"; a partial scan without a match is uncertain; a
+   failed, unreachable or unanswered server is "no information" (rule 15).
+3. **No secrets.** A file with a property name or a value that looks like a password, secret, token, credential or
+   connection string (Turkish spellings included) is refused as a whole and nothing from it is stored or echoed.
+4. **Who.** Attaching needs Work and the responsible basis, or the participant basis through one of the caller's own open
+   requests (the scan is then evidence on that request). The file must have searched this account (same name; same domain
+   when both carry one). Turning a match into a usage, or dismissing it with a reason, needs Work and the responsible basis,
+   once per match and account, never automatically; the created usage is an ordinary manual usage. A second decision on
+   the same match is a 409 conflict (`ServiceAccountUsageScanAlreadyDecided`); the first one stays.
+5. **gMSA evidence.** A scan with an expected gMSA yields, per account: former account still configured; incomplete (a
+   planned server not fully covered); converted on the covered servers (every planned server fully scanned, no former
+   account, the gMSA runs a component); or no components. It is shown as evidence only; the verifier verifies the
+   conversion through the existing action verification.
+6. **Append-only.** Scans, servers, matches, links and decisions are never updated or deleted; the same bytes from the same
+   person are one scan; every link and decision writes module history and the audit log.
+7. **File names.** Uploaded file names (scan, import, evidence) are stored and shown as the last path segment without
+   control, format (zero-width, bidi override/isolate), line-separator or invisible filler characters, at most 200
+   characters, so a name cannot hide or reorder its extension.
+
+8. **Paging (2026-10-05).** The account page carries the newest 5 scans and, per scan, the first 25 matches of each role
+   (former-account matches still waiting for a decision first). Per-server counts, coverage, outcomes and the gMSA
+   evidence are computed over every match of the searched name, so a page or the "undecided only" filter never changes
+   them and "not found" still needs a fully scanned server. Older scans and further matches are read-only pages
+   (`GET accounts/{id}/usage-scans?page=`, `GET accounts/{id}/usage-scans/{linkId}/items?role=&pending=&page=&pageSize=`,
+   at most 100 per page) under the same scope rule as the detail; only this account's searched-name matches are returned
+   and the stored file is never downloadable.
+9. **One file, several accounts (2026-10-06, no migration).** `POST usage-scans` (multipart `file`, `runStatement`, 1–20
+   distinct `accountIds`) validates the file once (secret guard first; a refused file stores nothing for anyone) and then
+   answers each account on its own with the single-account rules and the responsible basis only: `Attached`,
+   `AlreadyAttached`, `NotInScan`, `Ambiguous`, `Unavailable` (missing / out of scope / no responsible basis, without the
+   name when out of scope) or `Failed` (storage error; repeating is safe). One refusal or failure never blocks another
+   (per-account failure boundary); history and audit per link; each refusal (request, file, or some accounts not linked)
+   adds one `ServiceAccount.UsageScanBatchRefused` audit row with reason and counts only. Both upload routes re-check scope and basis inside the
+   link's write transaction (locked account/request rows, HOLDLOCK on grants and the tree), so a change after the check
+   writes nothing. ADR-0027 §4.
+
+## Requested gMSA name (migration 031, 2026-10-05)
+
+The gMSA name a conversion will use is recorded where the work is requested (`GmsaHandover`, `GmsaConversion` requests) and
+where the transition is tracked, so a name that Active Directory would shorten is caught before the conversion.
+
+1. **One rule.** `ServiceAccountGmsaName` counts the name without a `DOMAIN\` prefix, a UPN suffix or the trailing `$`; at
+   most 15 characters. The account-registration hint, the request/transition hint and the server use this one rule.
+2. **The server decides.** The UI shows the count and a warning while typing and never disables sending; the API refuses a
+   longer name, an empty counted name, more than 256 stored characters, or a name on any other work type
+   (400 `requestedGmsaName`). Nothing is written when it refuses.
+3. **Change and history.** A request update may change the name or clear it (`ClearFields: requestedGmsaName`, with a
+   reason); on a transition a blank name leaves the stored one unchanged. Every change is in module history.
+4. **Reports.** The report lists requested names on open requests and on transitions with their counted length
+   ("İstenen gMSA adları"); older snapshots and databases without 031 have no such list (unknown, not empty).
+5. **Before 031.** New binaries keep working on a database without the columns: names are unknown
+   (`RequestedGmsaNameAvailable` false, the form explains it), a write with a name is refused with `gmsaNameColumnsMissing`
+   and writes nothing, a write without a name succeeds.
+
 ## Reminders
 
 In-app notifications and coordinator message drafts only. Automatic mail requires a configured
@@ -247,6 +318,11 @@ bounded retry and a visible dead-letter list are required.
     the correct week.
 18. The XLSX export opens in desktop Microsoft Excel without a repair prompt; formula/
     shared-formula XML and dates are checked; PDF and XLSX reconcile to the same snapshot.
+19. A usage scan whose servers were all fully scanned without a match leaves the account, its requests, actions and
+    closure unchanged and says "not found in the scanned sources"; an unreachable server stays "no information".
+20. A scan file with a `Password` (or `parola`, `şifre`, `token`, `connection_string`, …) property or a `password=`
+    (`"Password":`, `token:`, `api-key=`, full-width or zero-width spellings, …) value is refused and nothing from it is stored.
+21. A gMSA check with one unreachable server is never "converted"; the verifier still verifies the conversion action.
 
 Legacy ownership reconciliation control: the main account inputs name a responsible person for
 40 accounts using 7 distinct name labels. The legacy combined view reached 53 accounts / 9

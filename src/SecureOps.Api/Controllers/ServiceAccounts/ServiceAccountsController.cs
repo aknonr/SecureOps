@@ -12,7 +12,8 @@ namespace SecureOps.Api.Controllers.ServiceAccounts;
 /// <summary>
 /// Scoped account list/detail and explicit workflow commands. Every command revalidates capability and data scope;
 /// stale versions return 409 with the caller's current view. Nothing here deletes accounts, rotates passwords,
-/// converts to gMSA or contacts a source system; the only directory access is the bounded read-only name search.
+/// converts to gMSA, scans a server or contacts a source system; the only directory access is the bounded read-only name
+/// search, and usage scans arrive only as files a person uploads (ADR-0027).
 /// </summary>
 [ApiController]
 [Route("api/v1/service-accounts")]
@@ -25,6 +26,7 @@ namespace SecureOps.Api.Controllers.ServiceAccounts;
 public sealed class ServiceAccountsController(ServiceAccountService service) : ControllerBase
 {
     private const long _maxEvidenceRequestBytes = 11L * 1024 * 1024;
+    private const long _maxUsageScanRequestBytes = 5L * 1024 * 1024;
 
     /// <summary>Entry summary: open work targeted at the caller's teams and coordinator attention counts (scope-filtered).</summary>
     [HttpGet("work-summary")]
@@ -103,6 +105,15 @@ public sealed class ServiceAccountsController(ServiceAccountService service) : C
     [ProducesResponseType(typeof(AccountDetail), StatusCodes.Status200OK)]
     public async Task<ActionResult<AccountDetail>> CloseRequestAsync(Guid id, CloseWorkRequest request, CancellationToken cancellationToken) =>
         ServiceAccountReplies.Reply(this, await service.CloseRequestAsync(User, Context(), id, request, cancellationToken));
+
+    /// <summary>
+    /// Why this request can or cannot be closed with <c>outcome</c> (default Completed): every missing condition from the same
+    /// server rule the close command uses. Read only; same scope as the account detail (out of scope = 404).
+    /// </summary>
+    [HttpGet("requests/{id:guid}/close-readiness")]
+    [ProducesResponseType(typeof(CloseReadiness), StatusCodes.Status200OK)]
+    public async Task<ActionResult<CloseReadiness>> CloseReadinessAsync(Guid id, [FromQuery] string? outcome = null, CancellationToken cancellationToken = default) =>
+        ServiceAccountReplies.Reply(this, await service.CloseReadinessAsync(User, Context(), id, outcome, cancellationToken));
 
     /// <summary>Reports a planned or performed action; the related request stays open.</summary>
     [HttpPost("accounts/{id:guid}/actions")]
@@ -206,6 +217,103 @@ public sealed class ServiceAccountsController(ServiceAccountService service) : C
     [ProducesResponseType(typeof(AccountDetail), StatusCodes.Status200OK)]
     public async Task<ActionResult<AccountDetail>> UsageExceptionAsync(Guid id, UsageExceptionRequest request, CancellationToken cancellationToken) =>
         ServiceAccountReplies.Reply(this, await service.SetUsageExceptionAsync(User, Context(), id, request, cancellationToken));
+
+    /// <summary>
+    /// Attaches a usage scan a person ran under their own authority (ADR-0027) to the account as evidence. The whole file is
+    /// checked (secret-like fields refuse it before anything is stored); a participant names one of its own open requests.
+    /// Nothing here contacts a server or changes the account, its requests or its actions.
+    /// </summary>
+    [HttpPost("accounts/{id:guid}/usage-scans")]
+    [Authorize(Policy = ServiceAccountPolicies.Work)]
+    [RequestSizeLimit(_maxUsageScanRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = _maxUsageScanRequestBytes)]
+    [ProducesResponseType(typeof(AccountDetail), StatusCodes.Status200OK)]
+    public async Task<ActionResult<AccountDetail>> UsageScanUploadAsync(Guid id, IFormFile file, [FromForm] string? runStatement,
+        [FromForm] Guid? requestId, CancellationToken cancellationToken)
+    {
+        if (file is null || file.Length is 0 or > _maxUsageScanRequestBytes)
+        {
+            return ServiceAccountReplies.Reply(this, SaResult<AccountDetail>.Fail(SaErrors.UsageScanFile,
+                file is { Length: > 0 } ? Infrastructure.ServiceAccounts.UsageScans.UsageScanFileCodes.TooLarge
+                    : Infrastructure.ServiceAccounts.UsageScans.UsageScanFileCodes.Empty));
+        }
+
+        using MemoryStream buffer = new();
+        await file.CopyToAsync(buffer, cancellationToken);
+        return ServiceAccountReplies.Reply(this, await service.AttachUsageScanAsync(User, Context(), id, file.FileName, buffer.ToArray(), runStatement,
+            requestId, cancellationToken));
+    }
+
+    /// <summary>
+    /// Attaches one usage-scan file (ADR-0027) to 1–20 distinct accounts (<c>accountIds</c>, repeated form field). The whole file
+    /// is checked once (secret-like fields refuse it before anything is stored); each account is then checked on its own and
+    /// answered separately, so one refusal never blocks another. Only the responsible basis attaches here; a participant
+    /// attaches from the account page through its own request. Nothing here contacts a server or changes an account.
+    /// </summary>
+    [HttpPost("usage-scans")]
+    [Authorize(Policy = ServiceAccountPolicies.Work)]
+    [RequestSizeLimit(_maxUsageScanRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = _maxUsageScanRequestBytes)]
+    [ProducesResponseType(typeof(UsageScanBatchResult), StatusCodes.Status200OK)]
+    public async Task<ActionResult<UsageScanBatchResult>> UsageScanBatchUploadAsync(IFormFile file, [FromForm] string? runStatement,
+        [FromForm] List<Guid>? accountIds, CancellationToken cancellationToken)
+    {
+        if (file is null || file.Length is 0 or > _maxUsageScanRequestBytes)
+        {
+            return ServiceAccountReplies.Reply(this, SaResult<UsageScanBatchResult>.Fail(SaErrors.UsageScanFile,
+                file is { Length: > 0 } ? Infrastructure.ServiceAccounts.UsageScans.UsageScanFileCodes.TooLarge
+                    : Infrastructure.ServiceAccounts.UsageScans.UsageScanFileCodes.Empty));
+        }
+
+        using MemoryStream buffer = new();
+        await file.CopyToAsync(buffer, cancellationToken);
+        return ServiceAccountReplies.Reply(this, await service.AttachUsageScanToAccountsAsync(User, Context(), accountIds, file.FileName, buffer.ToArray(),
+            runStatement, cancellationToken));
+    }
+
+    /// <summary>
+    /// One page of the scans attached to the account (newest first, <see cref="UsageScanPaging.ScanPageSize"/> per page), read
+    /// only and under the same scope as the account detail. Coverage and outcomes are computed over every matched item.
+    /// </summary>
+    [HttpGet("accounts/{id:guid}/usage-scans")]
+    [ProducesResponseType(typeof(UsageScanPage), StatusCodes.Status200OK)]
+    public async Task<ActionResult<UsageScanPage>> UsageScanPageAsync(Guid id, [FromQuery] int page = 1, CancellationToken cancellationToken = default) =>
+        ServiceAccountReplies.Reply(this, await service.UsageScanPageAsync(User, Context(), id, page, cancellationToken));
+
+    /// <summary>
+    /// One page of a linked scan's matched items for this account: <c>role=Former</c> (default, undecided first; <c>pending=true</c>
+    /// keeps only undecided items) or <c>role=Expected</c>. Read only; paging never changes coverage or outcomes.
+    /// </summary>
+    [HttpGet("accounts/{id:guid}/usage-scans/{linkId:guid}/items")]
+    [ProducesResponseType(typeof(UsageScanItemPage), StatusCodes.Status200OK)]
+    public async Task<ActionResult<UsageScanItemPage>> UsageScanItemsAsync(Guid id, Guid linkId, [FromQuery] string? role = null, [FromQuery] bool pending = false,
+        [FromQuery] int page = 1, [FromQuery] int? pageSize = null, CancellationToken cancellationToken = default) =>
+        ServiceAccountReplies.Reply(this, await service.UsageScanItemsAsync(User, Context(), id, linkId, role, pending, page, pageSize, cancellationToken));
+
+    /// <summary>
+    /// Compares a linked scan with an older scan of the same purpose (default: the next older one; <c>against</c> picks another
+    /// link of the account). Read only, same scope as the account detail, computed over every matched component; component
+    /// changes are paged. "Not found" only follows a fully scanned server and never means "not used" (G-33).
+    /// </summary>
+    [HttpGet("accounts/{id:guid}/usage-scans/{linkId:guid}/diff")]
+    [ProducesResponseType(typeof(UsageScanDiffView), StatusCodes.Status200OK)]
+    public async Task<ActionResult<UsageScanDiffView>> UsageScanDiffAsync(Guid id, Guid linkId, [FromQuery] Guid? against = null, [FromQuery] int page = 1,
+        [FromQuery] int? pageSize = null, CancellationToken cancellationToken = default) =>
+        ServiceAccountReplies.Reply(this, await service.UsageScanDiffAsync(User, Context(), id, linkId, against, page, pageSize, cancellationToken));
+
+    /// <summary>Records a matched component of an attached scan as a usage (a person's decision, never automatic).</summary>
+    [HttpPost("accounts/{id:guid}/usage-scan-items/{itemId:guid}/usage")]
+    [Authorize(Policy = ServiceAccountPolicies.Work)]
+    [ProducesResponseType(typeof(AccountDetail), StatusCodes.Status200OK)]
+    public async Task<ActionResult<AccountDetail>> RecordScanUsageAsync(Guid id, Guid itemId, RecordScanUsageRequest request, CancellationToken cancellationToken) =>
+        ServiceAccountReplies.Reply(this, await service.RecordScanUsageAsync(User, Context(), id, itemId, request, cancellationToken));
+
+    /// <summary>Leaves a matched component out of the usage records, with a reason.</summary>
+    [HttpPost("accounts/{id:guid}/usage-scan-items/{itemId:guid}/dismiss")]
+    [Authorize(Policy = ServiceAccountPolicies.Work)]
+    [ProducesResponseType(typeof(AccountDetail), StatusCodes.Status200OK)]
+    public async Task<ActionResult<AccountDetail>> DismissScanItemAsync(Guid id, Guid itemId, DismissScanItemRequest request, CancellationToken cancellationToken) =>
+        ServiceAccountReplies.Reply(this, await service.DismissScanItemAsync(User, Context(), id, itemId, request, cancellationToken));
 
     /// <summary>Updates gMSA suitability, plan or completion reference.</summary>
     [HttpPatch("transitions/{id:guid}")]

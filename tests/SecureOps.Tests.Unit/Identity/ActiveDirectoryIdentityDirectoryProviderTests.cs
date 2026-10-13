@@ -31,6 +31,22 @@ public sealed class ActiveDirectoryIdentityDirectoryProviderTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    public async Task FindUserAsync_ManagedSam_UsesOnlyExactSamTransport(bool found)
+    {
+        FakeClient client = new()
+        {
+            SamResult = found ? Record("syn.gmsa$") with { AccountTypeEvidence = "GroupManagedServiceAccount" } : null,
+            UpnResult = Record("unexpected")
+        };
+        DirectoryUserRecord? result = await Create(client, upn: true).FindUserAsync("syn.gmsa$", CancellationToken.None);
+        result?.AccountTypeEvidence.Should().Be(found ? "GroupManagedServiceAccount" : null);
+        client.SamInputs.Should().ContainSingle("syn.gmsa$");
+        client.UpnInputs.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
     public void SupportsUpnLookup_ReflectsEffectiveConfiguredBehavior(bool enabled)
     {
         ActiveDirectoryIdentityDirectoryProvider provider = Create(new FakeClient(), upn: enabled);

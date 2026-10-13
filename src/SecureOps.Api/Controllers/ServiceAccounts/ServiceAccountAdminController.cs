@@ -105,6 +105,27 @@ public sealed class ServiceAccountAdminController(ServiceAccountService service,
     public async Task<ActionResult<Guid>> GrantAsync(CreateScopeGrantRequest request, CancellationToken cancellationToken) =>
         ServiceAccountReplies.Reply(this, await service.CreateGrantAsync(User, ServiceAccountReplies.Context(this), request, users, cancellationToken));
 
+    /// <summary>Approved application users who can be chosen for a scope grant (no directory search).</summary>
+    [HttpGet("scope-grants/candidates")]
+    [Authorize(Policy = ServiceAccountPolicies.Administer)]
+    [ProducesResponseType(typeof(IReadOnlyList<ScopeGrantCandidate>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<ScopeGrantCandidate>>> CandidatesAsync(CancellationToken cancellationToken) =>
+        ServiceAccountReplies.Reply(this, await service.ScopeGrantCandidatesAsync(User, ServiceAccountReplies.Context(this), users, cancellationToken));
+
+    /// <summary>State of the one-time first scope grant (ADR-0026).</summary>
+    [HttpGet("scope-grants/bootstrap")]
+    [Authorize(Policy = ServiceAccountPolicies.Administer)]
+    [ProducesResponseType(typeof(ScopeBootstrapState), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ScopeBootstrapState>> BootstrapStateAsync(CancellationToken cancellationToken) =>
+        ServiceAccountReplies.Reply(this, await service.ScopeBootstrapStateAsync(User, ServiceAccountReplies.Context(this), cancellationToken));
+
+    /// <summary>One-time first scope grant to the caller while the module has never had a scope grant (ADR-0026).</summary>
+    [HttpPost("scope-grants/bootstrap")]
+    [Authorize(Policy = ServiceAccountPolicies.Administer)]
+    [ProducesResponseType(typeof(Guid), StatusCodes.Status200OK)]
+    public async Task<ActionResult<Guid>> BootstrapAsync(ScopeBootstrapRequest request, CancellationToken cancellationToken) =>
+        ServiceAccountReplies.Reply(this, await service.BootstrapScopeAsync(User, ServiceAccountReplies.Context(this), request, cancellationToken));
+
     /// <summary>Revokes a grant.</summary>
     [HttpPost("scope-grants/{id:guid}/revoke")]
     [Authorize(Policy = ServiceAccountPolicies.Administer)]

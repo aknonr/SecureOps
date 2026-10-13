@@ -27,6 +27,18 @@ Security is the defining constraint of this project. This document is the canoni
 - Authentication establishes only a corporate principal. Persisted SecureOps Access -> Role -> Capability remains the authorization authority, and unknown authenticated users remain pending.
 - SecureOps never requests or handles the user's LDAP/Jira password. The Jira integration credential remains only the REST technical identity.
 
+### Unsafe API Request Intent
+
+ADR-0029 adds a central guard after API authorization, before body binding, for
+every method except GET/HEAD/OPTIONS. `X-SecureOps-Csrf: 1` is mandatory and is
+not an authentication credential. Browser Origin/Referer must match exact
+`ApiCsrf:AllowedOrigins`; cross-site Fetch Metadata always fails. Non-browser
+callers without source metadata must supply the same custom header. Configuration
+defaults to an empty browser allow-list and cannot disable the guard. Denials are
+403 `ApiCsrfRejected` with a privacy-safe append-only audit; audit unavailability
+returns 503 while preventing endpoint execution. See
+`docs/contracts/api-csrf-origin-guard.md`. Future credentialed CORS requires review.
+
 ### Webhook Endpoint
 
 If the approved Turuncuhat integration is webhook-based, the approved caller invokes `/api/v1/alerts/webhook`. Authentication:

@@ -1,0 +1,36 @@
+@* Requested gMSA name input shared by the request and transition forms. The 15-character rule is the shared domain rule;
+   the warning is advice only and never disables a button: the server refuses a longer name. Before migration 031 the
+   field is disabled with an honest explanation (the API would refuse a name). *@
+@using SecureOps.Ui.Services.ServiceAccounts
+
+@if (Available)
+{
+    <MudTextField T="string" Value="@Value" ValueChanged="ValueChanged" Label="@Label" MaxLength="256" Immediate="true" Variant="Variant.Outlined"
+        HelperText="@ServiceAccountUiText.RequestedGmsaNameHelper(Value)" />
+    <div role="status" aria-live="polite">
+        @if (ServiceAccountUiText.RequestedGmsaNameHint(Value) is { } hint)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-1">@hint</MudAlert>
+        }
+    </div>
+}
+else
+{
+    <p class="so-panel-text--sm" role="note">
+        İstenen gMSA adı bu ortamda kaydedilemiyor: veritabanı güncellemesi 031 uygulanmamış. Diğer bilgiler kaydedilir.
+    </p>
+}
+
+@code {
+    /// <summary>Typed name.</summary>
+    [Parameter] public string? Value { get; set; }
+
+    /// <summary>Two-way binding sink.</summary>
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+
+    /// <summary>False before migration 031 (from <c>AccountDetail.RequestedGmsaNameAvailable</c>).</summary>
+    [Parameter] public bool Available { get; set; }
+
+    /// <summary>Field label.</summary>
+    [Parameter] public string Label { get; set; } = "İstenen gMSA adı";
+}
