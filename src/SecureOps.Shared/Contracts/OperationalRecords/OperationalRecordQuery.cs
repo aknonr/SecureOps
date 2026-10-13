@@ -19,4 +19,8 @@ public sealed record OperationalRecordQuery
 }
 
 /// <summary>Actual persisted matching count, not a source-system total.</summary>
-public sealed record OperationalRecordPageResponse(IReadOnlyList<OperationalRecordResponse> Items, int Total, int Page, int PageSize);
+public sealed record OperationalRecordPageResponse(IReadOnlyList<OperationalRecordResponse> Items, int Total, int Page, int PageSize)
+{
+    /// <summary>Matching records whose source never supplied a creation time; such records sort last by date.</summary>
+    public int UnknownSourceCreatedAtCount { get; init; }
+}

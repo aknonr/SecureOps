@@ -27,6 +27,20 @@ public sealed record JiraIssueDraft(
     public long RecordVersion { get; init; }
 }
 
+/// <summary>
+/// Read-only view of what a Jira-create retry would send, compared with the reviewed draft's durable
+/// fingerprint. Retry is accepted only when <paramref name="MatchesPersistedDraft"/> is true.
+/// </summary>
+/// <param name="Draft">Draft rebuilt exactly as the retry would rebuild it for this actor.</param>
+/// <param name="PersistedMappingVersion">Mapping version fixed on the transfer.</param>
+/// <param name="PersistedIdempotencyKey">Reviewed-draft fingerprint fixed on the transfer.</param>
+/// <param name="MatchesPersistedDraft">Whether the rebuilt draft has the persisted fingerprint.</param>
+public sealed record JiraRetryDraft(
+    JiraIssueDraft Draft,
+    string PersistedMappingVersion,
+    string PersistedIdempotencyKey,
+    bool MatchesPersistedDraft);
+
 /// <summary>Validated create fields shared by the preview and Jira adapter.</summary>
 public sealed record JiraIssueFieldMapping(
     string IssueTypeId,

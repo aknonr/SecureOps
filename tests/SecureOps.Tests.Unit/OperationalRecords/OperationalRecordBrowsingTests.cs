@@ -36,6 +36,22 @@ public sealed class OperationalRecordBrowsingTests
         source.ReceivedCalls().Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Browse_CountsUnknownSourceDates_AndSortsThemLastForOldest()
+    {
+        var repository = new InMemoryOperationalRecordRepository();
+        await repository.UpsertImportedAsync(TestRecord.SourceItem("source-a", "OR-A") with { CreatedAt = null }, "synthetic", default);
+        await repository.UpsertImportedAsync(TestRecord.SourceItem("source-b", "OR-B") with { CreatedAt = new DateTimeOffset(2026, 9, 2, 0, 0, 0, TimeSpan.Zero) }, "synthetic", default);
+        await repository.UpsertImportedAsync(TestRecord.SourceItem("source-c", "OR-C") with { CreatedAt = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero) }, "synthetic", default);
+
+        OperationalRecordPage oldest = await repository.BrowseAsync(new() { Sort = "oldest" }, false, default);
+        OperationalRecordPage dated = await repository.BrowseAsync(new() { Search = "OR-B" }, false, default);
+
+        oldest.Items.Select(r => r.OrCode).Should().Equal("OR-C", "OR-B", "OR-A");
+        oldest.UnknownSourceCreatedAtCount.Should().Be(1);
+        dated.UnknownSourceCreatedAtCount.Should().Be(0);
+    }
+
     [Theory]
     [InlineData(0, 25, "updated")]
     [InlineData(1, 101, "updated")]

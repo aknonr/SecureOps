@@ -369,14 +369,16 @@ public sealed class InMemoryOperationalRecordRepository : IOperationalRecordRepo
                 throw new InvalidOperationException("Jira creation cannot be persisted from the current workflow state.");
             }
 
+            DateTimeOffset now = _timeProvider.GetUtcNow();
             OperationalRecord updated = current with
             {
                 WorkflowState = OperationalRecordWorkflowState.JiraCreated,
                 JiraIssueKey = issueKey,
+                JiraIssueKeyPersistedAt = now,
                 ReconciliationRequired = false,
                 LastErrorCode = null,
                 CorrelationId = correlationId,
-                UpdatedAt = _timeProvider.GetUtcNow(),
+                UpdatedAt = now,
                 Version = current.Version + 1
             };
             _records[id] = updated;
