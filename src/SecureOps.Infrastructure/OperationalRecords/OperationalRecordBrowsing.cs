@@ -4,8 +4,11 @@ using SecureOps.Shared.Contracts.OperationalRecords;
 
 namespace SecureOps.Infrastructure.OperationalRecords;
 
-/// <summary>A bounded repository page with a count from the same read snapshot.</summary>
-public sealed record OperationalRecordPage(IReadOnlyList<OperationalRecord> Items, int Total);
+/// <summary>A bounded repository page with counts from the same read snapshot.</summary>
+/// <param name="Items">Requested page.</param>
+/// <param name="Total">All matching records.</param>
+/// <param name="UnknownSourceCreatedAtCount">Matching records whose source never supplied a creation time.</param>
+public sealed record OperationalRecordPage(IReadOnlyList<OperationalRecord> Items, int Total, int UnknownSourceCreatedAtCount = 0);
 
 /// <summary>Shared validation for SQL and local deterministic repositories.</summary>
 internal static class OperationalRecordBrowsing
@@ -24,11 +27,12 @@ internal static class OperationalRecordBrowsing
                 || r.Title.Contains(search, StringComparison.OrdinalIgnoreCase)));
         IOrderedEnumerable<OperationalRecord> ordered = query.Sort switch
         {
-            "oldest" => matches.OrderBy(r => r.CreatedAt),
+            // An absent creation time is not an old one: unknown dates sort last.
+            "oldest" => matches.OrderBy(r => r.CreatedAt is null).ThenBy(r => r.CreatedAt),
             "code" => matches.OrderBy(r => r.OrCode, StringComparer.OrdinalIgnoreCase),
             _ => matches.OrderByDescending(r => r.UpdatedAt)
         };
         OperationalRecord[] all = ordered.ThenBy(r => r.SourceRecordId, StringComparer.OrdinalIgnoreCase).ToArray();
-        return new(all.Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToArray(), all.Length);
+        return new(all.Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToArray(), all.Length, all.Count(r => r.CreatedAt is null));
     }
 }

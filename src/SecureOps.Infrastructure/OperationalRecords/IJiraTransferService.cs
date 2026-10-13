@@ -15,6 +15,12 @@ public interface IJiraTransferService
     /// <summary>Executes an explicit authorized Jira transfer request.</summary>
     public Task<OperationalRecordResult<OperationalRecord>> CreateAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Rebuilds, without any write, the draft a Jira-create retry would send and compares it with the
+    /// persisted reviewed-draft fingerprint. Only a key-less, safely failed create qualifies.
+    /// </summary>
+    public Task<OperationalRecordResult<JiraRetryDraft>> RetryPreviewAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken);
+
     /// <summary>Resumes the safe stage of a failed workflow.</summary>
     public Task<OperationalRecordResult<OperationalRecord>> RetryAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken);
 }

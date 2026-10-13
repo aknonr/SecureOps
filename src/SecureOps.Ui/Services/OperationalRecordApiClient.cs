@@ -71,6 +71,12 @@ public sealed class OperationalRecordApiClient : IOperationalRecordApiClient
             () => _httpClient.PostAsync($"{_root}/{id}/retry", content: null, cancellationToken),
             cancellationToken);
 
+    /// <inheritdoc />
+    public Task<JiraRetryPreviewResponse> RetryPreviewAsync(Guid id, CancellationToken cancellationToken) =>
+        SendAsync<JiraRetryPreviewResponse>(
+            () => _httpClient.GetAsync($"{_root}/{id}/retry-preview", cancellationToken),
+            cancellationToken);
+
     private static async Task<JiraTransferResponse> SendPublicationAsync(
         Func<Task<HttpResponseMessage>> send,
         CancellationToken cancellationToken)

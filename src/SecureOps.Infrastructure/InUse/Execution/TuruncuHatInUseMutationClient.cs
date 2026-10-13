@@ -16,7 +16,7 @@ public sealed class TuruncuHatInUseMutationClient(IHttpClientFactory clients, IT
         string? activityId, string? environment, CancellationToken token)
     {
         if (!completion.Value.Enabled || completion.Value.Provider != "TuruncuHat" || writes.Value.ReadOnlyIntegrationMode
-            || !writes.Value.ControlledTestWritesEnabled || !writes.Value.SourceCloseEnabled || lease.Intent.Source.Synthetic)
+            || !writes.Value.ControlledTestWritesEnabled || !completion.Value.SourceWritesEnabled || lease.Intent.Source.Synthetic)
         { return new("Rejected", "WriteFence"); }
         if (lease.Step < 0 || lease.Step >= InUseExecutionWorker.Steps.Count || InUseExecutionWorker.Steps[lease.Step] != step
             || !lease.Evidence.Any(e => e.Step == "Validate" && e.Outcome == "Verified")

@@ -1,5 +1,17 @@
 # Integrated TEST activation continuation
 
+## In Use source-write gate separation, 2026-10-13
+
+In Use completion no longer reads `OperationalRecords:SourceCloseEnabled`
+(ADR-0020 amendment 2026-10-13). Its corporate path needs the global fence,
+`InUseCompletion:Enabled=true`, `Provider=TuruncuHat` and the new default-off
+`InUseCompletion:SourceWritesEnabled`; startup rejects the new flag otherwise.
+This removes the post-rc6.26 conflict where SDM-01 kept `SourceCloseEnabled=false`
+while In Use completion needed it `true`. Activation settings below are
+unchanged: keep `InUseCompletion:Enabled=false` and add nothing for the new flag
+(default false). Read-only In Use evidence collection also refuses to run while
+the new flag is true. No corporate transport, deployment or TEST change.
+
 ## Combined Source Review, 2026-10-02
 
 The PR #4 source NO-GO checkpoint below is retained as history. Its format blocker is resolved

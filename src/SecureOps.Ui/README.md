@@ -594,13 +594,24 @@ that can discard a just-requested preview. API authorization is unchanged.
   Acknowledged. Under `reconciliationRequired` retry is never offered, even if a payload
   contradicts the contract by also sending `retryEligible=true`.
 - After a command settles, focus moves to the panel heading.
-- No Jira link is rendered: the contract carries no issue URL, and none is composed from the key.
+- A Jira link is rendered only from the server's `jiraIssueUrl` and only when it is an absolute
+  HTTPS URL (underlined, icon-marked, "yeni sekmede açılır" for screen readers, `noopener noreferrer`).
+  Without it the key stays plain text; nothing is composed from the key in the UI (2026-10-13).
+- Created also shows when the key was saved (`jiraIssueKeyPersistedAt`, "Bilinmiyor" when null)
+  and the transfer key from the record, so both survive a reload. `replayed=true` is stated as
+  "the same command had already completed; no new Jira call".
 - **Yeniden Dene is a write and is confirmed.** For a safe `JiraCreateFailed` the server reports
   `retryEligible=true` and `POST /retry` rebuilds the draft and calls Jira create again.
   `JiraRetryDialog` states that effect and the source outcome and uses the same statement gate.
-  The reviewed fields cannot be re-shown there: no preview exists in a failed stage.
+  Before it opens, the page reads `GET …/retry-preview` (no write): matching fields are shown as
+  what Jira will receive; `matchesPersistedDraft=false` closes Yeniden Dene with the reason (the
+  server would refuse); an unreadable preview is said and the server still checks the fingerprint.
 - A lost response that the re-read resolves to a persisted key is shown as Created with a
   resolution note; the stale "may or may not exist" notice is not kept beside the saved key.
+- Uncertain is split by durable state, so a reload keeps it: key-less `CreatingJira` with an
+  active claim is "Gönderildi; yanıt henüz kaydedilmedi" (wait, then Yenile), with a lapsed claim
+  "Gönderildi, yanıt kaydedilmedi; mutabakat gerekli"; `reconciliationRequired` keeps the original
+  title. Stage, last saved change, claim and transfer key are listed; no action is offered.
 - `WorkflowAlreadyInProgress` on create/retry is Uncertain, not Rejected: the same command scope
   is still executing and this page's request was not refused on its merits.
 - **UI transport resend (measured 2026-09-28).** .NET `SocketsHttpHandler` can transparently resend
@@ -616,7 +627,11 @@ that can discard a just-requested preview. API authorization is unchanged.
   connections produce one create and a non-retryable unknown outcome. No corporate
   destination is contacted, and proxy/TLS behavior still needs target acceptance.
 
-Backend contract needs (for Codex; nothing here is assumed by the UI):
+Backend contract needs — delivered 2026-10-13 (TH-8/9, additive; see
+`docs/contracts/secureops-api-v1-ui-integration.md`): 1 `jiraIssueUrl` (Corporate +
+`Jira:IssueBrowseBaseUrl` only), 2 `transferIdempotencyKey` + `jiraIssueKeyPersistedAt`,
+3 `replayed`, 4 `GET …/retry-preview` (rebuilt draft compared with the persisted fingerprint;
+draft content itself is not stored), 5 fallback command key unchanged. The original requests:
 
 1. `jiraIssueUrl` (nullable, absolute https, server-derived from configuration) on
    `OperationalRecordResponse` and `JiraTransferResponse`, to render the saved issue as a link.
@@ -629,8 +644,8 @@ Backend contract needs (for Codex; nothing here is assumed by the UI):
 5. Keep the deterministic actor/command/target fallback command key for create/retry; the UI sends
    no `Idempotency-Key` and relies on it to absorb transport resends (see above).
 
-None of these fields exist in the current DTOs or in the backend worktree's uncommitted changes;
-the UI does not read or assume them.
+The list page also reads `unknownSourceCreatedAtCount`: while non-zero, "En eski kaynak tarihi"
+is disabled with the reason (In Use pattern); unknown dates sort last on the server.
 
 Replay (all Simulation-only, synthetic `SIM-*` keys, loopback, test-owned LocalDB):
 

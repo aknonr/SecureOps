@@ -2,6 +2,15 @@
 
 ## Status and Ownership
 
+### Jira-Only Rollout Decision, 2026-10-13
+
+The owner decided that OR → Jira goes into full Jira-only use: for a Jira-suitable OR the operator opens the Jira
+issue from the product after preview and confirmation. Nothing is activated by that decision. `SourceCloseEnabled`
+stays false (no Turuncu Hat closure in this rollout), writes stay `Test`-only until a separate ADR, and the first
+corporate create still needs the eligibility decision, current Jira evidence and a separate write approval. Steps
+and owner questions: ADR-0033. Known defect: the In Use write gate also requires `SourceCloseEnabled=true`, while
+the Jira-only pilot requires it false (`PilotMustRemainSourceOpen`); TH-7 separates them.
+
 ### Attributed Outcomes And Closure Boundary, 2026-09-17
 
 Migration 021 captures the original persisted human initiator/profile and input
@@ -82,7 +91,7 @@ journeys at 1440x900 and 390x844. Full integration: 245 passed, including all te
 real LocalDB cases with no skips. Final presentation regressions: 66 targeted unit
 and 18 controller/OpenAPI cases passed. Canonical handoff contains exact evidence.
 
-The backend foundation is implemented for TEST validation. Codex owns API, services, integration boundaries, persistence, SQL, authorization, audit, release packaging, and backend tests. Claude owns all Blazor/Razor/CSS/UI work and does not need to change this module.
+The backend foundation is implemented for TEST validation and was delivered by Codex, the default owner of API, services, integration boundaries, persistence, SQL, authorization, audit, release packaging, and backend tests (AGENTS.md). Owner decision 2026-10-13 (ADR-0033): Claude implements the remaining In Use and OR → SDM work end to end (backend, API, SQL, UI; work items TH-6 to TH-14). The UI is `/operational-records` (list and detail with the Jira-only submission panel).
 
 Typed Turuncu Hat and corporate Jira adapters are implemented behind the existing boundaries and remain disabled by default. Paired `Simulation` selects the explicit deterministic no-network Development/Demo/Test workflow harness; legacy `Fake` remains for compatibility. The real Turuncu Hat read-only path is deployed and verified in TEST at source `0ec0376`; Jira creation and Turuncu Hat completion remain blocked until their separate write contracts and activation gate are approved. The canonical deployed evidence is recorded in `docs/24-api-test-deployment-readiness.md`.
 
@@ -118,7 +127,7 @@ approve eligibility, current remote field acceptance or a separate approver flow
 |---|---|
 | Authenticate/query active records | `IOperationalRecordClient` |
 | Read bounded source fields | `OperationalRecordSourceItem` and `OperationalRecordService` |
-| Operator selects a record | typed GET endpoints; UI deferred |
+| Operator selects a record | typed GET endpoints; `/operational-records` list and detail pages |
 | Resolve requester and authenticated reporter | `IJiraUserResolver.ResolveExactAsync` |
 | Apply fixed Jira mapping | `IJiraIssueDraftService` |
 | Review the exact proposed create fields | `POST .../{id}/jira-preview` |
@@ -239,6 +248,8 @@ Non-secret keys:
 - `OperationalRecords:ClaimLeaseSeconds` (30-900)
 - `OperationalRecords:ReadOnlyIntegrationMode` (`true` only in `Test` with `TuruncuHat` + `Corporate`)
 - `OperationalRecords:ControlledTestWritesEnabled` (defaults `false`; TEST writes require explicit `true`, read-only `false`, and the complete corporate provider pair)
+- `OperationalRecords:SourceCloseEnabled` (defaults `false`; independent BPM close gate, ADR-0009)
+- `OperationalRecords:Pilot:*` (defaults empty; exact one-record policy proposal, ADR-0018)
 - `CommandIdempotency:ExecutionLeaseSeconds` (30-900)
 - `CommandIdempotency:MaxKeyLength` (32-256)
 - `Jira:Provider` (`Disabled`, paired `Simulation` or legacy `Fake` only in Development/Demo/Test, or `Corporate`)

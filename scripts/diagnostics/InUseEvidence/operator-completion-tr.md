@@ -23,7 +23,8 @@ NETCore.App ve AspNetCore.App gerekir; SDK, Office veya Windows Service gerekmez
    JSON'u** yükler; IIS ortam değişkenleri, web.config ve Worker ayarlarını almaz.
    Parola/Authorization/SessionID komuta, rapora veya paylaşılan kanıta yazılmaz.
 4. `SourceProvider=TuruncuHat`, `ReadOnlyIntegrationMode=true`,
-   `ControlledTestWritesEnabled=false`, `SourceCloseEnabled=false` kalır.
+   `ControlledTestWritesEnabled=false`, `SourceCloseEnabled=false` ve
+   `InUseCompletion:SourceWritesEnabled=false` (ya da hiç yazılmamış) kalır.
    Normal TLS doğrulaması ve mevcut dar kaynak-okuma izni korunur.
 5. `dictionary.json` tam olarak `{}` kalır. Bu mod `ReporterProperty`, RFC
    sözleşmesi veya aday sözlük kullanmaz. Tarihsel A/B reporter modunda

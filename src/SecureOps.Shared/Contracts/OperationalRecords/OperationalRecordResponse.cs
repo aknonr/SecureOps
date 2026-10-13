@@ -64,6 +64,12 @@ public sealed record OperationalRecordResponse(
     public IReadOnlyList<string> BlockingConditions { get; init; } = [];
     /// <summary>Evaluation never grants permission to perform an external write.</summary>
     public bool ExternalWriteEligible { get; init; }
+    /// <summary>Reviewed-draft fingerprint fixed on the transfer (duplicate protection); null before any preview.</summary>
+    public string? TransferIdempotencyKey { get; init; }
+    /// <summary>UTC time the Jira key was durably saved; null without a key or when no durable entry exists.</summary>
+    public DateTimeOffset? JiraIssueKeyPersistedAt { get; init; }
+    /// <summary>Absolute HTTPS issue address from server configuration (Corporate only); null when not configured.</summary>
+    public string? JiraIssueUrl { get; init; }
 }
 
 /// <summary>Stable UI presentation categories derived from durable workflow states.</summary>

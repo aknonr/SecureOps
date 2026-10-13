@@ -64,7 +64,19 @@ public sealed class InUseCompletionEvidenceTests
         handler.Paths.Should().BeEmpty();
     }
 
-    private static ServiceProvider Create(HttpMessageHandler handler, bool writes = false)
+    [Theory]
+    [InlineData("OperationalRecords:SourceCloseEnabled")]
+    [InlineData("InUseCompletion:SourceWritesEnabled")]
+    public async Task Probe_AnyIndependentWriteGateArmed_RejectsBeforeAuthentication(string gate)
+    {
+        using var handler = new EvidenceHandler(1);
+        using ServiceProvider provider = Create(handler, armedGate: gate);
+        var client = (TuruncuHatOperationalRecordClient)provider.GetRequiredService<IOperationalRecordClient>();
+        await FluentActions.Awaiting(() => client.DiagnoseCompletionAsync("000100", default)).Should().ThrowAsync<InvalidDataException>();
+        handler.Paths.Should().BeEmpty();
+    }
+
+    private static ServiceProvider Create(HttpMessageHandler handler, bool writes = false, string? armedGate = null)
     {
         IConfiguration config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
@@ -77,7 +89,8 @@ public sealed class InUseCompletionEvidenceTests
             ["TuruncuHat:Username"] = "synthetic-only",
             ["TuruncuHat:Password"] = "synthetic-only",
             ["TuruncuHat:TenantId"] = "1",
-            ["TuruncuHat:SessionLifetimeSeconds"] = "60"
+            ["TuruncuHat:SessionLifetimeSeconds"] = "60",
+            [armedGate ?? "InUseCompletion:SourceWritesEnabled"] = armedGate is null ? "false" : "true"
         }).Build();
         var services = new ServiceCollection();
         services.AddSingleton(config);
