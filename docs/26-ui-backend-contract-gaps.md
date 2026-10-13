@@ -44,7 +44,7 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-35 — Unsafe API requests lack a central CSRF guard | Locally verified repair; corporate Negotiate/IIS/F5 acceptance pending |
 | G-36 — Change-plan checklist and closing have no API yet (plus two smaller plan-contract gaps) | Item 1 closed 2026-10-12 (API in #36, UI in F3); items 2 and 3 remain open |
 | G-37 — First TEST acceptance: no SID search, directory "not configured" vs "unreachable", free-text import row errors | Open (2026-10-13); the UI shows honest wording meanwhile |
-| G-38 — OR → Jira: no issue link, no persisted transfer key/time, no replay indicator, no reviewed draft for retry | Open (2026-10-13); planned as TH-8 (ADR-0033); the UI shows none of these meanwhile |
+| G-38 — OR → Jira: no issue link, no persisted transfer key/time, no replay indicator, no reviewed draft for retry | ✅ **Resolved** by TH-8/9 (#51); UI states verified locally in TH-12 (2026-10-13); the corporate link remains unverified |
 | G-39 — Service Accounts event flow: close readiness read per request, no verification readiness, preview ids without names | Open (2026-10-13); OLAY-3 UI works around each honestly |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
@@ -1243,7 +1243,7 @@ corporate systems, provider writes, merge and deployment remain outside scope.
 Counts: no gap. "Sahiplik kararı bekleyen hesap" (work summary) and `status=proposed` (list) both count distinct accounts with a `Proposed`
 ownership inside the caller's scope; the list now says what its total counts and whether it equals the card.
 
-## G-38 — OR → Jira: four read-contract gaps and one behaviour to keep
+## G-38 — OR → Jira: four read-contract gaps and one behaviour to keep — ✅ RESOLVED
 
 **Raised:** OR → Jira submission UI (2026-09-28, `src/SecureOps.Ui/README.md`, "Backend contract needs");
 registered here 2026-10-13 (TH-6). **Owner:** In Use / OR → SDM work under ADR-0033 (planned as TH-8, UI as TH-9).
@@ -1264,6 +1264,13 @@ Checked against `OperationalRecordResponse` and `JiraTransferResponse` on master
 **UI meanwhile:** the Jira key is shown as text without a link; after a reload only the persisted state is shown
 (an in-flight "sent, no answer" survives only as `CreatingJira`); the retry dialog states its effect but cannot
 list the reviewed fields. Nothing above is read or assumed.
+
+**Resolved (TH-8/9, #51; TH-12 check 2026-10-13).** Items 1-4 are on master: `jiraIssueUrl` (server-derived, Corporate
+provider only), `transferIdempotencyKey` and `jiraIssueKeyPersistedAt` on the record, `replayed` on the transfer, and
+`GET retry-preview` with `matchesPersistedDraft`. TH-12 drove the UI through each state on the local Demo/Simulation
+hosts (InMemory), using a test-only response-rewriting loopback proxy for the states those hosts cannot reach
+(`tests/browser/th12-ui-acceptance.cjs`). Not verified: a real `jiraIssueUrl` from the Corporate provider and the
+SQL-backed `jiraIssueKeyPersistedAt` (LocalDB journeys did not run in that environment). No new contract gap was found.
 
 ## G-39 — Service Accounts event flow (OLAY-3): close readiness per request, no verification readiness, ids without names
 

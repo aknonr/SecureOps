@@ -63,7 +63,8 @@ public sealed class OperationalRecordListRenderTests
         await using ServiceProvider services = registrations.BuildServiceProvider();
         await using var renderer = new HtmlRenderer(services, services.GetRequiredService<ILoggerFactory>());
         string html = await renderer.Dispatcher.InvokeAsync(async () => (await renderer.RenderComponentAsync<SecureOps.Ui.Pages.OperationalRecords>()).ToHtmlString());
-        return WebUtility.HtmlDecode(html);
+        // The page has scoped CSS; its b-* scope attribute is build output, not part of what these tests check.
+        return System.Text.RegularExpressions.Regex.Replace(WebUtility.HtmlDecode(html), " b-[a-z0-9]{10}", string.Empty);
     }
 
     private sealed class StaticNavigation : NavigationManager

@@ -349,14 +349,17 @@
                 <h3 id="inuse-complete">4. Raporu ekle ve WASAS adımını onayla</h3>
                 @if (_execution is { } execution)
                 {
-                    <p>@execution.Readiness.Explanation</p>
+                    @if (execution.Readiness.Available) { <p>@execution.Readiness.Explanation</p> }
+                    else
+                    { @* Why the button below is closed, said in words next to it and linked to it (TH-12). *@
+                      <div id="inuse-gate-reason" class="so-panel-note so-panel-note--caution" data-readiness="@execution.Readiness.Code"><MudIcon Icon="@Icons.Material.Outlined.Block" Size="Size.Small" aria-hidden="true" /><span><strong>Onay düğmesi kapalı.</strong> @execution.Readiness.Explanation</span></div> }
                     <p><strong>İşlem yapılacak OR: @record.Source.Code</strong> · @SavedCompleted(record) / @record.Source.Servers.Count sunucu kaydedildi · Sürüm @record.Version</p>
                     <p>Sunucu tipi: Application Server · Gerekli ortam: @RequiredEnvironment(record)</p>
                     <p role="status">@(_dirty ? "Kaydedilmemiş cevaplar var. Önce cevapları kaydedin." : NextAction)</p>
                     @if (record.PolicyProposal is { } pendingPolicy && record.Draft?.Policy?.Fingerprint != pendingPolicy.Fingerprint)
                     { <p role="status">Ortam ve NMS önerileri henüz bu sürüm için kaydedilmedi. 2. bölümde önerileri inceleyip onay kutusunu işaretleyin, ardından cevapları kaydedin.</p> }
                     <p>Yalnız WASAS aktivitesi onaylanır. Sonraki ekip beklerken genel OR açık kalabilir.</p>
-                    <MudButton OnClick="StartExecutionAsync" Disabled="@(_busy || _dirty || record.TrackingOnly || !InUseProgress.Ready(record) || record.Draft?.Policy?.Fingerprint != record.PolicyProposal?.Fingerprint || !execution.Readiness.Available || !MayStartExecution)" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FactCheck">Raporu ekle ve WASAS adımını onayla</MudButton>
+                    <MudButton OnClick="StartExecutionAsync" Disabled="@(_busy || _dirty || record.TrackingOnly || !InUseProgress.Ready(record) || record.Draft?.Policy?.Fingerprint != record.PolicyProposal?.Fingerprint || !execution.Readiness.Available || !MayStartExecution)" aria-describedby="@(execution.Readiness.Available ? null : "inuse-gate-reason")" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.FactCheck">Raporu ekle ve WASAS adımını onayla</MudButton>
                     <MudButton OnClick="RefreshExecutionAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.Refresh">İşlem durumunu yenile</MudButton>
                     @if (execution.Operation is { } operation)
                     { <InUseClosureResult Operation="operation" /><p>Başlatan: @operation.InitiatorLabel · @Time(operation.CreatedAt) · Rapor sürümü @operation.ReportVersion</p>
