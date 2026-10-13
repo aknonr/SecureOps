@@ -8242,7 +8242,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -8291,7 +8290,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8351,7 +8350,7 @@
             }
           },
           "422": {
-            "description": "Client Error",
+            "description": "Unprocessable Content",
             "content": {
               "text/plain": {
                 "schema": {
@@ -8371,7 +8370,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -15910,7 +15909,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -15921,7 +15919,6 @@
             "in": "header",
             "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
             "required": true,
-            "style": "simple",
             "schema": {
               "enum": [
                 "1"
@@ -16001,7 +15998,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16021,7 +16018,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -26131,7 +26128,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -26142,7 +26138,6 @@
             "in": "header",
             "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
             "required": true,
-            "style": "simple",
             "schema": {
               "enum": [
                 "1"
@@ -26252,7 +26247,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -26272,7 +26267,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -26304,7 +26299,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -26315,7 +26309,6 @@
             "in": "header",
             "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
             "required": true,
-            "style": "simple",
             "schema": {
               "enum": [
                 "1"
@@ -26425,7 +26418,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -26445,7 +26438,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -26465,7 +26458,7 @@
             }
           },
           "422": {
-            "description": "Client Error",
+            "description": "Unprocessable Content",
             "content": {
               "text/plain": {
                 "schema": {
@@ -37275,7 +37268,13 @@
       "name": "ServiceAccountChangePlans"
     },
     {
+      "name": "ServiceAccountEvents"
+    },
+    {
       "name": "ServiceAccountImports"
+    },
+    {
+      "name": "ServiceAccountMailHints"
     },
     {
       "name": "ServiceAccountReminders"
