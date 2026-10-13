@@ -22,7 +22,18 @@ public sealed class DisabledItsmUserMapping : IItsmUserMapping
     public const string ProviderName = "Disabled";
 
     /// <inheritdoc />
-    public Task<ItsmUserMatchResult> MatchByUserNameAsync(string? userName, CancellationToken cancellationToken)
+    public Task<ItsmUserMatchResult> MatchByUserNameAsync(string? userName, CancellationToken cancellationToken) =>
+        NotConfigured(cancellationToken);
+
+    /// <inheritdoc />
+    public Task<ItsmUserMatchResult> MatchByRegistrationNumberAsync(string? registrationNumber, CancellationToken cancellationToken) =>
+        NotConfigured(cancellationToken);
+
+    /// <inheritdoc />
+    public Task<ItsmUserMatchResult> MatchAsync(string? registrationNumber, string? userName, CancellationToken cancellationToken) =>
+        NotConfigured(cancellationToken);
+
+    private static Task<ItsmUserMatchResult> NotConfigured(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(ItsmUserMatchResult.Unknown(ItsmRecordLookupReason.NotConfigured, ProviderName));

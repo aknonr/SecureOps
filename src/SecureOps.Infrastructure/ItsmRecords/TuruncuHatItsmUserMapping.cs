@@ -7,10 +7,11 @@ using SecureOps.Shared.Configuration;
 namespace SecureOps.Infrastructure.ItsmRecords;
 
 /// <summary>
-/// Read-only Turuncu Hat adapter for <see cref="IItsmUserMapping"/> (ADR-0032). It sends one exact-equality
-/// <c>/query</c> on the user-name column, selects only the user id, the organization id, the home location id and
-/// the user name used to verify the match, and maps every failure to Unknown. It never selects a person name,
-/// e-mail, phone number or registration number, and never logs the session, credentials, base URL or the user name.
+/// Read-only Turuncu Hat adapter for <see cref="IItsmUserMapping"/> (ADR-0032 and its 2026-10-13 amendment). Each
+/// key is one exact-equality <c>/query</c> on <c>cmn_user</c>: the user-name column or the registration-number column.
+/// It selects only the user id, the organization id, the home location id and the key column used to verify the
+/// match, and maps every failure to Unknown. It never selects a person name, e-mail or phone number, never returns
+/// the key, and never logs the session, credentials, base URL, user name or registration number.
 /// </summary>
 public sealed class TuruncuHatItsmUserMapping(
     HttpClient httpClient,
@@ -25,8 +26,9 @@ public sealed class TuruncuHatItsmUserMapping(
     private const string _userObject = "cmn_user";
     private const int _maxTextLength = 128;
 
-    // m_username is selected only to prove the source honoured the equality filter; it is never returned or logged.
-    private static readonly string[] _selects = ["id", "m_username", "p_obs_id", "m_rel_home_lbs_id"];
+    // The key column is selected only to prove the source honoured the equality filter; it is never returned or logged.
+    private static readonly string[] _userNameSelects = ["id", "m_username", "p_obs_id", "m_rel_home_lbs_id"];
+    private static readonly string[] _registrationSelects = ["id", "c_registration_number", "p_obs_id", "m_rel_home_lbs_id"];
     private static readonly string[] _optional = ["p_obs_id", "m_rel_home_lbs_id"];
 
     private readonly TuruncuHatItsmQueryClient _query = new(httpClient, sessions, turuncuHat.Value, logger);
@@ -41,24 +43,62 @@ public sealed class TuruncuHatItsmUserMapping(
             return ItsmUserMatchResult.Unknown(ItsmRecordLookupReason.InvalidIdentifier, ProviderName);
         }
 
-        var stopwatch = Stopwatch.StartNew();
         // The name passed the allow-list, so it is placed in the filter verbatim; nothing is escaped.
-        string[] filters = [string.Concat("#%m_username%#='", name, "'")];
+        return await QueryAsync(new KeyQuery("itsm-user-match", "user name",
+            string.Concat("#%m_username%#='", name, "'"), _userNameSelects, "SET.m_username",
+            returned => string.Equals(returned?.Trim(), name, StringComparison.OrdinalIgnoreCase)), cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<ItsmUserMatchResult> MatchByRegistrationNumberAsync(string? registrationNumber, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        string? number = ItsmRegistrationNumber.Normalize(registrationNumber);
+        if (number is null)
+        {
+            return ItsmUserMatchResult.Unknown(ItsmRecordLookupReason.InvalidIdentifier, ProviderName);
+        }
+
+        // The number passed the digit-only allow-list without leading zeros, so it is placed in the filter verbatim.
+        // The returned value is normalized the same way, so a source that kept leading zeros still verifies.
+        return await QueryAsync(new KeyQuery("itsm-user-match-registration", "registration number",
+            string.Concat("#%c_registration_number%#='", number, "'"), _registrationSelects, "SET.c_registration_number",
+            returned => string.Equals(ItsmRegistrationNumber.Normalize(returned), number, StringComparison.Ordinal)), cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<ItsmUserMatchResult> MatchAsync(string? registrationNumber, string? userName, CancellationToken cancellationToken)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        (ItsmUserMatchResult result, bool conflict) = await ItsmUserMatchRules.MatchAsync(
+            this, registrationNumber, userName, ProviderName, cancellationToken);
+        telemetry.RecordOperation(ProviderName, "itsm-user-match-combined", conflict ? "conflict" : Outcome(result), stopwatch.Elapsed);
+        if (conflict)
+        {
+            logger.LogWarning("Turuncu Hat ITSM user match found the registration number and the user name on different users; no mapping is made.");
+        }
+
+        return result;
+    }
+
+    private async Task<ItsmUserMatchResult> QueryAsync(KeyQuery key, CancellationToken cancellationToken)
+    {
+        var stopwatch = Stopwatch.StartNew();
         try
         {
-            TuruncuHatItsmRecordRows? rows = await _query.QueryAsync(_userObject, filters, _selects, _optional, cancellationToken);
+            TuruncuHatItsmRecordRows? rows = await _query.QueryAsync(_userObject, [key.Filter], key.Selects, _optional, cancellationToken);
             ItsmUserMatchResult result = rows is null
                 ? ItsmUserMatchResult.Unknown(ItsmRecordLookupReason.AuthenticationFailed, ProviderName)
-                : Interpret(name, rows);
-            return Finish(result, stopwatch);
+                : Interpret(key, rows);
+            return Finish(key, result, stopwatch);
         }
         catch (ItsmQueryFailure failure)
         {
-            return Finish(ItsmUserMatchResult.Unknown(failure.Reason, ProviderName), stopwatch);
+            return Finish(key, ItsmUserMatchResult.Unknown(failure.Reason, ProviderName), stopwatch);
         }
     }
 
-    private static ItsmUserMatchResult Interpret(string name, TuruncuHatItsmRecordRows rows)
+    private static ItsmUserMatchResult Interpret(KeyQuery key, TuruncuHatItsmRecordRows rows)
     {
         if (!rows.Complete || rows.Malformed > 0)
         {
@@ -69,7 +109,6 @@ public sealed class TuruncuHatItsmUserMapping(
         foreach (IReadOnlyDictionary<string, string?> row in rows.Rows)
         {
             string? userId = row["SET.id"]?.Trim();
-            string? returnedName = row["SET.m_username"]?.Trim();
             if (string.IsNullOrEmpty(userId) || userId.Length > _maxTextLength
                 || !TryText(row, "SET.p_obs_id", out string? organization)
                 || !TryText(row, "SET.m_rel_home_lbs_id", out string? location))
@@ -77,8 +116,8 @@ public sealed class TuruncuHatItsmUserMapping(
                 return ItsmUserMatchResult.Unknown(ItsmRecordLookupReason.IncompleteResponse, ProviderName);
             }
 
-            // A row for another user name means the filter was not honoured; nothing in this response is trusted.
-            if (!string.Equals(returnedName, name, StringComparison.OrdinalIgnoreCase))
+            // A row for another key value means the filter was not honoured; nothing in this response is trusted.
+            if (!key.Verify(row[key.ReturnedKey]))
             {
                 return ItsmUserMatchResult.Unknown(ItsmRecordLookupReason.InvalidResponse, ProviderName);
             }
@@ -101,17 +140,28 @@ public sealed class TuruncuHatItsmUserMapping(
         return text is not { Length: > _maxTextLength };
     }
 
-    private ItsmUserMatchResult Finish(ItsmUserMatchResult result, Stopwatch stopwatch)
+    private static string Outcome(ItsmUserMatchResult result) => result.Status == ItsmUserMatchStatus.Unknown
+        ? "unknown-" + result.Reason.ToString().ToLowerInvariant()
+        : result.Status.ToString().ToLowerInvariant();
+
+    private ItsmUserMatchResult Finish(KeyQuery key, ItsmUserMatchResult result, Stopwatch stopwatch)
     {
-        string outcome = result.Status == ItsmUserMatchStatus.Unknown
-            ? "unknown-" + result.Reason.ToString().ToLowerInvariant()
-            : result.Status.ToString().ToLowerInvariant();
-        telemetry.RecordOperation(ProviderName, "itsm-user-match", outcome, stopwatch.Elapsed);
+        telemetry.RecordOperation(ProviderName, key.Operation, Outcome(result), stopwatch.Elapsed);
         if (result.Status == ItsmUserMatchStatus.Unknown)
         {
-            logger.LogWarning("Turuncu Hat ITSM user match could not prove an answer. Reason: {Reason}.", result.Reason);
+            // Only the key kind is logged, never its value.
+            logger.LogWarning("Turuncu Hat ITSM user match could not prove an answer. Key: {Key}. Reason: {Reason}.",
+                key.Kind, result.Reason);
         }
 
         return result;
+    }
+
+    // One exact-equality query: telemetry operation, key kind for logs, filter, selects and the check of the returned key.
+    // The filter carries the key value, so ToString names only the kind.
+    private sealed record KeyQuery(
+        string Operation, string Kind, string Filter, string[] Selects, string ReturnedKey, Func<string?, bool> Verify)
+    {
+        public override string ToString() => Kind;
     }
 }

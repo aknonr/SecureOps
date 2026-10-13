@@ -107,18 +107,93 @@ public sealed class ItsmTrackingAndUserProviderTests
         (first.User is not null).Should().Be(status == ItsmUserMatchStatus.Matched);
     }
 
+    [Theory]
+    [InlineData("990001", ItsmUserMatchStatus.Matched, ItsmRecordLookupReason.None)]
+    [InlineData("0990001", ItsmUserMatchStatus.Matched, ItsmRecordLookupReason.None)]
+    [InlineData("990002", ItsmUserMatchStatus.Ambiguous, ItsmRecordLookupReason.None)]
+    [InlineData("990003", ItsmUserMatchStatus.Unknown, ItsmRecordLookupReason.Unavailable)]
+    [InlineData("990004", ItsmUserMatchStatus.Matched, ItsmRecordLookupReason.None)]
+    [InlineData("990404", ItsmUserMatchStatus.NotMatched, ItsmRecordLookupReason.None)]
+    [InlineData("99a001", ItsmUserMatchStatus.Unknown, ItsmRecordLookupReason.InvalidIdentifier)]
+    [InlineData("0000", ItsmUserMatchStatus.Unknown, ItsmRecordLookupReason.InvalidIdentifier)]
+    [InlineData(null, ItsmUserMatchStatus.Unknown, ItsmRecordLookupReason.InvalidIdentifier)]
+    public async Task FakeRegistrationMapping_IsDeterministic_AndCoversEveryState(
+        string? registrationNumber, ItsmUserMatchStatus status, ItsmRecordLookupReason reason)
+    {
+        FakeItsmUserMapping fake = new();
+
+        ItsmUserMatchResult first = await fake.MatchByRegistrationNumberAsync(registrationNumber, CancellationToken.None);
+        ItsmUserMatchResult second = await fake.MatchByRegistrationNumberAsync(registrationNumber, CancellationToken.None);
+
+        first.Status.Should().Be(status);
+        first.Reason.Should().Be(reason);
+        first.Provider.Should().Be("Fake");
+        second.Should().Be(first);
+        (first.User is not null).Should().Be(status == ItsmUserMatchStatus.Matched);
+    }
+
+    [Theory]
+    [InlineData("990001", "synthetic.user", ItsmUserMatchStatus.Matched, ItsmRecordLookupReason.None)]
+    [InlineData("0990001", "Synthetic.User", ItsmUserMatchStatus.Matched, ItsmRecordLookupReason.None)]
+    [InlineData("990004", "synthetic.user", ItsmUserMatchStatus.Ambiguous, ItsmRecordLookupReason.None)]
+    [InlineData("990003", "synthetic.user", ItsmUserMatchStatus.Unknown, ItsmRecordLookupReason.Unavailable)]
+    [InlineData("990002", "synthetic.user", ItsmUserMatchStatus.Ambiguous, ItsmRecordLookupReason.None)]
+    [InlineData("990404", "synthetic.user", ItsmUserMatchStatus.Matched, ItsmRecordLookupReason.None)]
+    [InlineData("990404", "nobody", ItsmUserMatchStatus.NotMatched, ItsmRecordLookupReason.None)]
+    [InlineData("990001", "nobody", ItsmUserMatchStatus.Matched, ItsmRecordLookupReason.None)]
+    [InlineData("990001", "synthetic.down", ItsmUserMatchStatus.Unknown, ItsmRecordLookupReason.Unavailable)]
+    [InlineData("990001", "synthetic.dup", ItsmUserMatchStatus.Ambiguous, ItsmRecordLookupReason.None)]
+    [InlineData("99a001", "synthetic.user", ItsmUserMatchStatus.Unknown, ItsmRecordLookupReason.InvalidIdentifier)]
+    [InlineData(null, "synthetic.user", ItsmUserMatchStatus.Matched, ItsmRecordLookupReason.None)]
+    [InlineData("990001", null, ItsmUserMatchStatus.Matched, ItsmRecordLookupReason.None)]
+    [InlineData(null, null, ItsmUserMatchStatus.Unknown, ItsmRecordLookupReason.InvalidIdentifier)]
+    [InlineData(" ", "", ItsmUserMatchStatus.Unknown, ItsmRecordLookupReason.InvalidIdentifier)]
+    public async Task FakeCombinedMapping_FollowsThePriorityAndConflictRule(
+        string? registrationNumber, string? userName, ItsmUserMatchStatus status, ItsmRecordLookupReason reason)
+    {
+        ItsmUserMatchResult result = await new FakeItsmUserMapping().MatchAsync(registrationNumber, userName, CancellationToken.None);
+
+        result.Status.Should().Be(status);
+        result.Reason.Should().Be(reason);
+        result.Provider.Should().Be("Fake");
+        (result.User is not null).Should().Be(status == ItsmUserMatchStatus.Matched);
+    }
+
+    [Fact]
+    public async Task FakeCombinedMapping_ConflictNeverReturnsEitherUser()
+    {
+        FakeItsmUserMapping fake = new();
+
+        ItsmUserMatchResult byRegistration = await fake.MatchByRegistrationNumberAsync("990004", CancellationToken.None);
+        ItsmUserMatchResult byUserName = await fake.MatchByUserNameAsync("synthetic.user", CancellationToken.None);
+        ItsmUserMatchResult combined = await fake.MatchAsync("990004", "synthetic.user", CancellationToken.None);
+
+        byRegistration.User!.UserId.Should().NotBe(byUserName.User!.UserId);
+        combined.Status.Should().Be(ItsmUserMatchStatus.Ambiguous);
+        combined.User.Should().BeNull();
+    }
+
     [Fact]
     public async Task Disabled_TrackingAndUserMapping_AreAlwaysUnknownNotConfigured()
     {
+        DisabledItsmUserMapping disabled = new();
         ItsmRecordTrackingResult tracking = await new DisabledItsmRecordTracking().GetOrTrackingAsync("900001", CancellationToken.None);
-        ItsmUserMatchResult user = await new DisabledItsmUserMapping().MatchByUserNameAsync("synthetic.user", CancellationToken.None);
+        ItsmUserMatchResult[] users =
+        [
+            await disabled.MatchByUserNameAsync("synthetic.user", CancellationToken.None),
+            await disabled.MatchByRegistrationNumberAsync("990001", CancellationToken.None),
+            await disabled.MatchAsync("990001", "synthetic.user", CancellationToken.None)
+        ];
 
         tracking.Status.Should().Be(ItsmRecordLookupStatus.Unknown);
         tracking.Reason.Should().Be(ItsmRecordLookupReason.NotConfigured);
         tracking.Provider.Should().Be("Disabled");
-        user.Status.Should().Be(ItsmUserMatchStatus.Unknown);
-        user.Reason.Should().Be(ItsmRecordLookupReason.NotConfigured);
-        user.Provider.Should().Be("Disabled");
+        users.Should().AllSatisfy(user =>
+        {
+            user.Status.Should().Be(ItsmUserMatchStatus.Unknown);
+            user.Reason.Should().Be(ItsmRecordLookupReason.NotConfigured);
+            user.Provider.Should().Be("Disabled");
+        });
     }
 
     [Fact]
