@@ -8118,6 +8118,167 @@
         }
       }
     },
+    "/api/v1/operational-records/{id}/retry-preview": {
+      "get": {
+        "tags": [
+          "OperationalRecords"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraRetryPreviewResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraRetryPreviewResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraRetryPreviewResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Client Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server Error",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/operational-records/{id}/jira": {
       "post": {
         "tags": [
@@ -30987,6 +31148,34 @@
         },
         "additionalProperties": false
       },
+      "JiraRetryPreviewResponse": {
+        "type": "object",
+        "properties": {
+          "operationalRecordId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "persistedMappingVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "persistedIdempotencyKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "matchesPersistedDraft": {
+            "type": "boolean"
+          },
+          "draft": {
+            "$ref": "#/components/schemas/JiraPreviewResponse"
+          }
+        },
+        "additionalProperties": false
+      },
       "JiraReviewRequest": {
         "type": "object",
         "properties": {
@@ -31043,6 +31232,13 @@
           },
           "sourceCloseRequested": {
             "type": "boolean"
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "jiraIssueUrl": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -31545,6 +31741,10 @@
           "pageSize": {
             "type": "integer",
             "format": "int32"
+          },
+          "unknownSourceCreatedAtCount": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -31739,6 +31939,19 @@
           },
           "externalWriteEligible": {
             "type": "boolean"
+          },
+          "transferIdempotencyKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "jiraIssueKeyPersistedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "jiraIssueUrl": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

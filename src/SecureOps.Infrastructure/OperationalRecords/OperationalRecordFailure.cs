@@ -9,6 +9,9 @@ public sealed record OperationalRecordResult<T>(T? Value, OperationalRecordFailu
     /// <summary>Whether the operation succeeded.</summary>
     public bool IsSuccess => Failure is null;
 
+    /// <summary>True when a completed durable command was replayed and no new external call was made.</summary>
+    public bool IdempotentReplay { get; init; }
+
     /// <summary>Creates a successful result.</summary>
     public static OperationalRecordResult<T> Success(T value) => new(value, null);
 
