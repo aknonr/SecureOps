@@ -250,6 +250,27 @@ günlüğe yazmaz (mevcut hata günlük ara katmanı gövde kaydetmiyor olmalı;
 **kullanıcının kendi yazdığı kısa özet** (`summary`, mevcut alan; arayüz "ad ve mail içeriğini kopyalamayın" ipucu verir), isteğe bağlı mevcut `providerMessageId`. Saklama süresi sorusu doğmaz
 (gövde yok); özet ve olay kaydı mevcut modül saklama/audit süresine (audit ≥ 36 ay) tabidir. Sahibe soru S4 (özeti de kısıtlamak ister mi).
 
+**OLAY-2b uygulama notu (2026-10-13, dal `feature/service-accounts-mail-hints-20261013`).** Uygulanan: `events/mail-hints` (`ServiceAccountMailHintsController`,
+`ServiceAccountService.MailHintsAsync`), saf `EventMailHints` ve tek dosyalık kural tablosu `EventMailHintRules` (Domain, kural seti `olay-1`).
+Kararlar ve tasarımdan sapmalar:
+- Yetki `Work` + hesap kapsamda (kapsam dışı/bilinmeyen = 404, `View` tek başına 403). Metin boş/yalnız boşluk ya da 20 000 karakterden uzunsa
+  400 `field=text` (`TooLong` uyarısı yok; uzun girdi eşleştirmeden önce reddedilir). İstek gövdesi üst sınırı 128 KB (413).
+- Tüm desenler `RegexOptions.NonBacktracking` (doğrusal zaman) + 250 ms zaman aşımı; NonBacktracking ileri/geri bakış desteklemediği için rakam sınırları ve
+  "konu ile eylem en çok 70 karakter, aynı cümlede" yakınlığı kodda denetlenir. Girdi önce katlanır (küçük harf, Türkçe harf/aksan kaldırma; eşleşmeyen vekil
+  karakterler atılır, aksi halde `Normalize` istisna atar).
+- Olay ifadeleri: parola/şifre·password + değişti·yenilendi·güncellendi·reset·rotated; hesap·account + silindi·kaldırıldı·kapatıldı·deleted·decommissioned;
+  gMSA + geçti·çevrildi·dönüştü·migrated; sahip·sorumlu·owner + değişti·devredildi·transferred; taşındı·moved. Olumsuz/gelecek ifadeler ("değişmedi", "yapılacak",
+  "henüz", "will", "not") öneri üretmez. `OwnerReplied` ve `Other` için kural yok (ifade yok; kullanıcı elle seçer).
+- Referans: yalnız `OCO` (`-`, `_`, boşluk ya da bitişik) ve `OR` (`-`/`_` şart; İngilizce "or" eşleşmesin diye) önekli adaylar; kabul ölçüsü modülün mevcut
+  kayıt numarası kuralı `ChangePlanRules.OcoNumber` (≤64, `A–Z 0–9 - _ . /`, ≥1 rakam). `CHG`/`JIRA` önekleri eklenmedi (gerçek desen bilinmiyor, S5).
+- Tarih: `gg.AA.yyyy`, `gg/AA/yyyy`, `yyyy-AA-gg`, "1 Ekim 2026", "1 October 2026", "October 1, 2026"; yılsız Türkçe/İngilizce ay adı → `AssumedYear` (bu yıl).
+  Gelecekteki, geçersiz (31.02) ve 2000–2100 dışı tarihler önerilmez; aynı tarih bir kez listelenir; en çok 10 referans ve 10 tarih.
+- Parola benzeri: `parola|şifre|password|pwd|pass` + `:`/`=` + rakam ya da simge içeren değer, ya da ≥16 karakterlik üç sınıflı rastgele dizge → yalnız
+  `PasswordLikeContent` uyarısı; yakalanan parça hiçbir yerde tutulmaz.
+- **Günlük kanıtı:** `MailHintsRequest` kayıt türünün `ToString` çıktısı metni göstermez. Sebep: MVC, `Trace` düzeyinde eylem argümanlarını yazar
+  ("Executing action method ... with arguments"); barındırılan testte (her düzey, her kategori) bu satırda metin yakalandı ve kapatıldı. Test: istek gövdesi
+  geçerli/bozuk/yanlış tip/aşırı büyük, iki kimlik, CSRF reddi; günlük, audit ve yanıtlarda işaretçi yok.
+
 ## 8. Güvenlik tehdit tablosu (OLAY-2 için bağlayıcı; her satır testle kanıtlanır)
 
 | # | Tehdit | Karşılık |

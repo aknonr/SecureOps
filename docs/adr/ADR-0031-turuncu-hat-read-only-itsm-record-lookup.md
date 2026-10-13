@@ -1,6 +1,6 @@
 # ADR-0031: Turuncu Hat Read-Only ITSM Record Lookup and Write Scope
 
-**Status:** Proposed (owner acceptance pending); lookup implemented behind Disabled default, no real Turuncu Hat call verified
+**Status:** Accepted (owner, 2026-10-13); lookup implemented behind Disabled default, no real Turuncu Hat call verified
 **Date:** 2026-10-12
 
 ## Context

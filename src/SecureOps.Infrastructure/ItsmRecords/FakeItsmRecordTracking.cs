@@ -45,12 +45,18 @@ public sealed class FakeItsmRecordTracking : IItsmRecordTracking
 /// <summary>
 /// Deterministic synthetic provider for Development, Demo and Test (ADR-0004, ADR-0032). User name
 /// <c>synthetic.user</c> is Matched, <c>synthetic.dup</c> Ambiguous, <c>synthetic.down</c> Unknown/Unavailable,
-/// any other valid name NotMatched, an invalid name Unknown/InvalidIdentifier. Results report Provider "Fake".
+/// any other valid name NotMatched, an invalid name Unknown/InvalidIdentifier. Registration number <c>990001</c>
+/// (also written <c>0990001</c>) is the same user as <c>synthetic.user</c>; <c>990004</c> is another user, so it
+/// conflicts with <c>synthetic.user</c> in the combined match; <c>990002</c> is Ambiguous, <c>990003</c>
+/// Unknown/Unavailable, any other valid number NotMatched. Results report Provider "Fake" and are never real evidence.
 /// </summary>
 public sealed class FakeItsmUserMapping : IItsmUserMapping
 {
     /// <summary>Provider name reported in results.</summary>
     public const string ProviderName = "Fake";
+
+    private static readonly ItsmUserReference _syntheticUser = new("920001", "9601", "9701");
+    private static readonly ItsmUserReference _otherSyntheticUser = new("920004", "9601", "9702");
 
     /// <inheritdoc />
     public Task<ItsmUserMatchResult> MatchByUserNameAsync(string? userName, CancellationToken cancellationToken)
@@ -60,11 +66,31 @@ public sealed class FakeItsmUserMapping : IItsmUserMapping
         ItsmUserMatchResult result = name?.ToLowerInvariant() switch
         {
             null => ItsmUserMatchResult.Unknown(ItsmRecordLookupReason.InvalidIdentifier, ProviderName),
-            "synthetic.user" => ItsmUserMatchResult.Matched(new ItsmUserReference("920001", "9601", "9701"), ProviderName),
+            "synthetic.user" => ItsmUserMatchResult.Matched(_syntheticUser, ProviderName),
             "synthetic.dup" => ItsmUserMatchResult.Ambiguous(ProviderName),
             "synthetic.down" => ItsmUserMatchResult.Unknown(ItsmRecordLookupReason.Unavailable, ProviderName),
             _ => ItsmUserMatchResult.NotMatched(ProviderName)
         };
         return Task.FromResult(result);
     }
+
+    /// <inheritdoc />
+    public Task<ItsmUserMatchResult> MatchByRegistrationNumberAsync(string? registrationNumber, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ItsmUserMatchResult result = ItsmRegistrationNumber.Normalize(registrationNumber) switch
+        {
+            null => ItsmUserMatchResult.Unknown(ItsmRecordLookupReason.InvalidIdentifier, ProviderName),
+            "990001" => ItsmUserMatchResult.Matched(_syntheticUser, ProviderName),
+            "990002" => ItsmUserMatchResult.Ambiguous(ProviderName),
+            "990003" => ItsmUserMatchResult.Unknown(ItsmRecordLookupReason.Unavailable, ProviderName),
+            "990004" => ItsmUserMatchResult.Matched(_otherSyntheticUser, ProviderName),
+            _ => ItsmUserMatchResult.NotMatched(ProviderName)
+        };
+        return Task.FromResult(result);
+    }
+
+    /// <inheritdoc />
+    public async Task<ItsmUserMatchResult> MatchAsync(string? registrationNumber, string? userName, CancellationToken cancellationToken) =>
+        (await ItsmUserMatchRules.MatchAsync(this, registrationNumber, userName, ProviderName, cancellationToken)).Result;
 }
