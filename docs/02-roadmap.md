@@ -27,6 +27,7 @@ Future = Phase 8 (write operations, future)
 - Phase 0 stakeholder replies are still pending; Turuncuhat and BeyondTrust/PAM inquiry mails are drafted but awaiting manager approval and have not been sent.
 - Phase 1A backend IdentityLookup is implemented and hardened in code with tests. Real AD smoke testing with an approved read-only account is still pending.
 - Phase 1 read-only diagnostic MVP has not started. It must remain read-only and must not absorb Phase 3+ notification, Phase 4 PAM correlation, Phase 7 AI, or Phase 8 remediation scope.
+- Operational Record → SDM (Jira) (ADR-0009/0012/0018) and the In Use review workspace (ADR-0020) are implemented under owner-approved task exceptions but appear in no phase above. Their phase placement is an open owner decision; this map does not assign one. Status (2026-10-13): the real Turuncu Hat read-only source is verified in TEST; no Jira issue or Turuncu Hat write has been made. The owner decided on 2026-10-13 that OR → Jira goes into full Jira-only use; the steps and remaining gates are in ADR-0033 (Proposed).
 
 ## Realistic Schedule Outlook
 
