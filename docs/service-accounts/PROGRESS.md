@@ -17,6 +17,20 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
 - Push on the owner's workstation: Git Credential Manager holds two GitHub accounts, so name the owner's:
   `git -c credential.https://github.com.username=aknonr push origin <branch>`.
 
+## Web usage scan, TARAMA-S (branch `feature/service-accounts-web-usage-scan-20261013`, from master `e79ac0b`, not merged)
+
+- Owner decision 2026-10-13: the product runs the same read-only scan from the web; Worker is a Windows service; access is
+  direct WinRM + Kerberos + JEA (rules 1 and 3 unchanged). Contract first (`616fa0e`): `USAGE-SCAN-JOB-CONTRACT.md`,
+  `IServiceAccountUsageCollector` + deterministic fake. The Worker JEA runner, service setup and endpoint package are TARAMA-C
+  (Codex, separate branch).
+- Migration 037 (SA-008, `DBA-037-TR.md`): job/account/server tables, one active scan per account (filtered unique index),
+  guard triggers, API/Worker grants; harness 001–034 + 037 + `sa-037-guards.sql`. Runner on the existing Hangfire queue,
+  lease-fenced; each document validated by the ADR-0027 parser; final evidence in the 030 tables (`tool = Jea`). API: six
+  routes (OpenAPI snapshot: additions only). UI: live page + start panel. Off by default (`Collector=None`).
+- Verified here (Linux cloud, SDK 9.0.317): build 0/0, unit tests, format gate on a CRLF copy, the OpenAPI snapshot test.
+  Not verified: SQL (037, guards, SQL tests), Windows/IIS, browser, real JEA. Report: `TARAMA-S-RAPOR.md`.
+- Open: release selector `Get-ReleaseSqlPlan.ps1` does not know 037 (Codex); 035/036 belong to parallel branches.
+
 ## Change plan d, PR 2 (branch `feature/service-accounts-change-plan-checklist-20261012`, from the PR 1 branch `db56856`, not merged)
 
 - Contract first (`a737d2b`, pushed for F and G): `GET/POST change-plans/{id}/items/{itemId}/checks`, `POST .../evidence`,

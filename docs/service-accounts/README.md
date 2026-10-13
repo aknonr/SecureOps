@@ -88,6 +88,7 @@ Not reused, with reason:
 | UI | `src/SecureOps.Ui/Pages/ServiceAccounts/`, `src/SecureOps.Ui/Services/ServiceAccounts/`, `src/SecureOps.Ui/Shared/Components/ServiceAccounts/` |
 | SQL payloads | `sql/pending/service-accounts/` retained includes; numbered discovery through `sql/schema/025-*.sql`, `026-*.sql`, `029-*.sql` and matching migrations; separate grants |
 | Usage scan tooling | `scripts/powershell/Get-ServiceAccountUsage.ps1` (collector), `scripts/powershell/Invoke-ServiceAccountUsageScan.ps1` (combine), contracts `service-account-usage(-scan).schema.json`, parser `Infrastructure/ServiceAccounts/UsageScans/` |
+| Web usage scan | collector seam + fake `UsageScans/Collection/`, job runner/store/views `UsageScans/Jobs/`, rules `Domain/ServiceAccounts/UsageScanJobRules.cs`, API `ServiceAccountUsageScanJobsController`, UI `ServiceAccountUsageScanJob.razor` + `SaWebScanPanel` |
 | Tests | `tests/SecureOps.Tests.Unit/ServiceAccounts/`, `tests/SecureOps.Tests.Unit/Ui/ServiceAccountUiTests.cs`, `tests/SecureOps.Tests.Integration/ServiceAccounts/`, `tests/sql/service-accounts/`, `tests/browser/service-accounts.cjs` |
 
 All routes are under `/api/v1/service-accounts/…`.
@@ -150,6 +151,11 @@ Candidate 4 (`SA-004`, numbered 030, ADR-0027): UsageScans (uploaded file ≤ 4 
 expected gMSA, times, run statement), UsageScanServers (one row per planned server, result and per-source status),
 UsageScanItems (matched components, role Former/Expected), UsageScanLinks (scan → account, optional participant request)
 and UsageScanDecisions (usage recorded / dismissed with reason). All append-only by trigger; runtime SELECT/INSERT only.
+Candidate 8 (`SA-008`, numbered 037, web usage scan 2026-10-13): UsageScanJobs (job state, lease, plan hash, collector kind),
+UsageScanJobAccounts (filtered unique index: one queued/running scan per account; link outcome) and UsageScanJobServers (live
+per-server state, collector status, validated document, matched items). Operational state, never deleted; the evidence stays the
+030 record (`tool = Jea`). Contract with the Worker JEA runner: [USAGE-SCAN-JOB-CONTRACT.md](USAGE-SCAN-JOB-CONTRACT.md); DBA:
+[DBA-037-TR.md](DBA-037-TR.md).
 
 Dates: plan/business dates are `date`; events carry `datetimeoffset` only when a real instant is
 known; `TimePrecision` records DateOnly/Instant/Unknown. Source timestamps without a timezone
@@ -233,3 +239,5 @@ requested gMSA name of a conversion has no field in the API yet (open owner ques
   pending; see PROGRESS.md).
 - How the team reaches many servers with the collector is their own approved practice; a product-side fan-out over the
   default WinRM endpoint would be an exception to AGENTS.md rule 3 and needs an owner decision and its own ADR.
+- Web scan (2026-10-13): the module side and its contract exist; the Worker JEA runner, the Windows service setup and the
+  JEA endpoint package are TARAMA-C (Codex). Until a `Jea` collector is configured the feature is off (fail closed).

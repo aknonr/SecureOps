@@ -231,7 +231,7 @@ public sealed partial class ServiceAccountService
         }
 
         UsageScanJobRecord? job = await store.GetAsync(jobId, cancellationToken);
-        if (job is null || !await CoversAllAsync(caller, job, responsible: false, cancellationToken))
+        if (job is null || !(await CoversAllAsync(caller, job, cancellationToken)).Visible)
         {
             return (null, SaResult<UsageScanJobView>.Fail(SaErrors.NotFound));
         }
@@ -249,25 +249,29 @@ public sealed partial class ServiceAccountService
         IReadOnlyList<UsageScanJobFoundItem> items = await jobs!.Store!.ItemsAfterAsync(job.Id, after, UsageScanJobViews.MaxItemsPerPoll, cancellationToken);
         int last = items.Count == 0 ? after : items.Max(i => i.FinishSeq);
         bool more = job.Servers.Any(s => s.FinishSeq > last && (s.FormerMatches ?? 0) + (s.ExpectedMatches ?? 0) > 0);
-        bool canRetry = caller.Can(ServiceAccountCapabilities.Work) && await CoversAllAsync(caller, job, responsible: true, cancellationToken);
+        bool canRetry = caller.Can(ServiceAccountCapabilities.Work) && !UsageScanJobRules.IsActive(job.State)
+            && (await CoversAllAsync(caller, job, cancellationToken)).Responsible;
         return UsageScanJobViews.View(job, items, after, more, clock.GetUtcNow(), caller.User.Id, CanCancel(caller, job), canRetry);
     }
 
     private static bool CanCancel(SaCaller caller, UsageScanJobRecord job) =>
         job.StartedBy == caller.User.Id && caller.Can(ServiceAccountCapabilities.Work) || caller.Can(ServiceAccountCapabilities.Administer);
 
-    private async Task<bool> CoversAllAsync(SaCaller caller, UsageScanJobRecord job, bool responsible, CancellationToken cancellationToken)
+    /// <summary>Whether the caller's scope covers every account of the job, and whether it is responsible for every one (one read per account).</summary>
+    private async Task<(bool Visible, bool Responsible)> CoversAllAsync(SaCaller caller, UsageScanJobRecord job, CancellationToken cancellationToken)
     {
+        bool responsible = true;
         foreach (UsageScanJobAccount account in job.Accounts)
         {
-            if (await repository!.AnchorAsync(account.AccountId, cancellationToken) is not { } read || !caller.Scope.Covers(read.Anchor)
-                || responsible && !Responsible(caller.Scope, read.Anchor))
+            if (await repository!.AnchorAsync(account.AccountId, cancellationToken) is not { } read || !caller.Scope.Covers(read.Anchor))
             {
-                return false;
+                return (false, false);
             }
+
+            responsible &= Responsible(caller.Scope, read.Anchor);
         }
 
-        return job.Accounts.Count > 0;
+        return job.Accounts.Count > 0 ? (true, responsible) : (false, false);
     }
 
     /// <summary>Closes active jobs whose Worker lease expired or that nobody claimed in time; true when any was closed.</summary>
