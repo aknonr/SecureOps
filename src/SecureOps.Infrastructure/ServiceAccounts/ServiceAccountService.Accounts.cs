@@ -35,9 +35,24 @@ public sealed partial class ServiceAccountService
             return SaResult<AccountDetail>.Fail(SaErrors.NotFound);
         }
 
-        detail = await WithCloseReadinessAsync(detail, cancellationToken);
+        detail = WithVerificationReadiness(await WithCloseReadinessAsync(detail, cancellationToken));
         return await WithRulesAsync(detail with { Permissions = Permissions(caller, anchor.Anchor, detail.Requests) }, cancellationToken);
     }
+
+    /// <summary>
+    /// Adds each unverified action's verification readiness (G-39) from <see cref="ServiceAccountRules.EvaluateVerification"/> on the same
+    /// facts the verify command builds: the reader as verifier, the recorded evidence note only, no date yet.
+    /// </summary>
+    private AccountDetail WithVerificationReadiness(AccountDetail detail) =>
+        detail with
+        {
+            Actions = [.. detail.Actions.Select(a => a.Result == nameof(ServiceAccountActionResult.Verified) ? a : a with
+            {
+                VerificationReadiness = ReadinessOf(ServiceAccountRules.EvaluateVerification(Facts(a), null, true, !string.IsNullOrWhiteSpace(a.EvidenceNote), Today))
+            })]
+        };
+
+    private static VerificationReadiness ReadinessOf(IReadOnlyList<string> missing) => new(missing.Count == 0, missing);
 
     /// <summary>
     /// Adds each open request's Completed close readiness (G-39): one batched read of the same close facts the close command reads,
