@@ -158,6 +158,32 @@ Numara: **036** (035 OR-2'ye ayrılı, `00-ORTAK-MERGE-SIRASI.md`'ye "ayrıldı"
   güncellemesi bekleniyor" ile gösterir; `close-readiness` ve `mail-hints` migration gerektirmez, 036'dan önce de çalışır (migration bağımsız, bkz. §10).
 - Kurulu TEST'e hiçbir şey uygulanmaz; DBA kılavuzu (`DBA-036-TR.md`) OLAY-2 ile yazılır.
 
+**OLAY-2c uygulama notu (2026-10-13, dal `feature/service-accounts-account-events-20261013`).** Uygulanan: `POST accounts/{id}/events/preview`
+ve `POST accounts/{id}/events` (ayrı `ServiceAccountEventsController`, Work, gövde ≤ 64 KB), olay tablosu Domain'de
+`ServiceAccountEventRules.Shape` (§3, S1–S8 varsayılanları), migration 036 (`SA-009`, `SA-009-API-permissions.sql`), `GET me` →
+`eventGuidanceAvailable`. §13'teki doğrulanmamış maddeler koddan kontrol edildi:
+- **Transaction:** mevcut yazma yöntemlerinin her biri `MutateAsync` ile kendi bağlantı + transaction'ını açıyor; ortak transaction yoktu.
+  Commit için yeni tek-transaction yol yazıldı; eylem ve yazışma INSERT'leri ile kapanış gerçekleri okuması mevcut yöntemlerden iç
+  yardımcılara ayrıldı (`InsertActionAsync`, `InsertCommunicationAsync`, `RequestCloseFactsAsync(connection, transaction)`), davranış aynı.
+- **`summary`:** sütun `nvarchar(4000)`, mevcut uç 4000 ile sınırlıyor; olay akışında S4 gereği **1000** (`EventSummaryMax`).
+- **Hata günlüğü:** `SafeExceptionHandlingMiddleware` yalnız istisna + TraceId yazar, istek gövdesi okunmaz/kaydedilmez; modül
+  `RunAsync` SQL hatasında yalnız numara/durum/köken yazar. Olay audit satırları yalnız kimlik taşır (testte `summary` metni aranır, yok).
+
+Kararlar ve sapmalar:
+- Sıra (tek transaction): hesap satırı kilidi (`UPDLOCK`) → idempotency anahtarı (aynı taslak = `replayed`, farklı = 409) → hesap ve
+  talep sürümü → yazışma → eylem → referanslar → son yanıt tarihi → yeni talep → sahiplik önerisi → (istenirse) kapatma → olay + kalemler.
+  Her kayıt kendi geçmiş + audit satırını aynı işlemde yazar; ayrıca `EventRecorded`. Hesap sürümü ilerletilir (aynı hesabın açık
+  önizlemeleri bayatlar). Eşzamanlı çift tıklama: biri yazar, öteki `replayed` döner (testli).
+- `previewDigest` = kanonik taslak + hesap sürümü + bağlı talep sürümü + kural seti (`olay-2c-1`); idempotency karşılaştırması
+  sürümsüz taslak karmasıyla (`DraftDigest`) yapılır, çünkü ilk kayıt sürümleri değiştirir.
+- Referanslar: eylem varsa eyleme, bağlı talep varsa talebe; ikisi de yoksa yazışmaya, o da yoksa hesaba bağlanır.
+- `requestId` yalnız `OwnerReplied`, `PasswordChanged`, `AccountDeleted`, `GmsaConverted` ile; talep açık olmalı ve (eylem varsa) kapanış
+  kuralının eşleşmesine uymalı (`requestTypeMismatch`). `createRequest` türü sunucuda (`ServiceMoved` → Review, `Other` → Evaluate).
+- Kapatma (`closeRequest`) katılımcıya kapalı (mevcut kapatma da sorumlu dayanak ister). `EvaluateClose` yazılmış son kayıtlarla aynı
+  transaction'da çalışır; eksik varsa 422 + `current` = `CloseReadiness`, hiçbir şey yazılmaz.
+- Rehber dışı kişi/takım kimliği 400 `directory`. Fazla alan (ör. `result`, `verifiedOn`, `action.actionType`) JSON bağlamada 400.
+- Hata numaraları 51410 (önkoşul/tekrar), 51411 (ekleme-yalnız), 51412 (izin betiği önkoşulu); 035'in numaralarıyla çakışmasın diye 514xx.
+
 ## 6. "Neden kapatılamıyor" — tek kaynak (C)
 
 Sorun: `ValidateClose` ilk ihlali döndürüyor. Çözüm: Domain'de `ServiceAccountRules.EvaluateClose(...)` **tüm** eksikleri listeler; `ValidateClose` bunun ilk elemanını döndürmeye
@@ -293,6 +319,7 @@ ADR-0031/0032; OLAY-2'de bu arayüz yok, referans yalnız biçim doğrulanır).
 
 - Hiçbir kod/derleme/test çalıştırılmadı; yalnız koddan okunan kurallar (`ServiceAccountRules`, sözlük, sözleşme tipleri, uç listesi) esas alındı.
 - Mevcut yazma yöntemlerinin ayrı transaction açıp açmadığı, `summary` sütun uzunluğu, hata günlüğünün gövde kaydetmediği OLAY-2'de koddan doğrulanacak maddelerdir.
+  (OLAY-2c'de doğrulandı: §5.6 uygulama notu.)
 - Gerçek OR/OCO numara desenleri bilinmiyor (yalnız biçim kuralı var); mail örüntüleri sentetik varsayımlardır, gerçek maillerle ayarlanmadı.
 
 ## 14. Sahibe sorular

@@ -28,31 +28,7 @@ public sealed partial class SqlServiceAccountRepository
         Guid id = existing ?? Guid.NewGuid();
         if (existing is null)
         {
-            string precision = request.OccurredAt is not null ? "Instant" : request.OccurredOn is not null ? "DateOnly" : "Unknown";
-            await connection.ExecuteAsync(Cmd("""
-                INSERT INTO svcacct.Communications(Id, ProviderMessageId, Direction, Kind, OccurredOn, OccurredAt, Precision, ContactTeamId, ContactPersonId,
-                    Subject, Summary, Link, RecordScope, MeaningfulReply, CreatedAt, CreatedBy, UpdatedAt, UpdatedBy)
-                VALUES(@id, @provider, @Direction, @Kind, @OccurredOn, @OccurredAt, @precision, @ContactTeamId, @ContactPersonId, @Subject, @Summary, @Link,
-                    @Scope, @MeaningfulReply, @now, @UserId, @now, @UserId);
-                """, new
-            {
-                id,
-                provider,
-                Direction = direction.ToString(),
-                Kind = kind.ToString(),
-                OccurredOn = request.OccurredAt is { } at ? ReportCalendar.LocalDate(at) : request.OccurredOn,
-                request.OccurredAt,
-                precision,
-                request.ContactTeamId,
-                request.ContactPersonId,
-                Subject = ServiceAccountText.Clean(request.Subject),
-                Summary = ServiceAccountText.Clean(request.Summary),
-                Link = ServiceAccountText.Clean(request.Link),
-                Scope = request.AccountIds.Count == 0 ? "Team" : "Account",
-                request.MeaningfulReply,
-                now,
-                actor.UserId
-            }, transaction, cancellationToken));
+            await InsertCommunicationAsync(connection, transaction, id, provider, request, direction, kind, actor, now, cancellationToken);
         }
 
         int added = await LinkAsync(connection, transaction, id, request.AccountIds, actor, now, cancellationToken);
@@ -68,6 +44,37 @@ public sealed partial class SqlServiceAccountRepository
             new { EntityId = id, Accounts = request.AccountIds.Count, Added = added }, actor, now, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return (id, existing is not null, added);
+    }
+
+    /// <summary>Inserts one communication row inside the caller's transaction (no account link, reference, history or audit).</summary>
+    private static Task InsertCommunicationAsync(SqlConnection connection, SqlTransaction transaction, Guid id, string? provider, CreateCommunicationRequest request,
+        CommunicationDirection direction, CommunicationKind kind, SaActor actor, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        string precision = request.OccurredAt is not null ? "Instant" : request.OccurredOn is not null ? "DateOnly" : "Unknown";
+        return connection.ExecuteAsync(Cmd("""
+            INSERT INTO svcacct.Communications(Id, ProviderMessageId, Direction, Kind, OccurredOn, OccurredAt, Precision, ContactTeamId, ContactPersonId,
+                Subject, Summary, Link, RecordScope, MeaningfulReply, CreatedAt, CreatedBy, UpdatedAt, UpdatedBy)
+            VALUES(@id, @provider, @Direction, @Kind, @OccurredOn, @OccurredAt, @precision, @ContactTeamId, @ContactPersonId, @Subject, @Summary, @Link,
+                @Scope, @MeaningfulReply, @now, @UserId, @now, @UserId);
+            """, new
+        {
+            id,
+            provider,
+            Direction = direction.ToString(),
+            Kind = kind.ToString(),
+            OccurredOn = request.OccurredAt is { } at ? ReportCalendar.LocalDate(at) : request.OccurredOn,
+            request.OccurredAt,
+            precision,
+            request.ContactTeamId,
+            request.ContactPersonId,
+            Subject = ServiceAccountText.Clean(request.Subject),
+            Summary = ServiceAccountText.Clean(request.Summary),
+            Link = ServiceAccountText.Clean(request.Link),
+            Scope = request.AccountIds.Count == 0 ? "Team" : "Account",
+            request.MeaningfulReply,
+            now,
+            actor.UserId
+        }, transaction, cancellationToken));
     }
 
     /// <summary>Reads one communication with its linked accounts.</summary>

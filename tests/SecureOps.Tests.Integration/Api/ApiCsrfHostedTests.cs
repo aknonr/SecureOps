@@ -29,6 +29,8 @@ public sealed class ApiCsrfHostedTests
     [InlineData("DELETE", "/api/v1/resources/categories/00000000-0000-0000-0000-000000000001")]
     [InlineData("PATCH", "/api/v1/service-accounts/transitions/00000000-0000-0000-0000-000000000001")]
     [InlineData("POST", "/api/v1/service-accounts/accounts/00000000-0000-0000-0000-000000000001/usage-scans")]
+    [InlineData("POST", "/api/v1/service-accounts/accounts/00000000-0000-0000-0000-000000000001/events/preview")]
+    [InlineData("POST", "/api/v1/service-accounts/accounts/00000000-0000-0000-0000-000000000001/events")]
     public async Task CrossOrigin_Multipart_DeniedBeforeBindingAndAudited(string method, string path)
     {
         using WebApplicationFactory<Program> factory = Factory();

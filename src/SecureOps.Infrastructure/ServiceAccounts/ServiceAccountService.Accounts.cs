@@ -265,10 +265,8 @@ public sealed partial class ServiceAccountService
                 return SaResult<CloseReadiness>.Fail(SaErrors.NotFound);
             }
 
-            IReadOnlyList<CloseGap> gaps = ServiceAccountRules.EvaluateClose(facts.Status, facts.Type, parsed, null, facts.Actions, facts.OwnershipConfirmed);
-            return new SaResult<CloseReadiness>(new CloseReadiness(gaps.Count == 0, facts.Status.ToString(), parsed.ToString(),
-                [.. gaps.Select(g => new CloseMissing(g.Code, g.Remedy.ToString(), g.SubCodes.Count == 0 ? null : g.SubCodes,
-                    g.ExpectedActionType?.ToString(), g.RelatedActionId))]));
+            return CloseReadinessView(facts.Status, parsed,
+                ServiceAccountRules.EvaluateClose(facts.Status, facts.Type, parsed, null, facts.Actions, facts.OwnershipConfirmed));
         }, cancellationToken);
 
     /// <summary>Resolves an entity's account, checks scope/permissions and runs the mutation.</summary>
