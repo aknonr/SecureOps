@@ -554,6 +554,7 @@ public sealed partial class SqlOperationalRecordRepository : IOperationalRecordR
         EligibilityReason = row.EligibilityReason,
         WorkflowState = ParseState(row.WorkflowState),
         JiraIssueKey = row.JiraIssueKey,
+        JiraIssueKeyPersistedAt = string.IsNullOrWhiteSpace(row.JiraIssueKey) ? null : row.JiraIssueKeyPersistedAt,
         LastErrorCode = row.LastErrorCode,
         CorrelationId = row.CorrelationId,
         MappingVersion = row.MappingVersion,
@@ -583,7 +584,15 @@ public sealed partial class SqlOperationalRecordRepository : IOperationalRecordR
             or OperationalRecordWorkflowState.NeedsManualReview
             or OperationalRecordWorkflowState.Eligible;
 
-    private const string _readSql = """
+    // The key's first append-only JiraCreated entry is written in the same transaction as the key.
+    // READCOMMITTED keeps serializable readers (browse, transitions) from holding history range locks;
+    // the row is immutable once committed.
+    private const string _keyPersistedAtColumn = """
+        (SELECT MIN(h.OccurredAt) FROM ops.OperationalRecordWorkflowHistory h WITH (READCOMMITTED)
+                WHERE h.OperationalRecordId = r.OperationalRecordId AND h.WorkflowState = 'JiraCreated') AS JiraIssueKeyPersistedAt
+        """;
+
+    private const string _readSql = $"""
         SELECT r.OperationalRecordId AS Id, r.SourceRecordId, r.OrCode, r.Title, r.Description, r.Requester,
             r.SourceCreatedAt AS CreatedAt, r.EnvironmentName AS Environment, r.ServerReference,
             r.ApplicationReference, r.Classification, r.JiraEligible, r.EligibilityReason, r.WorkflowState,
@@ -592,7 +601,8 @@ public sealed partial class SqlOperationalRecordRepository : IOperationalRecordR
             transfer.MappingVersion, transfer.IdempotencyKey, transfer.JiraIssueKey, transfer.ReconciliationRequired,
             COALESCE(transfer.SourceCloseRequested, 0) AS SourceCloseRequested,
             CAST(CASE WHEN JSON_VALUE(transfer.ClosureEvidenceJson,'$.State')='VerifiedClosed' THEN 1 ELSE 0 END AS bit) AS SourceClosureVerified,
-            r.SdmEvaluationJson
+            r.SdmEvaluationJson,
+            {_keyPersistedAtColumn}
         FROM ops.OperationalRecords r
         LEFT JOIN ops.JiraTransfers transfer ON transfer.OperationalRecordId = r.OperationalRecordId
         """;
@@ -614,6 +624,7 @@ public sealed partial class SqlOperationalRecordRepository : IOperationalRecordR
         public string EligibilityReason { get; init; } = string.Empty;
         public string WorkflowState { get; init; } = string.Empty;
         public string? JiraIssueKey { get; init; }
+        public DateTimeOffset? JiraIssueKeyPersistedAt { get; init; }
         public string? LastErrorCode { get; init; }
         public string? CorrelationId { get; init; }
         public string? MappingVersion { get; init; }

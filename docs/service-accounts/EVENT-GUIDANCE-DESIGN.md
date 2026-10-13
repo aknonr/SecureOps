@@ -72,6 +72,22 @@ açık/koyu tema. Yeni genel CSS yok; kapsamlı `.razor.css` ve mevcut `SoPageHe
 Sunucu hatasında dürüst durum: "Kaydedilemedi, hiçbir kayıt oluşmadı" (işlem tek transaction olduğu için doğru) — yalnız **sunucu cevabı hiç gelmediyse**
 (zaman aşımı) "sonuç bilinmiyor; hesabı yenileyip kontrol edin" denir ve yeniden gönderme aynı idempotency anahtarıyla güvenle yapılır (§8).
 
+**OLAY-3 uygulama notu (2026-10-13, dal `feature/service-accounts-event-guidance-ui-20261013`).** Uygulanan: `SaEventFlow` (hesap sayfasının üstü),
+`SaCloseMissingList`, `SaEventDraftModel`, `ServiceAccountEventText`; talep panelinde neden-kapalı listesi ve satır başına "Gelişme bildir", işlem panelinde
+kapanış adayı alt kodları, "Sıradaki adım"da "Bildir", `SaPageGuide`'da "Sizin için" satırı (§9). Kararlar ve sapmalar:
+- Kart seçimi native radyo grubu (ok tuşları); adım göstergesi `ol` + `aria-current="step"`; her adımda odak adım başlığına (`tabindex=-1`). Hazır olmayan
+  "İleri"/"Kaydet"/"Talebi kapat" `disabled` değil, `aria-disabled` + `aria-describedby` + görünür neden.
+- Taslak yalnız olay tablosunun izin verdiği blokları gönderir (`ServiceAccountEventRules.Shape` yalnız alan göstermek için okunur); sonuç, kayıt türü,
+  işlem türü, doğrulama alanı hiç gönderilmez. Katılımcı yalnız talebe bağlanan dört olayı görür, kapatma/yeni talep göndermez.
+- Idempotency anahtarı akış her açıldığında bir kez üretilir; yeniden gönderme aynı taslak + aynı anahtar + aynı digest. "Sonuç bilinmiyor" yalnız cevap
+  yoksa (zaman aşımı/ağ); 409 `eventStale` hesabı yeniden okur ve "önizlemeyi yenile" der; 422 sunucunun `current` listesini gösterir ve "kapatmadan
+  önizlemeyi yenile" sunar; 409 anahtar yeniden kullanımı "ilk gönderim kaydedilmiş olabilir, yenileyip kontrol edin" der.
+- Yapıştırılan mail metni yalnız `mail-hints` çağrısına gider ve öneri gelince kutudan silinir; taslağa, günlüğe, tarayıcı depolamasına girmez. Yılsız tarih
+  önerisi seçilirse UI "yıl varsayıldı" notunu kendi gösterir (önizleme bunu bilmez; G-39 madde 5).
+- `RequestView.closeReadiness` olmadığından sayfa her yükleme/kayıttan sonra açık talepler için (en çok 20) `close-readiness?outcome=Completed` okur; diğer
+  sonuç seçilince o sonucu okur. `CloseReasonRequired` yalnız gerekçe yazılınca listeden düşer (gerekçe kapatma anında yazılır). Okunamazsa ipucu yok,
+  düğme sunucuya gider. "Bildir" kartı yalnız `requests-overdue` adımında (en eski gecikmiş, çalışılabilir talep); kurallar değişmedi. Eksikler: G-39.
+
 ## 5. Sözleşme (OLAY-2 uygular; hepsi yalnız ekleme, `/api/v1/service-accounts`)
 
 Yetenek: `ServiceAccounts.Work` (+ hesapta sorumlu dayanak; katılımcı yalnız kendi `ParticipantRequestIds` taleplerine, §5.5). Tüm POST'lar mevcut CSRF başlığını
@@ -158,6 +174,32 @@ Numara: **036** (035 OR-2'ye ayrılı, `00-ORTAK-MERGE-SIRASI.md`'ye "ayrıldı"
   güncellemesi bekleniyor" ile gösterir; `close-readiness` ve `mail-hints` migration gerektirmez, 036'dan önce de çalışır (migration bağımsız, bkz. §10).
 - Kurulu TEST'e hiçbir şey uygulanmaz; DBA kılavuzu (`DBA-036-TR.md`) OLAY-2 ile yazılır.
 
+**OLAY-2c uygulama notu (2026-10-13, dal `feature/service-accounts-account-events-20261013`).** Uygulanan: `POST accounts/{id}/events/preview`
+ve `POST accounts/{id}/events` (ayrı `ServiceAccountEventsController`, Work, gövde ≤ 64 KB), olay tablosu Domain'de
+`ServiceAccountEventRules.Shape` (§3, S1–S8 varsayılanları), migration 036 (`SA-009`, `SA-009-API-permissions.sql`), `GET me` →
+`eventGuidanceAvailable`. §13'teki doğrulanmamış maddeler koddan kontrol edildi:
+- **Transaction:** mevcut yazma yöntemlerinin her biri `MutateAsync` ile kendi bağlantı + transaction'ını açıyor; ortak transaction yoktu.
+  Commit için yeni tek-transaction yol yazıldı; eylem ve yazışma INSERT'leri ile kapanış gerçekleri okuması mevcut yöntemlerden iç
+  yardımcılara ayrıldı (`InsertActionAsync`, `InsertCommunicationAsync`, `RequestCloseFactsAsync(connection, transaction)`), davranış aynı.
+- **`summary`:** sütun `nvarchar(4000)`, mevcut uç 4000 ile sınırlıyor; olay akışında S4 gereği **1000** (`EventSummaryMax`).
+- **Hata günlüğü:** `SafeExceptionHandlingMiddleware` yalnız istisna + TraceId yazar, istek gövdesi okunmaz/kaydedilmez; modül
+  `RunAsync` SQL hatasında yalnız numara/durum/köken yazar. Olay audit satırları yalnız kimlik taşır (testte `summary` metni aranır, yok).
+
+Kararlar ve sapmalar:
+- Sıra (tek transaction): hesap satırı kilidi (`UPDLOCK`) → idempotency anahtarı (aynı taslak = `replayed`, farklı = 409) → hesap ve
+  talep sürümü → yazışma → eylem → referanslar → son yanıt tarihi → yeni talep → sahiplik önerisi → (istenirse) kapatma → olay + kalemler.
+  Her kayıt kendi geçmiş + audit satırını aynı işlemde yazar; ayrıca `EventRecorded`. Hesap sürümü ilerletilir (aynı hesabın açık
+  önizlemeleri bayatlar). Eşzamanlı çift tıklama: biri yazar, öteki `replayed` döner (testli).
+- `previewDigest` = kanonik taslak + hesap sürümü + bağlı talep sürümü + kural seti (`olay-2c-1`); idempotency karşılaştırması
+  sürümsüz taslak karmasıyla (`DraftDigest`) yapılır, çünkü ilk kayıt sürümleri değiştirir.
+- Referanslar: eylem varsa eyleme, bağlı talep varsa talebe; ikisi de yoksa yazışmaya, o da yoksa hesaba bağlanır.
+- `requestId` yalnız `OwnerReplied`, `PasswordChanged`, `AccountDeleted`, `GmsaConverted` ile; talep açık olmalı ve (eylem varsa) kapanış
+  kuralının eşleşmesine uymalı (`requestTypeMismatch`). `createRequest` türü sunucuda (`ServiceMoved` → Review, `Other` → Evaluate).
+- Kapatma (`closeRequest`) katılımcıya kapalı (mevcut kapatma da sorumlu dayanak ister). `EvaluateClose` yazılmış son kayıtlarla aynı
+  transaction'da çalışır; eksik varsa 422 + `current` = `CloseReadiness`, hiçbir şey yazılmaz.
+- Rehber dışı kişi/takım kimliği 400 `directory`. Fazla alan (ör. `result`, `verifiedOn`, `action.actionType`) JSON bağlamada 400.
+- Hata numaraları 51410 (önkoşul/tekrar), 51411 (ekleme-yalnız), 51412 (izin betiği önkoşulu); 035'in numaralarıyla çakışmasın diye 514xx.
+
 ## 6. "Neden kapatılamıyor" — tek kaynak (C)
 
 Sorun: `ValidateClose` ilk ihlali döndürüyor. Çözüm: Domain'de `ServiceAccountRules.EvaluateClose(...)` **tüm** eksikleri listeler; `ValidateClose` bunun ilk elemanını döndürmeye
@@ -223,6 +265,27 @@ Kurallar (Domain'de saf fonksiyon `EventMailHints`, birim testli, sürümlü `ku
 günlüğe yazmaz (mevcut hata günlük ara katmanı gövde kaydetmiyor olmalı; OLAY-2'de test ve doğrulama maddesi). Kaydedilen yalnız kullanıcının onayladığı: tarih, referans numaraları, tür,
 **kullanıcının kendi yazdığı kısa özet** (`summary`, mevcut alan; arayüz "ad ve mail içeriğini kopyalamayın" ipucu verir), isteğe bağlı mevcut `providerMessageId`. Saklama süresi sorusu doğmaz
 (gövde yok); özet ve olay kaydı mevcut modül saklama/audit süresine (audit ≥ 36 ay) tabidir. Sahibe soru S4 (özeti de kısıtlamak ister mi).
+
+**OLAY-2b uygulama notu (2026-10-13, dal `feature/service-accounts-mail-hints-20261013`).** Uygulanan: `events/mail-hints` (`ServiceAccountMailHintsController`,
+`ServiceAccountService.MailHintsAsync`), saf `EventMailHints` ve tek dosyalık kural tablosu `EventMailHintRules` (Domain, kural seti `olay-1`).
+Kararlar ve tasarımdan sapmalar:
+- Yetki `Work` + hesap kapsamda (kapsam dışı/bilinmeyen = 404, `View` tek başına 403). Metin boş/yalnız boşluk ya da 20 000 karakterden uzunsa
+  400 `field=text` (`TooLong` uyarısı yok; uzun girdi eşleştirmeden önce reddedilir). İstek gövdesi üst sınırı 128 KB (413).
+- Tüm desenler `RegexOptions.NonBacktracking` (doğrusal zaman) + 250 ms zaman aşımı; NonBacktracking ileri/geri bakış desteklemediği için rakam sınırları ve
+  "konu ile eylem en çok 70 karakter, aynı cümlede" yakınlığı kodda denetlenir. Girdi önce katlanır (küçük harf, Türkçe harf/aksan kaldırma; eşleşmeyen vekil
+  karakterler atılır, aksi halde `Normalize` istisna atar).
+- Olay ifadeleri: parola/şifre·password + değişti·yenilendi·güncellendi·reset·rotated; hesap·account + silindi·kaldırıldı·kapatıldı·deleted·decommissioned;
+  gMSA + geçti·çevrildi·dönüştü·migrated; sahip·sorumlu·owner + değişti·devredildi·transferred; taşındı·moved. Olumsuz/gelecek ifadeler ("değişmedi", "yapılacak",
+  "henüz", "will", "not") öneri üretmez. `OwnerReplied` ve `Other` için kural yok (ifade yok; kullanıcı elle seçer).
+- Referans: yalnız `OCO` (`-`, `_`, boşluk ya da bitişik) ve `OR` (`-`/`_` şart; İngilizce "or" eşleşmesin diye) önekli adaylar; kabul ölçüsü modülün mevcut
+  kayıt numarası kuralı `ChangePlanRules.OcoNumber` (≤64, `A–Z 0–9 - _ . /`, ≥1 rakam). `CHG`/`JIRA` önekleri eklenmedi (gerçek desen bilinmiyor, S5).
+- Tarih: `gg.AA.yyyy`, `gg/AA/yyyy`, `yyyy-AA-gg`, "1 Ekim 2026", "1 October 2026", "October 1, 2026"; yılsız Türkçe/İngilizce ay adı → `AssumedYear` (bu yıl).
+  Gelecekteki, geçersiz (31.02) ve 2000–2100 dışı tarihler önerilmez; aynı tarih bir kez listelenir; en çok 10 referans ve 10 tarih.
+- Parola benzeri: `parola|şifre|password|pwd|pass` + `:`/`=` + rakam ya da simge içeren değer, ya da ≥16 karakterlik üç sınıflı rastgele dizge → yalnız
+  `PasswordLikeContent` uyarısı; yakalanan parça hiçbir yerde tutulmaz.
+- **Günlük kanıtı:** `MailHintsRequest` kayıt türünün `ToString` çıktısı metni göstermez. Sebep: MVC, `Trace` düzeyinde eylem argümanlarını yazar
+  ("Executing action method ... with arguments"); barındırılan testte (her düzey, her kategori) bu satırda metin yakalandı ve kapatıldı. Test: istek gövdesi
+  geçerli/bozuk/yanlış tip/aşırı büyük, iki kimlik, CSRF reddi; günlük, audit ve yanıtlarda işaretçi yok.
 
 ## 8. Güvenlik tehdit tablosu (OLAY-2 için bağlayıcı; her satır testle kanıtlanır)
 
@@ -293,6 +356,7 @@ ADR-0031/0032; OLAY-2'de bu arayüz yok, referans yalnız biçim doğrulanır).
 
 - Hiçbir kod/derleme/test çalıştırılmadı; yalnız koddan okunan kurallar (`ServiceAccountRules`, sözlük, sözleşme tipleri, uç listesi) esas alındı.
 - Mevcut yazma yöntemlerinin ayrı transaction açıp açmadığı, `summary` sütun uzunluğu, hata günlüğünün gövde kaydetmediği OLAY-2'de koddan doğrulanacak maddelerdir.
+  (OLAY-2c'de doğrulandı: §5.6 uygulama notu.)
 - Gerçek OR/OCO numara desenleri bilinmiyor (yalnız biçim kuralı var); mail örüntüleri sentetik varsayımlardır, gerçek maillerle ayarlanmadı.
 
 ## 14. Sahibe sorular

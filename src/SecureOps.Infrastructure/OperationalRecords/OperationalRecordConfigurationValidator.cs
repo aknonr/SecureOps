@@ -110,6 +110,16 @@ public static class OperationalRecordConfigurationValidator
                 "OperationalRecords:ControlledTestWritesEnabled requires Test, ReadOnlyIntegrationMode=false, SourceProvider=TuruncuHat, and Jira:Provider=Corporate.");
         }
 
+        // In Use source writes have their own gate (ADR-0020 amendment 2026-10-13); it is meaningful only below the open global fence.
+        InUseCompletionOptions inUseCompletion = configuration.GetSection("InUseCompletion").Get<InUseCompletionOptions>() ?? new();
+        if (inUseCompletion.SourceWritesEnabled
+            && (!inUseCompletion.Enabled || !string.Equals(inUseCompletion.Provider, "TuruncuHat", StringComparison.Ordinal)
+                || !testEnvironment || operational.ReadOnlyIntegrationMode || !operational.ControlledTestWritesEnabled || !turuncuHatSource))
+        {
+            throw new InvalidOperationException(
+                "InUseCompletion:SourceWritesEnabled requires InUseCompletion:Enabled=true, InUseCompletion:Provider exactly TuruncuHat, Test, ReadOnlyIntegrationMode=false, ControlledTestWritesEnabled=true, and SourceProvider=TuruncuHat.");
+        }
+
         if (operational.ReadOnlyIntegrationMode)
         {
             if (!testEnvironment)

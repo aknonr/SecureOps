@@ -54,9 +54,12 @@ public sealed record ScopeBootstrapRequest(string Reason);
 /// <param name="HasServiceAccountsAccess">Holds at least the module View capability; without it a scope grant has no effect.</param>
 public sealed record ScopeGrantCandidate(string CorporateIdentity, string Label, string? LoginName, bool IsCaller, bool HasServiceAccountsAccess);
 
-/// <summary>Caller's module context for UI composition.</summary>
+/// <summary>
+/// Caller's module context for UI composition. <c>EventGuidanceAvailable</c> is false until migration 036 (account events) is
+/// applied; the event preview and commit then answer 503 and the UI says a database update is pending.
+/// </summary>
 public sealed record ServiceAccountMe(bool Configured, IReadOnlyList<string> Capabilities, string ScopeKind, IReadOnlyList<SaRef> Organizations,
-    IReadOnlyList<SaRef> Teams, bool HasScope);
+    IReadOnlyList<SaRef> Teams, bool HasScope, bool EventGuidanceAvailable = false);
 
 /// <summary>Weekly report query.</summary>
 /// <remarks><c>Period</c>: Week (default, Monday of <c>WeekStart</c>), Month (month of <c>WeekStart</c>) or Custom (<c>WeekStart</c>..<c>PeriodEnd</c> inclusive, at most 366 days).</remarks>

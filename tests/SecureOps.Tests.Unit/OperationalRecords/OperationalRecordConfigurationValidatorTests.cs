@@ -415,6 +415,81 @@ public sealed class OperationalRecordConfigurationValidatorTests
         validate.Should().Throw<InvalidOperationException>();
     }
 
+    [Fact]
+    public void Validate_InUseSourceWrites_DefaultOffAndIndependentOfOrSourceClose()
+    {
+        new InUseCompletionOptions().SourceWritesEnabled.Should().BeFalse();
+        Dictionary<string, string?> values = InUseSourceWriteValues();
+        Action validate = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Test");
+        validate.Should().NotThrow();
+        values["OperationalRecords:SourceCloseEnabled"].Should().Be("false");
+        values["InUseCompletion:SourceWritesEnabled"] = "false";
+        validate.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData("InUseCompletion:Enabled=false", "Test")]
+    [InlineData("InUseCompletion:Enabled=~", "Test")]
+    [InlineData("InUseCompletion:Provider=Fixture", "Test")]
+    [InlineData("InUseCompletion:Provider=Disabled", "Test")]
+    [InlineData("InUseCompletion:Provider=turuncuhat", "Test")]
+    [InlineData("InUseCompletion:Provider=~", "Test")]
+    [InlineData("OperationalRecords:ControlledTestWritesEnabled=false", "Test")]
+    [InlineData("OperationalRecords:ReadOnlyIntegrationMode=true;OperationalRecords:ControlledTestWritesEnabled=false", "Test")]
+    [InlineData("OperationalRecords:ControlledTestWritesEnabled=false;OperationalRecords:SourceProvider=Disabled", "Test")]
+    [InlineData("OperationalRecords:ControlledTestWritesEnabled=false", "Production")]
+    [InlineData("OperationalRecords:ControlledTestWritesEnabled=false", "Pilot")]
+    public void Validate_InUseSourceWritesWithoutTheirFences_FailsClosedAtStartup(string overrides, string environment)
+    {
+        Dictionary<string, string?> values = InUseSourceWriteValues();
+        foreach (string[] pair in overrides.Split(';').Select(item => item.Split('=')))
+        {
+            if (pair[1] == "~")
+            { values.Remove(pair[0]); }
+            else
+            { values[pair[0]] = pair[1]; }
+        }
+
+        Action validate = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), environment);
+        validate.Should().Throw<InvalidOperationException>().WithMessage("*InUseCompletion:SourceWritesEnabled*");
+        values["InUseCompletion:SourceWritesEnabled"] = "false";
+        InvalidOperationException? remaining = null;
+        try
+        { validate(); }
+        catch (InvalidOperationException exception)
+        { remaining = exception; }
+        remaining?.Message.Should().NotContain("InUseCompletion");
+    }
+
+    [Fact]
+    public void Validate_InUseSourceWrites_DoNotChangeOrSourceCloseRules()
+    {
+        Dictionary<string, string?> values = InUseSourceWriteValues();
+        values["OperationalRecords:SourceCloseEnabled"] = "true";
+        Action validate = () => OperationalRecordConfigurationValidator.Validate(Configuration(values), "Test");
+        validate.Should().Throw<InvalidOperationException>().WithMessage("*close mapping*");
+        values["InUseCompletion:SourceWritesEnabled"] = "false";
+        validate.Should().Throw<InvalidOperationException>().WithMessage("*close mapping*");
+        foreach (KeyValuePair<string, string?> mapping in WriteEnterpriseValues().Where(pair => pair.Key.StartsWith("TuruncuHat:Activity", StringComparison.Ordinal)
+            || pair.Key is "TuruncuHat:CompletedStatusId" or "TuruncuHat:CompletionCommentTemplate"))
+        { values[mapping.Key] = mapping.Value; }
+        validate.Should().NotThrow();
+        values["InUseCompletion:SourceWritesEnabled"] = "true";
+        validate.Should().NotThrow();
+    }
+
+    private static Dictionary<string, string?> InUseSourceWriteValues(bool sourceWrites = true)
+    {
+        Dictionary<string, string?> values = ReadOnlyEnterpriseValues();
+        values["OperationalRecords:ReadOnlyIntegrationMode"] = "false";
+        values["OperationalRecords:ControlledTestWritesEnabled"] = "true";
+        values["OperationalRecords:SourceCloseEnabled"] = "false";
+        values["InUseCompletion:Enabled"] = "true";
+        values["InUseCompletion:Provider"] = "TuruncuHat";
+        values["InUseCompletion:SourceWritesEnabled"] = sourceWrites ? "true" : "false";
+        return values;
+    }
+
     private static Dictionary<string, string?> ReadOnlyEnterpriseValues() => new()
     {
         ["OperationalRecords:SourceProvider"] = "TuruncuHat",

@@ -140,6 +140,34 @@ public sealed class JiraTransferService : IJiraTransferService
     }
 
     /// <inheritdoc />
+    public async Task<OperationalRecordResult<JiraRetryDraft>> RetryPreviewAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken)
+    {
+        OperationalRecord? record = await _repository.GetAsync(id, cancellationToken);
+        if (record is null || IsSyntheticCorporateRecord(record))
+        {
+            return OperationalRecordResult<JiraRetryDraft>.Fail(OperationalErrorCodes.OperationalRecordNotFound, "repository", false);
+        }
+
+        // Same gates as the Jira-create branch of retry; a close-only retry sends nothing to Jira.
+        if (record.WorkflowState != OperationalRecordWorkflowState.JiraCreateFailed || record.ReconciliationRequired
+            || !string.IsNullOrWhiteSpace(record.JiraIssueKey) || record.MappingVersion is null || record.IdempotencyKey is null)
+        {
+            return OperationalRecordResult<JiraRetryDraft>.Fail(OperationalErrorCodes.OperationalRecordInvalidState, "retry-preview", false);
+        }
+
+        OperationalRecordResult<JiraIssueDraft> draftResult = await _draftService.BuildAsync(record, context.Actor, cancellationToken);
+        if (!draftResult.IsSuccess)
+        {
+            return new OperationalRecordResult<JiraRetryDraft>(null, draftResult.Failure);
+        }
+
+        JiraIssueDraft draft = draftResult.Value!;
+        bool matches = string.Equals(draft.MappingVersion, record.MappingVersion, StringComparison.Ordinal)
+            && string.Equals(draft.IdempotencyKey, record.IdempotencyKey, StringComparison.Ordinal);
+        return OperationalRecordResult<JiraRetryDraft>.Success(new JiraRetryDraft(draft, record.MappingVersion, record.IdempotencyKey, matches));
+    }
+
+    /// <inheritdoc />
     public Task<OperationalRecordResult<OperationalRecord>> CreateAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) =>
         _operationalOptions.ReadOnlyIntegrationMode
             ? Task.FromResult(ExternalWritesDisabled())
@@ -208,7 +236,7 @@ public sealed class JiraTransferService : IJiraTransferService
 
             return completed is null
                 ? OperationalRecordResult<OperationalRecord>.Fail(OperationalErrorCodes.OperationalRecordNotFound, "repository", false)
-                : OperationalRecordResult<OperationalRecord>.Success(completed);
+                : OperationalRecordResult<OperationalRecord>.Success(completed) with { IdempotentReplay = true };
         }
 
         if (begin.Disposition == CommandBeginDisposition.Failed)
@@ -434,7 +462,7 @@ public sealed class JiraTransferService : IJiraTransferService
             return await RecordJiraFailureAsync(creating, OperationalErrorCodes.JiraCreateFailed, true, true, context, cancellationToken);
         }
 
-        if (!IsValidIssueKey(created.IssueKey))
+        if (!JiraIssueLink.IsValidKey(created.IssueKey))
         {
             return await RecordJiraFailureAsync(creating, OperationalErrorCodes.JiraValidationFailed, false, true, context, cancellationToken);
         }
@@ -654,19 +682,4 @@ public sealed class JiraTransferService : IJiraTransferService
         WorkflowAcquireDisposition.ReconciliationRequired => new(OperationalErrorCodes.WorkflowConflict, "jira-reconciliation", false),
         _ => new(OperationalErrorCodes.WorkflowConflict, "workflow", false)
     };
-
-    private static bool IsValidIssueKey(string issueKey)
-    {
-        if (string.IsNullOrWhiteSpace(issueKey) || issueKey.Length > 64)
-        {
-            return false;
-        }
-
-        int separator = issueKey.LastIndexOf('-');
-        return separator > 0
-            && separator < issueKey.Length - 1
-            && issueKey[..separator].All(character => char.IsAsciiLetterUpper(character) || char.IsDigit(character))
-            && char.IsAsciiLetterUpper(issueKey[0])
-            && issueKey[(separator + 1)..].All(char.IsDigit);
-    }
 }

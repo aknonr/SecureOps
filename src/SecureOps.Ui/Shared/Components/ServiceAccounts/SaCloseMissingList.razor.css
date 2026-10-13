@@ -1,0 +1,16 @@
+.sa-missing {
+    list-style: none;
+    margin: 0.25rem 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+/* The block icon is decoration; the sentence itself says what is missing, so colour is never the only signal. */
+.sa-missing li {
+    display: flex;
+    gap: 0.4rem;
+    align-items: flex-start;
+    overflow-wrap: anywhere;
+}

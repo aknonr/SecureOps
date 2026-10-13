@@ -95,6 +95,90 @@ public sealed class JiraTransferServiceTests
         replay.IsSuccess.Should().BeTrue();
         replay.Value!.JiraIssueKey.Should().Be(first.Value!.JiraIssueKey);
         fixture.Jira.Calls.Should().Be(1);
+        first.IdempotentReplay.Should().BeFalse();
+        replay.IdempotentReplay.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task JiraKey_PersistenceTime_IsRecordedWithTheKeyAndNotBefore()
+    {
+        TestFixture fixture = await TestFixture.CreateAsync(sourceCloseEnabled: false);
+        (await fixture.Repository.GetAsync(fixture.RecordId, CancellationToken.None))!.JiraIssueKeyPersistedAt.Should().BeNull();
+
+        DateTimeOffset before = DateTimeOffset.UtcNow;
+        OperationalRecordResult<OperationalRecord> created = await fixture.Service.CreateAsync(fixture.RecordId, _context, CancellationToken.None);
+
+        created.Value!.JiraIssueKey.Should().Be("TEST-100");
+        created.Value.JiraIssueKeyPersistedAt.Should().NotBeNull().And.BeOnOrAfter(before);
+    }
+
+    [Fact]
+    public async Task RetryPreview_AfterSafeCreateFailure_RebuildsMatchingDraftWithoutAnyWrite()
+    {
+        CountingJiraClient jira = new(new ExternalIntegrationException(OperationalErrorCodes.JiraUnavailable, true));
+        TestFixture fixture = await TestFixture.CreateAsync(jira, sourceCloseEnabled: false);
+        _ = await fixture.Service.CreateAsync(fixture.RecordId, _context, CancellationToken.None);
+        OperationalRecord failed = (await fixture.Repository.GetAsync(fixture.RecordId, CancellationToken.None))!;
+        failed.WorkflowState.Should().Be(OperationalRecordWorkflowState.JiraCreateFailed);
+        int audits = fixture.Audit.Events.Count;
+
+        OperationalRecordResult<JiraRetryDraft> preview = await fixture.Service.RetryPreviewAsync(fixture.RecordId, _context, CancellationToken.None);
+
+        preview.IsSuccess.Should().BeTrue();
+        preview.Value!.MatchesPersistedDraft.Should().BeTrue();
+        preview.Value.PersistedIdempotencyKey.Should().Be(failed.IdempotencyKey);
+        preview.Value.Draft.IdempotencyKey.Should().Be(failed.IdempotencyKey);
+        preview.Value.Draft.Summary.Should().Contain("OR-100");
+        jira.Calls.Should().Be(1);
+        fixture.Audit.Events.Should().HaveCount(audits);
+        (await fixture.Repository.GetAsync(fixture.RecordId, CancellationToken.None)).Should().BeEquivalentTo(failed);
+    }
+
+    [Fact]
+    public async Task RetryPreview_WhenRebuiltDraftDiffersFromReviewedFingerprint_ReportsMismatch_AndRetryIsRefused()
+    {
+        CountingJiraClient jira = new(new ExternalIntegrationException(OperationalErrorCodes.JiraUnavailable, true));
+        TestFixture fixture = await TestFixture.CreateAsync(jira, sourceCloseEnabled: false);
+        _ = await fixture.Service.CreateAsync(fixture.RecordId, _context, CancellationToken.None);
+        JiraTransferService changedMapping = fixture.ServiceWithMapping("mapping-v2");
+
+        OperationalRecordResult<JiraRetryDraft> preview = await changedMapping.RetryPreviewAsync(fixture.RecordId, _context, CancellationToken.None);
+        OperationalRecordResult<OperationalRecord> retry = await changedMapping.RetryAsync(fixture.RecordId, _context, CancellationToken.None);
+
+        preview.Value!.MatchesPersistedDraft.Should().BeFalse();
+        preview.Value.PersistedMappingVersion.Should().Be("mapping-v1");
+        retry.IsSuccess.Should().BeFalse();
+        jira.Calls.Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RetryPreview_OutsideKeylessSafeFailure_IsInvalidState(bool created)
+    {
+        TestFixture fixture = await TestFixture.CreateAsync(sourceCloseEnabled: false);
+        if (created)
+        {
+            _ = await fixture.Service.CreateAsync(fixture.RecordId, _context, CancellationToken.None);
+        }
+
+        OperationalRecordResult<JiraRetryDraft> preview = await fixture.Service.RetryPreviewAsync(fixture.RecordId, _context, CancellationToken.None);
+
+        preview.Failure!.Code.Should().Be(OperationalErrorCodes.OperationalRecordInvalidState);
+        preview.Failure.Stage.Should().Be("retry-preview");
+    }
+
+    [Fact]
+    public async Task RetryPreview_AfterUnknownOutcome_IsInvalidState_AndNeverShowsADraft()
+    {
+        CountingJiraClient jira = new(new ExternalIntegrationException(OperationalErrorCodes.JiraUnavailable, true, outcomeUnknown: true));
+        TestFixture fixture = await TestFixture.CreateAsync(jira, sourceCloseEnabled: false);
+        _ = await fixture.Service.CreateAsync(fixture.RecordId, _context, CancellationToken.None);
+
+        OperationalRecordResult<JiraRetryDraft> preview = await fixture.Service.RetryPreviewAsync(fixture.RecordId, _context, CancellationToken.None);
+
+        preview.Value.Should().BeNull();
+        preview.Failure!.Code.Should().Be(OperationalErrorCodes.OperationalRecordInvalidState);
     }
 
     [Fact]
@@ -344,14 +428,15 @@ public sealed class JiraTransferServiceTests
             CountingJiraClient jira,
             CountingSourceClient source,
             InMemoryAuditWriter audit,
-            JiraTransferService service,
+            Func<string, JiraTransferService> build,
             Guid recordId)
         {
             Repository = repository;
             Jira = jira;
             Source = source;
             Audit = audit;
-            Service = service;
+            Service = build("mapping-v1");
+            ServiceWithMapping = build;
             RecordId = recordId;
         }
 
@@ -360,6 +445,7 @@ public sealed class JiraTransferServiceTests
         public CountingSourceClient Source { get; }
         public InMemoryAuditWriter Audit { get; }
         public JiraTransferService Service { get; }
+        public Func<string, JiraTransferService> ServiceWithMapping { get; }
         public Guid RecordId { get; }
 
         public static async Task<TestFixture> CreateAsync(
@@ -390,22 +476,24 @@ public sealed class JiraTransferServiceTests
             jira ??= new CountingJiraClient();
             source ??= new CountingSourceClient();
             InMemoryAuditWriter audit = new();
-            JiraIssueDraftService draftService = new(
-                new ExactRequesterResolver(),
-                new IdentityAccountNormalizer(Options.Create(new IdentityLookupOptions())),
-                Options.Create(new JiraIntegrationOptions
-                {
-                    ProjectKey = "TEST",
-                    IssueType = "Task",
-                    MappingVersion = "mapping-v1",
-                    UnresolvedRequesterPolicy = "Block"
-                }), Options.Create(new OperationalRecordsOptions { SourceCloseEnabled = sourceCloseEnabled, ReadOnlyIntegrationMode = readOnlyIntegrationMode }));
-            JiraTransferService service = new(
+            InMemoryCommandIdempotencyStore commands = new(TimeProvider.System);
+            CountingJiraClient client = jira;
+            CountingSourceClient sourceClient = source;
+            JiraTransferService Build(string mappingVersion) => new(
                 repository,
-                draftService,
-                jira,
-                source,
-                new InMemoryCommandIdempotencyStore(TimeProvider.System),
+                new JiraIssueDraftService(
+                    new ExactRequesterResolver(),
+                    new IdentityAccountNormalizer(Options.Create(new IdentityLookupOptions())),
+                    Options.Create(new JiraIntegrationOptions
+                    {
+                        ProjectKey = "TEST",
+                        IssueType = "Task",
+                        MappingVersion = mappingVersion,
+                        UnresolvedRequesterPolicy = "Block"
+                    }), Options.Create(new OperationalRecordsOptions { SourceCloseEnabled = sourceCloseEnabled, ReadOnlyIntegrationMode = readOnlyIntegrationMode })),
+                client,
+                sourceClient,
+                commands,
                 audit,
                 Options.Create(new OperationalRecordsOptions
                 {
@@ -415,13 +503,14 @@ public sealed class JiraTransferServiceTests
                 }),
                 Options.Create(new CommandIdempotencyOptions()),
                 NullLogger<JiraTransferService>.Instance, closureVerifier);
+            JiraTransferService service = Build("mapping-v1");
             if (initializePreview)
             {
                 OperationalRecordResult<JiraIssueDraft> preview = await service.PreviewAsync(record.Id, _context, CancellationToken.None);
                 preview.IsSuccess.Should().BeTrue();
             }
 
-            return new TestFixture(repository, jira, source, audit, service, record.Id);
+            return new TestFixture(repository, jira, source, audit, Build, record.Id);
         }
     }
 

@@ -66,6 +66,12 @@ public sealed record OperationalRecordResponse(
     public bool ExternalWriteEligible { get; init; }
     /// <summary>Advisory request type read from explicit title/description words; null when none or ambiguous. Never eligibility.</summary>
     public RequestTypeSuggestionResponse? SuggestedRequestType { get; init; }
+    /// <summary>Reviewed-draft fingerprint fixed on the transfer (duplicate protection); null before any preview.</summary>
+    public string? TransferIdempotencyKey { get; init; }
+    /// <summary>UTC time the Jira key was durably saved; null without a key or when no durable entry exists.</summary>
+    public DateTimeOffset? JiraIssueKeyPersistedAt { get; init; }
+    /// <summary>Absolute HTTPS issue address from server configuration (Corporate only); null when not configured.</summary>
+    public string? JiraIssueUrl { get; init; }
 }
 
 /// <summary>Advisory request type the operator may confirm or change; it grants nothing (ADR-0018 Amendment 1).</summary>

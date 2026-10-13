@@ -192,6 +192,79 @@ public sealed class JiraSubmissionTests
     }
 
     [Fact]
+    public async Task CreatedPanel_LinksOnlyTheServersHttpsAddress_AndShowsKeySaveTimeAndTransferKeyAfterReload()
+    {
+        OperationalRecordResponse record = Saved("SYN-42") with
+        {
+            JiraIssueUrl = "https://jira.contoso.example/browse/SYN-42",
+            JiraIssueKeyPersistedAt = new DateTimeOffset(2026, 10, 13, 9, 0, 0, TimeSpan.Zero),
+            TransferIdempotencyKey = "persisted-transfer-key"
+        };
+
+        string html = await RenderPanelAsync(record, null, JiraSubmissionView.Phase.Created);
+
+        html.Should().Contain("href=\"https://jira.contoso.example/browse/SYN-42\"").And.Contain("rel=\"noopener noreferrer\"")
+            .And.Contain("SYN-42 kaydını Jira'da aç").And.Contain("(yeni sekmede açılır)")
+            .And.Contain("Anahtarın kaydedildiği zaman (yerel)")
+            .And.Contain(new DateTimeOffset(2026, 10, 13, 9, 0, 0, TimeSpan.Zero).ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture))
+            .And.Contain("persisted-transfer-key");
+        html.Should().NotContain("Sunucu bağlantı adresi sağlamıyor");
+    }
+
+    [Theory]
+    [InlineData("http://jira.contoso.example/browse/SYN-42")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("/browse/SYN-42")]
+    public async Task CreatedPanel_NonHttpsAddress_IsNotLinked_AndUnknownSaveTimeIsSaid(string url)
+    {
+        string html = await RenderPanelAsync(Saved("SYN-42") with { JiraIssueUrl = url }, null, JiraSubmissionView.Phase.Created);
+
+        html.Should().NotContain("href=").And.Contain("Sunucu bağlantı adresi sağlamıyor").And.Contain("Bilinmiyor");
+    }
+
+    [Fact]
+    public async Task Replay_IsStated_InCreatedAndAcknowledgedPanels()
+    {
+        var replayed = new JiraSubmissionView.Attempt(Transfer(OperationalRecordWorkflowState.JiraCreated, "SYN-7") with { Replayed = true }, null);
+
+        (await RenderPanelAsync(Saved("SYN-7"), null, JiraSubmissionView.Phase.Created, replayed))
+            .Should().Contain("data-replayed").And.Contain("aynı komut daha önce tamamlanmıştı");
+        (await RenderPanelAsync(Record(), null, JiraSubmissionView.Phase.Acknowledged, replayed))
+            .Should().Contain("data-replayed").And.Contain("Jira'ya yeni çağrı yapılmadı");
+        (await RenderPanelAsync(Saved("SYN-7"), null, JiraSubmissionView.Phase.Created,
+            new(Transfer(OperationalRecordWorkflowState.JiraCreated, "SYN-7"), null))).Should().NotContain("data-replayed");
+    }
+
+    [Theory]
+    [InlineData(true, false, OperationalRecordWorkflowState.JiraCreateFailed, JiraSubmissionView.UncertainKind.ServerFlagged)]
+    [InlineData(false, true, OperationalRecordWorkflowState.CreatingJira, JiraSubmissionView.UncertainKind.SentAwaitingAnswer)]
+    [InlineData(false, false, OperationalRecordWorkflowState.CreatingJira, JiraSubmissionView.UncertainKind.SentNoAnswer)]
+    [InlineData(false, false, OperationalRecordWorkflowState.Previewed, JiraSubmissionView.UncertainKind.UnacknowledgedHere)]
+    public void UncertainKind_ComesFromDurableState(bool flagged, bool claimed, OperationalRecordWorkflowState state, JiraSubmissionView.UncertainKind expected) =>
+        JiraSubmissionView.UncertainKindOf(Record() with { ReconciliationRequired = flagged, Claimed = claimed, WorkflowState = state })
+            .Should().Be(expected);
+
+    [Fact]
+    public async Task SentWithoutAnswer_AfterReload_IsSaidFromDurableState_WithoutAnyAction()
+    {
+        OperationalRecordResponse sent = Record() with
+        {
+            WorkflowState = OperationalRecordWorkflowState.CreatingJira,
+            TransferIdempotencyKey = "persisted-transfer-key"
+        };
+
+        string lapsed = await RenderPanelAsync(sent, null, JiraSubmissionView.Phase.Uncertain);
+        string running = await RenderPanelAsync(sent with { Claimed = true, ClaimExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1) }, null, JiraSubmissionView.Phase.Uncertain);
+
+        lapsed.Should().Contain("Gönderildi, yanıt kaydedilmedi; mutabakat gerekli").And.Contain("Sona erdi; istek sonuçlanmadan bitti")
+            .And.Contain("kayıtlı Jira anahtarı yok").And.Contain("persisted-transfer-key")
+            .And.Contain("Boş arama sonucu tek başına kaydın olmadığını kanıtlamaz");
+        running.Should().Contain("Gönderildi; yanıt henüz kaydedilmedi").And.Contain("İstek hâlâ sürüyor olabilir").And.Contain("Etkin · bitiş");
+        lapsed.Should().NotContain("<button");
+        running.Should().NotContain("<button");
+    }
+
+    [Fact]
     public async Task AcknowledgedPanel_DoesNotClaimTheIssueExists()
     {
         var attempt = new JiraSubmissionView.Attempt(Transfer(OperationalRecordWorkflowState.JiraCreated, "SIM-9"), null);
@@ -369,6 +442,72 @@ public sealed class JiraSubmissionTests
         await f.Records.Received(confirm ? 1 : 0).RetryAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
         f.Get<bool>("_busy").Should().BeFalse();
         f.Get<bool>("_submitting").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Retry_FirstReadsTheRetryDraft_AndPassesItToTheConfirmation()
+    {
+        using var f = new PageFixture(confirm: false);
+        JiraRetryPreviewResponse retryPreview = new(Record().Id, "OR-123", "synthetic-v1", "synthetic-transfer-key", true, Preview());
+        f.Set("_preview", null);
+        f.Set("_record", Record() with { WorkflowState = OperationalRecordWorkflowState.JiraCreateFailed, RetryEligible = true });
+        f.Records.RetryPreviewAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(retryPreview);
+
+        await f.Call("RetryAsync");
+
+        await f.Records.Received(1).RetryPreviewAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await f.Dialogs.Received(1).ShowAsync<JiraRetryDialog>(Arg.Any<string>(),
+            Arg.Is<DialogParameters>(p => ReferenceEquals(p.Get<JiraRetryPreviewResponse>(nameof(JiraRetryDialog.RetryPreview)), retryPreview)),
+            Arg.Any<DialogOptions>());
+        await f.Records.DidNotReceive().RetryAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Retry_WithPersistedKey_ResumesTheSourceStep_WithoutReadingAJiraDraft()
+    {
+        using var f = new PageFixture(confirm: false);
+        f.Set("_preview", null);
+        f.Set("_record", Saved("SYN-1") with { WorkflowState = OperationalRecordWorkflowState.OperationalRecordCloseFailed, RetryEligible = true });
+
+        await f.Call("RetryAsync");
+
+        await f.Records.DidNotReceive().RetryPreviewAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await f.Dialogs.Received(1).ShowAsync<JiraRetryDialog>(Arg.Any<string>(), Arg.Any<DialogParameters>(), Arg.Any<DialogOptions>());
+    }
+
+    [Fact]
+    public void RetryDialog_WhenServerSaysDraftNoLongerMatches_StaysClosedEvenAfterTheStatement()
+    {
+#pragma warning disable BL0005 // Parameters are set directly to exercise the handler without a dialog host.
+        var dialog = new JiraRetryDialog
+        {
+            Record = Record() with { WorkflowState = OperationalRecordWorkflowState.JiraCreateFailed },
+            RetryPreview = new(Record().Id, "OR-123", "synthetic-v0", "older-key", false, null)
+        };
+#pragma warning restore BL0005
+        const BindingFlags members = BindingFlags.Instance | BindingFlags.NonPublic;
+        typeof(JiraRetryDialog).GetField("_acknowledged", members)!.SetValue(dialog, true);
+
+        ((bool)typeof(JiraRetryDialog).GetProperty("Refused", members)!.GetValue(dialog)!).Should().BeTrue();
+        // No dialog instance is cascaded: reaching Close would throw, so returning proves the guard.
+        typeof(JiraRetryDialog).GetMethod("Confirm", members)!.Invoking(m => m.Invoke(dialog, null)).Should().NotThrow();
+    }
+
+    [Fact]
+    public void RetryDialog_RetryDraftMatchOrUnreadable_DoesNotRefuse()
+    {
+        const BindingFlags members = BindingFlags.Instance | BindingFlags.NonPublic;
+#pragma warning disable BL0005 // Parameters are set directly to exercise the handler without a dialog host.
+        var matching = new JiraRetryDialog
+        {
+            Record = Record() with { WorkflowState = OperationalRecordWorkflowState.JiraCreateFailed },
+            RetryPreview = new(Record().Id, "OR-123", "synthetic-v1", "synthetic-transfer-key", true, Preview())
+        };
+        var unreadable = new JiraRetryDialog { Record = Record() with { WorkflowState = OperationalRecordWorkflowState.JiraCreateFailed } };
+#pragma warning restore BL0005
+
+        ((bool)typeof(JiraRetryDialog).GetProperty("Refused", members)!.GetValue(matching)!).Should().BeFalse();
+        ((bool)typeof(JiraRetryDialog).GetProperty("Refused", members)!.GetValue(unreadable)!).Should().BeFalse();
     }
 
     [Fact]

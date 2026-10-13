@@ -47,6 +47,14 @@
                     @if (context.Status == "Open" && Detail.Permissions.CanWorkRequest(context.Id))
                     {
                         <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => Select(context))" aria-expanded="@((_selected?.Id == context.Id).ToString().ToLowerInvariant())">@(Detail.Permissions.Work ? "Güncelle / kapat" : "Güncelle")</MudButton>
+                        @if (EventAvailable)
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => Report(context))" aria-label="@($"{context.ActionLabel} talebi için gelişme bildir")">Gelişme bildir</MudButton>
+                        }
+                        @if (Detail.Permissions.Work && ReadinessOf(context) is { CanClose: false } readiness)
+                        {
+                            <div class="so-panel-text--sm">Henüz tamamlandı olarak kapatılamaz (@readiness.Missing.Count eksik).</div>
+                        }
                     }
                 </MudTd>
             </RowTemplate>
@@ -87,16 +95,48 @@
             <h3 class="so-panel-title mt-4">Talebi kapat</h3>
             <MudGrid Spacing="2">
                 <MudItem xs="12" md="4">
-                    <MudSelect T="string" @bind-Value="_closeOutcome" Label="Sonuç" Variant="Variant.Outlined">
+                    <MudSelect T="string" Value="_closeOutcome" ValueChanged="OutcomeChangedAsync" Label="Sonuç" Variant="Variant.Outlined">
                         <MudSelectItem T="string" Value="@("Completed")">Tamamlandı (gerçekleşen işlem gerekir)</MudSelectItem>
                         <MudSelectItem T="string" Value="@("NotNeeded")">Gerek kalmadı</MudSelectItem>
                         <MudSelectItem T="string" Value="@("Cancelled")">İptal</MudSelectItem>
                     </MudSelect>
                 </MudItem>
-                <MudItem xs="12" md="8"><MudTextField @bind-Value="_closeReason" Label="Gerekçe" MaxLength="1000" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="8"><MudTextField @bind-Value="_closeReason" Label="Gerekçe" MaxLength="1000" Variant="Variant.Outlined" Immediate="true" /></MudItem>
             </MudGrid>
             <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">Kapatma, talebi açık işler ve hatırlatmalar listesinden çıkarır. Hesap kaydı silinmez.</MudAlert>
-            <MudButton OnClick="CloseAsync" Disabled="Busy" Variant="Variant.Outlined" Color="Color.Primary" Class="mt-2">Talebi kapat</MudButton>
+            CloseReadiness? readiness = SelectedReadiness; IReadOnlyList<CloseMissing> blocking = readiness is null ? [] : ServiceAccountEventText.Blocking(readiness, !string.IsNullOrWhiteSpace(_closeReason));
+            <div class="sa-close-why" aria-live="polite">
+                @if (_readinessLoading)
+                {
+                    <p class="so-panel-text--sm">Kapatma koşulları sunucudan okunuyor…</p>
+                }
+                else if (readiness is null)
+                {
+                    <p class="so-panel-text--sm">Kapatma koşulları okunamadı. "Talebi kapat" isteği sunucuya gider; kararı sunucu verir.</p>
+                }
+                else if (blocking.Count > 0)
+                {
+                    <p class="so-panel-text--sm"><strong>Talep bu sonuçla şu an kapatılamaz.</strong> Sunucunun kapanış kuralına göre eksikler:</p>
+                    <SaCloseMissingList Id="sa-close-why-list" Missing="blocking">
+                        <Actions>
+                            @if (context.Remedy == "ReportAction" && EventAvailable)
+                            {
+                                <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => Report(selected))">Gelişme bildir</MudButton>
+                            }
+                            else if (context.Remedy == "ConfirmOwnership")
+                            {
+                                <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => OnOpenTab.InvokeAsync((int)SaTab.Ownership))">Sahiplik sekmesi</MudButton>
+                            }
+                        </Actions>
+                    </SaCloseMissingList>
+                }
+                else
+                {
+                    <p class="so-panel-text--sm">Sunucuya göre bu sonuçla kapatılabilir (bilgi; kapatırken yeniden denetlenir).</p>
+                }
+            </div>
+            <MudButton OnClick="CloseAsync" Disabled="Busy" Variant="Variant.Outlined" Color="Color.Primary" Class="mt-2"
+                       aria-disabled="@(blocking.Count > 0 ? "true" : "false")" aria-describedby="@(blocking.Count > 0 ? "sa-close-why-list" : null)">Talebi kapat</MudButton>
             }
             else
             {
@@ -158,12 +198,37 @@
     /// <summary>Command sink.</summary>
     [Parameter] public EventCallback<SaCommand> OnCommand { get; set; }
 
+    /// <summary>Server close readiness (outcome Completed) per open request; a missing entry means it could not be read.</summary>
+    [Parameter] public IReadOnlyDictionary<Guid, CloseReadiness> Readiness { get; set; } = new Dictionary<Guid, CloseReadiness>();
+
+    /// <summary>Reads the close readiness of one request for another outcome; null when it could not be read.</summary>
+    [Parameter] public Func<Guid, string, Task<CloseReadiness?>>? LoadReadiness { get; set; }
+
+    /// <summary>The event flow is installed (migration 036); otherwise no "Gelişme bildir" is offered.</summary>
+    [Parameter] public bool EventAvailable { get; set; }
+
+    /// <summary>Opens the event flow for a request.</summary>
+    [Parameter] public EventCallback<SaEventStart> OnReportEvent { get; set; }
+
+    /// <summary>Opens a detail tab.</summary>
+    [Parameter] public EventCallback<int> OnOpenTab { get; set; }
+
+    private CloseReadiness? _otherReadiness;
+    private bool _readinessLoading;
+
+    /// <summary>The readiness for the selected request and outcome (Completed from the page's read, others read on choice).</summary>
+    private CloseReadiness? SelectedReadiness => _selected is not { } selected ? null
+        : _closeOutcome == "Completed" ? ReadinessOf(selected)
+        : _otherReadiness is { } other && other.Outcome == _closeOutcome ? other : null;
+
+    private CloseReadiness? ReadinessOf(RequestView request) => Readiness.TryGetValue(request.Id, out CloseReadiness? readiness) ? readiness : null;
+
     protected override void OnParametersSet()
     {
         if (_seenRevision != Revision)
         {
             _seenRevision = Revision;
-            (_selected, _edit, _create, _closeOutcome, _closeReason) = (null, new(), new(), "Completed", null);
+            (_selected, _edit, _create, _closeOutcome, _closeReason, _otherReadiness) = (null, new(), new(), "Completed", null, null);
         }
         else if (_selected is not null)
         {
@@ -172,8 +237,27 @@
         }
     }
 
-    private void Select(RequestView request)
+    private Task Report(RequestView request) => OnReportEvent.InvokeAsync(new SaEventStart(ServiceAccountEventText.EventForRequest(request.ActionType), request.Id));
+
+    private async Task OutcomeChangedAsync(string outcome)
     {
+        _closeOutcome = outcome;
+        _otherReadiness = null;
+        if (outcome != "Completed" && _selected is { } selected && LoadReadiness is not null)
+        {
+            _readinessLoading = true;
+            CloseReadiness? read = await LoadReadiness(selected.Id, outcome);
+            _readinessLoading = false;
+            if (_selected?.Id == selected.Id && _closeOutcome == outcome)
+            {
+                _otherReadiness = read;
+            }
+        }
+    }
+
+    internal void Select(RequestView request)
+    {
+        (_closeOutcome, _otherReadiness) = ("Completed", null);
         _selected = _selected?.Id == request.Id ? null : request;
         _edit = new EditModel
         {
@@ -212,8 +296,15 @@
         return OnCommand.InvokeAsync(new SaCommand(HttpMethod.Patch, $"/requests/{request.Id}", body));
     }
 
-    private Task CloseAsync() => OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, $"/requests/{_selected!.Id}/close",
-        new CloseWorkRequest(_selected.Version, _closeOutcome, string.IsNullOrWhiteSpace(_closeReason) ? null : _closeReason.Trim())));
+    /// <summary>
+    /// Sends the close command unless the server's readiness lists something still missing (the button is then aria-disabled and the
+    /// list says why). Without a readiness answer the command goes to the server, which decides.
+    /// </summary>
+    private Task CloseAsync() =>
+        SelectedReadiness is { } readiness && ServiceAccountEventText.Blocking(readiness, !string.IsNullOrWhiteSpace(_closeReason)).Count > 0
+            ? Task.CompletedTask
+            : OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, $"/requests/{_selected!.Id}/close",
+                new CloseWorkRequest(_selected.Version, _closeOutcome, string.IsNullOrWhiteSpace(_closeReason) ? null : _closeReason.Trim())));
 
     private Task CreateAsync() => OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, $"/accounts/{Detail.Summary.Id}/requests",
         new CreateWorkRequest(_create.ActionType, _create.TargetTeamId, _create.FollowupPersonId, null, ServiceAccountUiText.ToDate(_create.PlanStart),

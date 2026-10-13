@@ -849,13 +849,40 @@ if (_access.Can(Capabilities.OperationalRecordsView))
 
         int generation = _generation;
         _busy = true;
+
+        // A Jira-create retry shows what Jira would receive: the server rebuilds the draft without
+        // writing and says whether it still matches the reviewed fingerprint. A read failure is shown
+        // in the dialog; the server still verifies the fingerprint on the retry itself.
+        JiraRetryPreviewResponse? retryPreview = null;
+        UiProblem? retryPreviewProblem = null;
+        if (!OperationalRecordView.HasJira(_record))
+        {
+            _busyMessage = "Yeniden denenecek alanlar okunuyor…";
+            StateHasChanged();
+            try
+            {
+                retryPreview = await Records.RetryPreviewAsync(RecordId, CancellationToken.None);
+            }
+            catch (SecureOpsApiException ex)
+            {
+                retryPreviewProblem = ex.Problem;
+            }
+
+            if (!Current(generation)) return;
+        }
+
         _busyMessage = "Yeniden deneme kararı bekleniyor…";
 
         // A retry without a persisted key asks Jira to create the issue again, so it is confirmed
         // exactly like the first create rather than dispatched on a single click.
         IDialogReference dialog = await Dialogs.ShowAsync<JiraRetryDialog>(
             title: string.Empty,
-            new DialogParameters { { nameof(JiraRetryDialog.Record), _record } },
+            new DialogParameters
+            {
+                { nameof(JiraRetryDialog.Record), _record },
+                { nameof(JiraRetryDialog.RetryPreview), retryPreview },
+                { nameof(JiraRetryDialog.RetryPreviewProblem), retryPreviewProblem }
+            },
             new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true });
         DialogResult? outcome = await dialog.Result;
         if (!Current(generation)) return;

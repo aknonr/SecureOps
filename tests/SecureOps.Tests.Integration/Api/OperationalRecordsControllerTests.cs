@@ -412,6 +412,7 @@ public sealed class OperationalRecordsControllerTests
         public Task<OperationalRecordResult<JiraIssueDraft>> PreviewAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) => Task.FromResult(previewResult);
         public Task<OperationalRecordResult<OperationalRecord>> CreateAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<OperationalRecordResult<OperationalRecord>> RetryAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<OperationalRecordResult<JiraRetryDraft>> RetryPreviewAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private sealed class CapturingTransferService(OperationalRecordResult<JiraIssueDraft> previewResult) : IJiraTransferService
@@ -432,6 +433,9 @@ public sealed class OperationalRecordsControllerTests
             throw new NotSupportedException();
 
         public Task<OperationalRecordResult<OperationalRecord>> RetryAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<OperationalRecordResult<JiraRetryDraft>> RetryPreviewAsync(Guid id, OperationalRecordCommandContext context, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
     }
 

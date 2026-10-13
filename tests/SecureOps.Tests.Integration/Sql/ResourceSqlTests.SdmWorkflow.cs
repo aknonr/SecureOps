@@ -49,6 +49,7 @@ public sealed partial class ResourceSqlTests
         (await restarted.CreateAsync(record.Id, context with { IdempotencyKey = "new-" + unique }, _token)).IsSuccess.Should().BeFalse();
         OperationalRecord persisted = (await new SqlOperationalRecordRepository(configuration).GetAsync(record.Id, _token))!;
         persisted.JiraIssueKey.Should().Be(issueKey);
+        persisted.JiraIssueKeyPersistedAt.Should().NotBeNull().And.BeAfter(DateTimeOffset.UtcNow.AddHours(-1));
         persisted.WorkflowState.Should().Be(OperationalRecordWorkflowState.JiraCreated);
         persisted.SourceCloseRequested.Should().BeFalse();
         persisted.LastErrorCode.Should().BeNull();

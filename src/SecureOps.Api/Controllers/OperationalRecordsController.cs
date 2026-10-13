@@ -26,6 +26,7 @@ public sealed class OperationalRecordsController : ControllerBase
     private readonly IJiraTransferService _transferService;
     private readonly CommandIdempotencyOptions _commandOptions;
     private readonly TimeProvider _timeProvider;
+    private readonly JiraIntegrationOptions _jiraOptions;
     private readonly bool _simulationMode;
     private readonly bool _readOnlyIntegrationMode;
     private readonly bool _controlledTestWritesEnabled;
@@ -44,6 +45,7 @@ public sealed class OperationalRecordsController : ControllerBase
         _transferService = transferService;
         _commandOptions = commandOptions.Value;
         _timeProvider = timeProvider;
+        _jiraOptions = jiraOptions.Value;
         _readOnlyIntegrationMode = operationalOptions.Value.ReadOnlyIntegrationMode;
         _controlledTestWritesEnabled = operationalOptions.Value.ControlledTestWritesEnabled;
         _sourceCloseEnabled = operationalOptions.Value.SourceCloseEnabled && !_readOnlyIntegrationMode
@@ -77,7 +79,10 @@ public sealed class OperationalRecordsController : ControllerBase
     public async Task<ActionResult<OperationalRecordPageResponse>> BrowseAsync([FromQuery] OperationalRecordQuery query, CancellationToken cancellationToken)
     {
         OperationalRecordPage page = await _recordService.BrowseAsync(query, cancellationToken);
-        return Ok(new OperationalRecordPageResponse(page.Items.Select(ToResponse).ToArray(), page.Total, query.Page, query.PageSize));
+        return Ok(new OperationalRecordPageResponse(page.Items.Select(ToResponse).ToArray(), page.Total, query.Page, query.PageSize)
+        {
+            UnknownSourceCreatedAtCount = page.UnknownSourceCreatedAtCount
+        });
     }
 
     /// <summary>Returns one persisted operational record.</summary>
@@ -122,6 +127,34 @@ public sealed class OperationalRecordsController : ControllerBase
     {
         OperationalRecordResult<JiraIssueDraft> result = await _transferService.ReviewAsync(id, request, Context(), cancellationToken);
         return result.IsSuccess ? Ok(ToPreviewResponse(result.Value!)) : Failure<JiraPreviewResponse>(result.Failure!);
+    }
+
+    /// <summary>Shows, without any write, what a Jira-create retry would send and whether it matches the reviewed draft.</summary>
+    [HttpGet("{id:guid}/retry-preview")]
+    [Authorize(Policy = Policies.CanRetryJira)]
+    [EnableRateLimiting(ApiRateLimits.JiraPreview)]
+    [ProducesResponseType(typeof(JiraRetryPreviewResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<JiraRetryPreviewResponse>> RetryPreviewAsync(Guid id, CancellationToken cancellationToken)
+    {
+        OperationalRecordResult<JiraRetryDraft> result = await _transferService.RetryPreviewAsync(id, Context(), cancellationToken);
+        if (!result.IsSuccess)
+        {
+            return Failure<JiraRetryPreviewResponse>(result.Failure!);
+        }
+
+        JiraRetryDraft retry = result.Value!;
+        // A rebuilt draft that no longer matches is not what was reviewed; it is withheld, not shown as the retry content.
+        return Ok(new JiraRetryPreviewResponse(
+            retry.Draft.OperationalRecordId,
+            retry.Draft.OrCode,
+            retry.PersistedMappingVersion,
+            retry.PersistedIdempotencyKey,
+            retry.MatchesPersistedDraft,
+            retry.MatchesPersistedDraft ? ToPreviewResponse(retry.Draft) : null));
     }
 
     private JiraPreviewResponse ToPreviewResponse(JiraIssueDraft draft)
@@ -184,7 +217,7 @@ public sealed class OperationalRecordsController : ControllerBase
 
         OperationalRecordCommandContext context = Context(idempotencyKey);
         OperationalRecordResult<OperationalRecord> result = await _transferService.CreateAsync(id, context, cancellationToken);
-        return result.IsSuccess ? Ok(ToTransferResponse(result.Value!, context.CorrelationId)) : Failure<JiraTransferResponse>(result.Failure!);
+        return result.IsSuccess ? Ok(ToTransferResponse(result, context.CorrelationId)) : Failure<JiraTransferResponse>(result.Failure!);
     }
 
     /// <summary>Resumes only the safe failed stage of a durable workflow.</summary>
@@ -213,7 +246,7 @@ public sealed class OperationalRecordsController : ControllerBase
 
         OperationalRecordCommandContext context = Context(idempotencyKey);
         OperationalRecordResult<OperationalRecord> result = await _transferService.RetryAsync(id, context, cancellationToken);
-        return result.IsSuccess ? Ok(ToTransferResponse(result.Value!, context.CorrelationId)) : Failure<JiraTransferResponse>(result.Failure!);
+        return result.IsSuccess ? Ok(ToTransferResponse(result, context.CorrelationId)) : Failure<JiraTransferResponse>(result.Failure!);
     }
 
     private OperationalRecordCommandContext Context(string? idempotencyKey = null)
@@ -322,7 +355,10 @@ public sealed class OperationalRecordsController : ControllerBase
             && !_readOnlyIntegrationMode && _controlledTestWritesEnabled,
         SuggestedRequestType = RequestTypeSuggester.Suggest(record.Title, record.Description) is { } hint
             ? new(hint.Type, hint.Terms, hint.RuleVersion)
-            : null
+            : null,
+        TransferIdempotencyKey = record.IdempotencyKey,
+        JiraIssueKeyPersistedAt = record.JiraIssueKeyPersistedAt,
+        JiraIssueUrl = JiraIssueLink.Create(_jiraOptions, record.JiraIssueKey)
     };
 
     private bool IsRetryEligible(OperationalRecord record) =>
@@ -335,6 +371,16 @@ public sealed class OperationalRecordsController : ControllerBase
     private bool IsValidIdempotencyKey(string? idempotencyKey) =>
         string.IsNullOrWhiteSpace(idempotencyKey)
         || CommandIdempotency.IsValid(idempotencyKey, _commandOptions.MaxKeyLength);
+
+    private JiraTransferResponse ToTransferResponse(OperationalRecordResult<OperationalRecord> result, string correlationId)
+    {
+        OperationalRecord record = result.Value!;
+        return ToTransferResponse(record, correlationId) with
+        {
+            Replayed = result.IdempotentReplay,
+            JiraIssueUrl = JiraIssueLink.Create(_jiraOptions, record.JiraIssueKey)
+        };
+    }
 
     private JiraTransferResponse ToTransferResponse(OperationalRecord record, string correlationId) => new(
         record.Id,

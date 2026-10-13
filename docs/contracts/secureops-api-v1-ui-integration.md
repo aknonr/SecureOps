@@ -220,6 +220,9 @@ It reads persisted data only, with `search` (literal code/title substring, max
 `page`, `pageSize`; total is matching persisted rows, never a source total.
 Sort ties use source identifier. Corporate mode excludes synthetic records
 before counting/paging. SQL count and rows share a bounded serializable read.
+`unknownSourceCreatedAtCount` (additive, 2026-10-13) counts matching records whose
+source never supplied a creation time; `sort=oldest` lists them last because an
+unknown date is not an old one. The UI disables the date order while it is non-zero.
 Existing GET root remains the explicit bounded source refresh; no polling,
 typing, sorting, page navigation or passive reload may call it.
 No migration or runtime grant is added; baseline remains 001-011.
@@ -346,6 +349,7 @@ back to SunucuTalep. Existing blockers and unresolved identity remain explicit.
 | `POST /api/v1/operational-records/{id}/jira-review` | `OperationalRecords.CreateJiraPreview` | `{ "requestType": 0, "expectedVersion": 1 }` | review-only `JiraPreviewResponse`, audited; no external dispatch or identity lookup | 409 stale/already-previewed/claimed/known-key/reconciliation state, 422 unsupported type, 403 capability, 429 |
 | `POST /api/v1/operational-records/{id}/jira` | `OperationalRecords.CreateJira` | optional `Idempotency-Key` header, maximum configured length; no reporter input | `JiraTransferResponse` | `ExternalWritesDisabled`, `InvalidIdempotencyKey`, `OperatorReporterResolutionFailed`, `JiraReporterRejected`, `OperationalRecordAlreadyClaimed`, `OperationalRecordChanged`, `OperationalRecordNoLongerOpen`, `WorkflowAlreadyInProgress`, `JiraCreateFailed` |
 | `POST /api/v1/operational-records/{id}/retry` | `OperationalRecords.Retry` | optional `Idempotency-Key` header | resumed `JiraTransferResponse` | `ExternalWritesDisabled`, `WorkflowAlreadyCompleted`, conflict/freshness/Jira/source-close codes |
+| `GET /api/v1/operational-records/{id}/retry-preview` | `OperationalRecords.Retry` | route GUID; rate-limited like preview | `JiraRetryPreviewResponse`: the draft a Jira-create retry would rebuild for this actor, `persistedMappingVersion`/`persistedIdempotencyKey` fixed on the transfer, `matchesPersistedDraft`; `draft` is present only when it matches. No write, audit or state change | 409 `OperationalRecordInvalidState` (stage `retry-preview`) unless key-less `JiraCreateFailed` without reconciliation; requester/reporter codes as preview |
 
 The UI must refresh authoritative record state after 409, 422, or command completion. It must not infer claim ownership, retry safety, Jira success, or source-close success from local state. Preserve and show the returned correlation ID for support diagnostics without exposing raw external responses.
 
@@ -360,6 +364,8 @@ candidate recommendation, Jira eligibility and external-write eligibility.
 No approval action or new API route is introduced.
 
 `OperatorReporterResolutionFailed` is a non-create outcome: show "İşlemi yapan kullanıcı Jira üzerinde doğrulanamadığı için kayıt oluşturulmadı." `JiraReporterRejected` means Jira rejected the verified reporter field or the integration account lacks reporter-change permission; do not suggest falling back to the integration identity.
+
+**Additive OR → Jira read fields (2026-10-13, TH-8/9).** `OperationalRecordResponse.transferIdempotencyKey` is the reviewed-draft fingerprint fixed on the transfer (duplicate protection, null before any preview). `jiraIssueKeyPersistedAt` is the UTC time of the first append-only `JiraCreated` workflow entry, written in the same transaction as the key; null without a key or when no such entry exists, shown as unknown. `jiraIssueUrl` (also on `JiraTransferResponse`) is `Jira:IssueBrowseBaseUrl` + key, only for the Corporate provider, an absolute HTTPS base without credentials/query/fragment and a strict key; otherwise null and the UI shows the key as plain text. `JiraTransferResponse.replayed=true` means the same command scope had already completed: the stored result is returned and this request made no Jira or source call. The deterministic actor/command/target fallback key is unchanged and the UI still sends no `Idempotency-Key`. A retry is accepted only when the rebuilt draft has the persisted fingerprint; `retry-preview` reports that before the confirmation so the UI can show the fields, or close the retry when the server would refuse it.
 
 `OperationalRecordResponse.claimed` means the stored claim expiry is later than server time. `claimedBy`, `claimedAt`, and `claimExpiresAt` are the authoritative lease metadata; an expired lease can retain historical owner/timestamps while `claimed=false`. `version` changes with persisted workflow mutations. `reconciliationRequired=true` means an unknown Jira-create outcome blocks automatic retry. `jiraExists=true` means a trusted Jira key is persisted. `retryEligible=true` means the current durable state is one the retry endpoint can safely resume; it is always false while reconciliation is required.
 

@@ -192,12 +192,13 @@ effective values locally in a separately approved ACL-protected file, outside
 the delivery. If values currently exist only in IIS environment configuration,
 that approved local preparation step is REQUIRED; do not rename web.config to
 JSON or modify IIS. Do not dump/export the whole IIS configuration. Transfer only
-the two sections below through the owner's existing protected administration
+the sections below through the owner's existing protected administration
 process; no secrets need to be sent to the developer.
 
 | Section | Required effective values |
 |---|---|
 | OperationalRecords | SourceProvider exactly `TuruncuHat`; ReadOnlyIntegrationMode `true`; ControlledTestWritesEnabled `false`; SourceCloseEnabled `false` |
+| InUseCompletion | SourceWritesEnabled `false` or absent (default); the collector refuses to run while any write gate is armed |
 | TuruncuHat | Existing HTTPS BaseUrl including its API path; Authorization, Username, Password (server-owned, never shared); TenantId greater than zero; verified SessionIdSegmentIndex and positive SessionLifetimeSeconds |
 | TuruncuHat limits | Preserve reviewed ConnectTimeoutSeconds, RequestTimeoutSeconds, MaxResponseBytes, MaxDescriptionLength; example shows existing defaults 5/30/1048576/8000; DiagnosticContractLogging stays false |
 

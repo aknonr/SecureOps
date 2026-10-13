@@ -84,4 +84,13 @@ public interface IOperationalRecordApiClient
     /// workflow is in a retryable stage.
     /// </remarks>
     public Task<JiraTransferResponse> RetryAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads, without any write, what a Jira-create retry would send and whether it still matches the
+    /// reviewed draft's persisted fingerprint.
+    /// </summary>
+    /// <param name="id">Record identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The server's comparison; the draft is present only when it matches.</returns>
+    public Task<JiraRetryPreviewResponse> RetryPreviewAsync(Guid id, CancellationToken cancellationToken);
 }

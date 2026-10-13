@@ -5,8 +5,10 @@
     Jira to create the issue again; with a key it resumes only the source step. Either is an
     external write, so it gets the same explicit statement gate as the first create.
 
-    The reviewed fields cannot be shown again here: the retry route has no preview, and a new
-    preview is not available in a failed stage. What is shown comes from the record alone.
+    For a Jira-create retry the page first reads GET retry-preview: the draft the retry would rebuild,
+    compared with the reviewed fingerprint fixed on the transfer. Matching fields are shown as what
+    Jira will receive. A mismatch means the server will refuse the retry, so the button stays closed
+    and the reason is stated; nothing on this page decides that, it only reflects the server's answer.
 *@
 
 <MudDialog Class="so-dialog" DefaultFocus="DefaultFocus.None">
@@ -33,11 +35,47 @@
 
         @if (!OperationalRecordView.HasJira(Record))
         {
-            <p class="so-dialog-note">
-                Aktarılacak alanlar bu pencerede yeniden gösterilemez. Sunucu, kayıt için sabitlenmiş
-                eşleme parmak izini doğrular; eşleme veya çözümlenen kimlikler değiştiyse yeniden
-                deneme reddedilir ve yeni inceleme gerekir.
-            </p>
+            @if (RetryPreview is { MatchesPersistedDraft: true, Draft: { } draft })
+            {
+                <p class="so-dialog-note" data-retry-fields>
+                    Aşağıdaki alanlar ilk denemede gözden geçirilen taslakla aynı sunucu parmak izine sahiptir;
+                    yeniden deneme Jira'ya bunları gönderir.
+                </p>
+                <SoFieldGrid MinColumnWidth="180px">
+                    <SoField Label="Jira hedefi">@draft.ProjectKey · @draft.IssueType</SoField>
+                    <SoField Label="Özet">@draft.Summary</SoField>
+                    <SoField Label="Raporlayıcı">@(draft.ReporterUsername ?? "Proje varsayılanı")</SoField>
+                    <SoField Label="Atanacak kişi">@(draft.AssigneeUsername ?? "Proje varsayılanı")</SoField>
+                    <SoField Label="Takip eden kişi (kaynak talep sahibi)">@(draft.RequesterAccountId ?? "Çözümlenemedi")</SoField>
+                    @if (draft.Labels is { Count: > 0 })
+                    {
+                        <SoField Label="Etiketler">@string.Join(", ", draft.Labels)</SoField>
+                    }
+                    <SoField Label="Mükerrer koruma (sunucu aktarım anahtarı)">
+                        <code class="so-code so-code--sm">@RetryPreview.PersistedIdempotencyKey</code>
+                    </SoField>
+                </SoFieldGrid>
+                <details class="so-dialog-details">
+                    <summary>Açıklama</summary>
+                    <pre class="so-dialog-body">@draft.Description</pre>
+                </details>
+            }
+            else if (RetryPreview is { MatchesPersistedDraft: false })
+            {
+                <p class="so-dialog-note so-dialog-note--blocked" role="alert" data-retry-mismatch>
+                    <strong>Yeniden deneme yapılamaz.</strong> Bugün üretilen taslak, ilk denemede sabitlenen
+                    içerikle eşleşmiyor (eşleme, kaynak kayıt veya çözümlenen kimlikler değişmiş). Sunucu bu
+                    yeniden denemeyi reddeder; kaydı yenileyip platform yöneticisiyle yeni inceleme planlayın.
+                </p>
+            }
+            else
+            {
+                <p class="so-dialog-note" data-retry-fields-unavailable>
+                    Aktarılacak alanlar okunamadı@(RetryPreviewProblem is { } problem ? $" ({problem.Title})" : string.Empty).
+                    Sunucu, yeniden denemede kayıt için sabitlenmiş parmak izini yine doğrular; eşleme veya
+                    çözümlenen kimlikler değiştiyse yeniden deneme reddedilir.
+                </p>
+            }
         }
 
         <SoFieldGrid MinColumnWidth="180px">
@@ -51,14 +89,15 @@
 
         <SoConfirmStatement Text="@Statement" @bind-Checked="_acknowledged" DescribedBy="@_hintId" AutoFocus="true" />
         <p id="@_hintId" class="so-dialog-ack-hint">
-            @(_acknowledged ? "Onay verildi. Yeniden Dene düğmesi etkin." : "Yeniden Dene düğmesi, yukarıdaki beyan işaretlenene kadar kapalıdır.")
+            @(Refused ? "Yeniden Dene kapalı: sunucu bu taslakla yeniden denemeyi reddeder."
+                : _acknowledged ? "Onay verildi. Yeniden Dene düğmesi etkin." : "Yeniden Dene düğmesi, yukarıdaki beyan işaretlenene kadar kapalıdır.")
         </p>
     </DialogContent>
 
     <DialogActions>
         <MudButton OnClick="Cancel" Variant="Variant.Text">Vazgeç</MudButton>
         <MudButton OnClick="Confirm" Variant="Variant.Filled" Color="Color.Primary"
-                   Disabled="@(!_acknowledged)" aria-describedby="@_hintId"
+                   Disabled="@(!_acknowledged || Refused)" aria-describedby="@_hintId"
                    StartIcon="@Icons.Material.Filled.RestartAlt">
             Yeniden Dene
         </MudButton>
@@ -75,6 +114,17 @@
     /// <summary>Authoritative record the retry acts on.</summary>
     [Parameter, EditorRequired]
     public OperationalRecordResponse Record { get; set; } = default!;
+
+    /// <summary>Server comparison of the retry draft with the reviewed fingerprint, when it could be read.</summary>
+    [Parameter]
+    public JiraRetryPreviewResponse? RetryPreview { get; set; }
+
+    /// <summary>Why the retry draft could not be read, when it could not.</summary>
+    [Parameter]
+    public UiProblem? RetryPreviewProblem { get; set; }
+
+    // The server has said the rebuilt draft is not the reviewed one; a retry would be refused.
+    private bool Refused => !OperationalRecordView.HasJira(Record) && RetryPreview is { MatchesPersistedDraft: false };
 
     private string Consequence => OperationalRecordView.HasJira(Record)
         ? $"Jira kaydı ({Record.JiraIssueKey}) yeniden oluşturulmaz; yalnız kaynak aşaması yeniden denenir."
@@ -95,7 +145,7 @@
     private void Confirm()
     {
         // The disabled button is the visible gate; this guards a stale or scripted click.
-        if (!_acknowledged) return;
+        if (!_acknowledged || Refused) return;
         Dialog.Close(DialogResult.Ok(true));
     }
 

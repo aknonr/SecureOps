@@ -17,6 +17,20 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
 - Push on the owner's workstation: Git Credential Manager holds two GitHub accounts, so name the owner's:
   `git -c credential.https://github.com.username=aknonr push origin <branch>`.
 
+## Event guidance UI OLAY-3 (branch `feature/service-accounts-event-guidance-ui-20261013`, from master `4a7ea77`, master `0556459` merged in, not merged)
+
+- Account page: "Bir gelişme mi oldu?" stepped flow (Ne oldu? → Ayrıntılar + optional mail paste → Önizleme "Şunlar kaydedilecek / Kaydedilmeyecek" →
+  separate Kaydet) against the OLAY-2a/2b/2c routes; hidden with a short honest text when `eventGuidanceAvailable` is false (036 missing). Close hints
+  from `close-readiness` on "Talebi kapat" (aria-disabled + the server's list + remedy buttons), closure sub-codes on actions, "Bildir" on the next-step
+  card, role line in the page guide. UI/tests/docs only; contract gaps [G-39](../26-ui-backend-contract-gaps.md). Decisions: EVENT-GUIDANCE-DESIGN §4 note.
+- Verified 2026-10-13 locally (Windows, SDK 9.0.317): build 0/0; full unit 2622 passed / 1 skipped (existing), new `ServiceAccountEventFlowUiTests` (24); repository-wide format gate clean; journey
+  `tests/browser/service-accounts-event-flow.cjs` 7/7 on the local Demo (API :5630, UI :5631, synthetic LocalDB `SecureOps_SaOlay3Ui1013` built by the
+  harness 001–036 without role scripts, `sa-demo-bootstrap.sql`; database dropped afterwards): keyboard + heading focus, mail hints cleared from the box,
+  one save per event, 409 stale and 422 refused close writing nothing, close hint aria-disabled, next-step Bildir, 390 px and dark without overflow.
+  The journey found one defect, fixed: the page did not re-render after a delegate call, so a refreshed preview reused the stale account version.
+- Not verified: unknown outcome and missing 036 in a browser (unit-tested only; the API call is server-side), participant in a browser (unit-tested),
+  real 200 % zoom by eye, screen reader, Windows/IIS, corporate TEST (036 not installed there).
+
 ## Close readiness OLAY-2a (branch `feature/service-accounts-close-readiness-20261013`, from master `633eed9` + OLAY-1 design merged in, not merged)
 
 - `ServiceAccountRules.EvaluateClose` lists every missing close condition (`CloseGap`: code, remedy, sub-codes of the closest deletion
@@ -25,6 +39,13 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
   outcome names, no write/audit); OpenAPI snapshot additive only (one path, `CloseReadiness`, `CloseMissing`). No migration, no UI.
 - Not in this PR: `RequestView.closeReadiness` (detail lacks the verifier/evidence facts; see EVENT-GUIDANCE-DESIGN §6 note) and
   `EvaluateVerification`.
+
+## Mail hints OLAY-2b (branch `feature/service-accounts-mail-hints-20261013`, from master `6ee5d26`, not merged)
+
+- `POST accounts/{id}/events/mail-hints` (Work + account in scope, else 403/404): pasted reply text in, **suggestions only** out
+  (event kinds, OR/OCO numbers, dates); deterministic rules in one table (`EventMailHintRules`), pure function `EventMailHints`, no
+  language model, no network, nothing written, text never stored, logged or echoed. Own controller file; OpenAPI snapshot additive only.
+  Details and limits: EVENT-GUIDANCE-DESIGN §7 "OLAY-2b uygulama notu". No migration, no UI.
 
 ## Event guidance design OLAY-1 (branch `docs/service-accounts-event-guidance-design-20261013`, from master `633eed9`, not merged)
 

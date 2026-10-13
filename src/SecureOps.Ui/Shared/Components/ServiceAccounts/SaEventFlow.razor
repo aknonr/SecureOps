@@ -1,0 +1,674 @@
+@* "Bir gelişme mi oldu?" (EVENT-GUIDANCE-DESIGN.md §4): the person picks what happened, fills only that event's fields, sees what will
+   and will not be recorded, and saves everything in one server transaction with a separate click. The server derives every record
+   kind, checks every permission and the close rule; this component only shows its answers. The idempotency key is made once when
+   the flow opens, so a retry after an unknown outcome cannot record twice. Pasted mail text goes to the hint endpoint only and is
+   cleared from the form once the hints arrive; it is never stored, logged or kept in the browser. *@
+@using SecureOps.Domain.ServiceAccounts
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<section class="so-panel sa-event" aria-labelledby="sa-event-title">
+    <div class="so-panel-head"><h2 id="sa-event-title" class="so-panel-title">Gelişme bildirme</h2></div>
+    @if (!Available)
+    {
+        <p class="so-panel-text sa-event-off">
+            <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" aria-hidden="true" />
+            "Bir gelişme mi oldu?" bu ortamda kapalı: olay kaydı için veritabanı güncellemesi (036) kurulu değil. Yazışmayı, işlem bildirimini ve talebi
+            İşler ve Yazışmalar sekmelerinden ayrı ayrı kaydedebilirsiniz.
+        </p>
+    }
+    else if (ServiceAccountEventText.WhyNoFlow(Detail.Permissions) is { } why)
+    {
+        <p class="so-panel-text">@why</p>
+    }
+    else if (!_open)
+    {
+        <p class="so-panel-text">Mail, telefon veya toplantıda öğrendiğiniz bir gelişmeyi seçin. Ürün neyin kaydedileceğini önce gösterir; siz onaylayınca hepsi birlikte kaydedilir.</p>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Campaign" OnClick="@(() => Open(null))">Bir gelişme mi oldu?</MudButton>
+    }
+    else
+    {
+        <ol class="sa-event-steps" aria-label="Adımlar">
+            @foreach ((string name, int number) in _stepNames.Select((n, i) => (n, i + 1)))
+            {
+                <li class="@(number == _step ? "sa-event-step--current" : number < _step ? "sa-event-step--done" : null)" aria-current="@(number == _step ? "step" : null)">
+                    <span class="sa-event-step-num" aria-hidden="true">@(number < _step ? "✓" : number.ToString())</span> @name
+                </li>
+            }
+        </ol>
+
+        @if (_step == 1)
+        {
+            <h3 class="sa-event-heading" tabindex="-1" @ref="_heading">Adım 1 / 3 · Ne oldu?</h3>
+            <fieldset class="sa-event-kinds">
+                <legend class="so-panel-text--sm">Bir gelişme seçin. Her kartta ürünün ne kaydedeceği yazar.</legend>
+                @foreach (ServiceAccountEventText.EventCard card in ServiceAccountEventText.CardsFor(Detail.Permissions))
+                {
+                    <label class="@(_m.Kind == card.Kind ? "sa-event-card sa-event-card--chosen" : "sa-event-card")">
+                        <input type="radio" name="sa-event-kind" value="@card.Kind" checked="@(_m.Kind == card.Kind)" @onchange="@(() => Choose(card.Kind))" />
+                        <span class="sa-event-card-text">
+                            <strong>@card.Title</strong>
+                            <span>@card.Explanation</span>
+                            <span class="so-panel-text--sm"><strong>Ürün ne kaydeder:</strong> @card.Records</span>
+                        </span>
+                    </label>
+                }
+            </fieldset>
+            @if (!Detail.Permissions.Work)
+            {
+                <p class="so-panel-text--sm">Ekibinize atanmış talep üzerinden yalnız talebe bağlanabilen gelişmeleri bildirebilirsiniz; sahiplik ve yeni talep hesaptan sorumlu ekiptedir.</p>
+            }
+            <div class="sa-event-actions">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ToDetails" aria-disabled="@(_m.Kind is null ? "true" : "false")"
+                           aria-describedby="@(_m.Kind is null ? "sa-event-why-1" : null)">İleri: Ayrıntılar</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="Cancel">Vazgeç</MudButton>
+            </div>
+            @if (_m.Kind is null) { <p id="sa-event-why-1" class="so-panel-text--sm">Önce ne olduğunu seçin.</p> }
+        }
+        else if (_step == 2 && ServiceAccountEventText.Card(_m.Kind) is { } chosen && ServiceAccountEventText.Shape(_m.Kind) is { } shape)
+        {
+            <h3 class="sa-event-heading" tabindex="-1" @ref="_heading">Adım 2 / 3 · Ayrıntılar: @chosen.Title</h3>
+            <p class="so-panel-text--sm">@chosen.Records</p>
+
+            <SaDisclosure Title="Yanıt mailini yapıştır (isteğe bağlı)" Class="mt-2">
+                <p class="so-panel-text--sm">
+                    Ürün metinden yalnız öneri çıkarır (kural tabanlı; yapay zekâ yok): olası gelişme, OR/OCO numarası, tarih. Metin yalnız öneri için gönderilir;
+                    saklanmaz, kaydedilmez, öneri gelince bu kutudan silinir. Önerileri siz seçer ve düzeltirsiniz.
+                </p>
+                <MudTextField T="string" @bind-Value="_mailText" Label="Mail metni" Lines="5" MaxLength="20000" Variant="Variant.Outlined" Immediate="true" />
+                <MudButton Variant="Variant.Outlined" Class="mt-2" OnClick="HintAsync" aria-disabled="@(string.IsNullOrWhiteSpace(_mailText) || _hintsBusy ? "true" : "false")">Öneri al</MudButton>
+                @if (_hintsBusy) { <p role="status" class="so-panel-text--sm">Öneri hazırlanıyor…</p> }
+                @if (_hintProblem is { } hintProblem)
+                {
+                    <p role="alert" class="so-panel-text--sm sa-event-problem">Öneri alınamadı: @hintProblem.Title. @(ServiceAccountProblems.FieldMessage(hintProblem)) Alanları elle doldurabilirsiniz.</p>
+                }
+                @if (_hints is { } hints)
+                {
+                    <div class="sa-event-hints" role="status">
+                        <p class="so-panel-text--sm"><strong>Öneriler</strong> (hiçbiri kendiliğinden seçilmedi):</p>
+                        @foreach (string warning in hints.Warnings) { <p class="so-panel-text--sm"><MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" aria-hidden="true" /> @ServiceAccountEventText.HintWarning(warning)</p> }
+                        <ul>
+                            @foreach (MailHintEvent suggestion in hints.EventSuggestions.Where(s => ServiceAccountEventText.CardsFor(Detail.Permissions).Any(c => c.Kind == s.EventKind)))
+                            {
+                                <li>Olası gelişme: @(ServiceAccountEventText.Card(suggestion.EventKind)?.Title)
+                                    @if (suggestion.EventKind != _m.Kind) { <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => SwitchKind(suggestion.EventKind))">Bu gelişmeye geç</MudButton> }
+                                    else { <span class="so-panel-text--sm"> (seçili)</span> }
+                                </li>
+                            }
+                            @if (shape.References)
+                            {
+                                foreach (MailHintReference reference in hints.References)
+                                {
+                                    <li>@reference.Type numarası: @reference.Number
+                                        <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => _m.AddReference(reference.Type, reference.Number))">Referanslara ekle</MudButton>
+                                    </li>
+                                }
+                            }
+                            @foreach (MailHintDate date in hints.Dates)
+                            {
+                                <li>Tarih: @ServiceAccountUiText.Date(date.Value)@(date.Kind == "AssumedYear" ? " (yıl yazmıyordu; bu yıl varsayıldı)" : string.Empty)
+                                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => UseDate(date))">Gelişme tarihi yap</MudButton>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+            </SaDisclosure>
+
+            <MudGrid Spacing="2" Class="mt-1">
+                <MudItem xs="12" sm="6" md="4">
+                    <MudDatePicker Editable="true" Date="_m.OccurredOn" DateChanged="DateChanged" Label="Gelişmenin gerçek tarihi" DateFormat="dd.MM.yyyy" MaxDate="DateTime.Today"
+                                   Disabled="_m.DateUnknown" Clearable="true" Variant="Variant.Outlined" HelperText="Mailin değil, işlemin yapıldığı gün." />
+                    @if (_m.DateAssumed && !_m.DateUnknown) { <p class="so-panel-text--sm sa-event-warn"><MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" aria-hidden="true" /> @ServiceAccountEventText.Warning("DateAssumed")</p> }
+                </MudItem>
+                <MudItem xs="12" sm="6" md="4" Class="d-flex align-center">
+                    <MudCheckBox T="bool" Value="_m.DateUnknown" ValueChanged="UnknownChanged" Label="Tarih bilinmiyor (tarih uydurulmaz)" />
+                </MudItem>
+                <MudItem xs="12" sm="6" md="4">
+                    <MudSelect T="string" @bind-Value="_m.Channel" Label="Nereden öğrendiniz?" Variant="Variant.Outlined">
+                        @foreach ((string value, string label) in ServiceAccountEventText.Channels) { <MudSelectItem T="string" Value="@value">@label</MudSelectItem> }
+                    </MudSelect>
+                </MudItem>
+
+                @if (shape.LinkRequest)
+                {
+                    IReadOnlyList<RequestView> linkable = ServiceAccountEventText.LinkableRequests(Detail, _m.Kind);
+                    <MudItem xs="12" md="6">
+                        @if (linkable.Count == 0)
+                        {
+                            <p class="so-panel-text--sm">@(Detail.Permissions.Work ? "Bu gelişmeye uyan açık talep yok; talebe bağlanmadan kaydedilir." : "Ekibinize atanmış, bu gelişmeye uyan açık talep yok; bu gelişmeyi buradan bildiremezsiniz.")</p>
+                        }
+                        else
+                        {
+                            <MudSelect T="Guid?" Value="_m.RequestId" ValueChanged="RequestChanged" Label="@(Detail.Permissions.Work ? "Bağlı talep (isteğe bağlı)" : "Bağlı talep (zorunlu)")"
+                                       Clearable="@Detail.Permissions.Work" Variant="Variant.Outlined">
+                                @foreach (RequestView request in linkable)
+                                {
+                                    <MudSelectItem T="Guid?" Value="@((Guid?)request.Id)">@request.ActionLabel — @(request.TargetTeam?.Label ?? "hedef ekip yok")</MudSelectItem>
+                                }
+                            </MudSelect>
+                        }
+                    </MudItem>
+                    @if (_m.RequestId is not null && Detail.Permissions.Work)
+                    {
+                        <MudItem xs="12" md="6" Class="d-flex align-center">
+                            <MudCheckBox T="bool" @bind-Value="_m.CloseRequest" Label="Talebi de kapat (Tamamlandı) — sunucu kapanış kuralına bakar" />
+                        </MudItem>
+                    }
+                }
+            </MudGrid>
+
+            @if (shape.ActionType is { } actionType)
+            {
+                <h4 class="sa-event-sub">İşlem bildirimi: @ServiceAccountUiText.Action(actionType.ToString()) <SoStatusBadge Label="@ServiceAccountEventText.Reported" Tone="SoStatusBadge.BadgeTone.Caution" Icon="@Icons.Material.Filled.HelpOutline" /></h4>
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" md="4">
+                        <MudSelect T="Guid?" @bind-Value="_m.PerformerTeamId" Label="Yapan ekip (biliniyorsa)" Clearable="true" Variant="Variant.Outlined">
+                            @foreach (TeamView team in Teams) { <MudSelectItem T="Guid?" Value="@((Guid?)team.Id)">@team.Name</MudSelectItem> }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="4"><SaPersonPicker Label="Yapan kişi (biliniyorsa)" @bind-Value="_m.PerformerPersonId" /></MudItem>
+                    <MudItem xs="12" md="4"><MudTextField @bind-Value="_m.EvidenceNote" Label="Kanıt notu" MaxLength="2000" Variant="Variant.Outlined" /></MudItem>
+                </MudGrid>
+            }
+
+            @if (shape.Ownership)
+            {
+                <h4 class="sa-event-sub">Sahiplik önerisi (karar değil)</h4>
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" md="4">
+                        <MudSelect T="Guid?" @bind-Value="_m.OwnerTeamId" Label="Yeni sahip ekip" Clearable="true" Variant="Variant.Outlined">
+                            @foreach (TeamView team in Teams) { <MudSelectItem T="Guid?" Value="@((Guid?)team.Id)">@team.Name</MudSelectItem> }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="4"><SaPersonPicker Label="Yeni sahip kişi" @bind-Value="_m.OwnerPersonId" /></MudItem>
+                    <MudItem xs="12" md="4"><MudDatePicker Editable="true" @bind-Date="_m.OwnerEffectiveFrom" Label="Geçerlilik (biliniyorsa)" DateFormat="dd.MM.yyyy" Clearable="true" Variant="Variant.Outlined" /></MudItem>
+                    <MudItem xs="12"><MudTextField @bind-Value="_m.OwnerReason" Label="Gerekçe (zorunlu)" MaxLength="1000" Variant="Variant.Outlined" Immediate="true" /></MudItem>
+                </MudGrid>
+            }
+
+            @if (shape.Communication != EventBlockRule.NotAllowed)
+            {
+                @if (shape.Communication == EventBlockRule.Optional)
+                {
+                    <MudCheckBox T="bool" @bind-Value="_m.IncludeCommunication" Label="Yazışma kaydı da ekle" Class="mt-2" />
+                }
+                else
+                {
+                    <h4 class="sa-event-sub">Yazışma</h4>
+                }
+                @if (shape.Communication == EventBlockRule.Required || _m.IncludeCommunication)
+                {
+                    <MudGrid Spacing="2">
+                        @if (shape.Direction is null)
+                        {
+                            <MudItem xs="6" md="3">
+                                <MudSelect T="string" @bind-Value="_m.Direction" Label="Yön" Variant="Variant.Outlined">
+                                    <MudSelectItem T="string" Value="@("Incoming")">Gelen</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@("Outgoing")">Giden</MudSelectItem>
+                                </MudSelect>
+                            </MudItem>
+                        }
+                        @if (shape.CommunicationKind is null)
+                        {
+                            <MudItem xs="6" md="3">
+                                <MudSelect T="string" @bind-Value="_m.CommunicationKind" Label="Tür" Variant="Variant.Outlined">
+                                    @foreach ((string value, string label) in ServiceAccountUiText.CommunicationKinds.Where(k => k.Value != "Draft")) { <MudSelectItem T="string" Value="@value">@label</MudSelectItem> }
+                                </MudSelect>
+                            </MudItem>
+                        }
+                        <MudItem xs="12" md="3">
+                            <MudSelect T="Guid?" @bind-Value="_m.ContactTeamId" Label="Muhatap ekip" Clearable="true" Variant="Variant.Outlined">
+                                @foreach (TeamView team in Teams) { <MudSelectItem T="Guid?" Value="@((Guid?)team.Id)">@team.Name</MudSelectItem> }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="3"><SaPersonPicker Label="Muhatap kişi" @bind-Value="_m.ContactPersonId" /></MudItem>
+                        <MudItem xs="12" md="6"><MudTextField @bind-Value="_m.Subject" Label="Konu" MaxLength="400" Variant="Variant.Outlined" /></MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_m.Summary" Label="Kısa özet (kendi cümleniz)" MaxLength="1000" Lines="2" Variant="Variant.Outlined"
+                                          HelperText="Mail metnini, kişi adlarını ve adresleri kopyalamayın; ne olduğunu bir iki cümleyle yazın." />
+                        </MudItem>
+                    </MudGrid>
+                }
+            }
+
+            @if (shape.References)
+            {
+                <h4 class="sa-event-sub">Referanslar (OCO / OR numarası)</h4>
+                @foreach ((SaEventDraftModel.ReferenceRow row, int index) in _m.References.Select((r, i) => (r, i)))
+                {
+                    <div class="sa-event-ref">
+                        <MudSelect T="string" @bind-Value="row.Type" Label="Tür" Variant="Variant.Outlined" Class="sa-event-ref-type">
+                            @foreach (string type in ServiceAccountEventText.ReferenceTypes) { <MudSelectItem T="string" Value="@type">@type</MudSelectItem> }
+                        </MudSelect>
+                        <MudTextField @bind-Value="row.Number" Label="Numara" MaxLength="64" Variant="Variant.Outlined" />
+                        <MudButton Variant="Variant.Text" OnClick="@(() => _m.References.RemoveAt(index))" aria-label="@($"{index + 1}. referansı kaldır")">Kaldır</MudButton>
+                    </div>
+                }
+                @if (_m.References.Count < SaEventDraftModel.MaxReferences)
+                {
+                    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Add" OnClick="@(() => _m.References.Add(new()))">Numara ekle</MudButton>
+                }
+                <p class="so-panel-text--sm">Numara ITSM'de sorgulanmaz; yalnız biçimi denetlenir. OR/OCO onayı bu ürünün işi değildir.</p>
+            }
+
+            @if (shape.CreateRequestType is { } createType && Detail.Permissions.Work)
+            {
+                <MudCheckBox T="bool" @bind-Value="_m.CreateRequest" Label="@($"Yeni talep de aç: {ServiceAccountUiText.Action(createType.ToString())}")" Class="mt-2" />
+                @if (_m.CreateRequest)
+                {
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" md="4">
+                            <MudSelect T="Guid?" @bind-Value="_m.CreateTargetTeamId" Label="Hedef ekip" Clearable="true" Variant="Variant.Outlined">
+                                @foreach (TeamView team in Teams) { <MudSelectItem T="Guid?" Value="@((Guid?)team.Id)">@team.Name</MudSelectItem> }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="8"><MudTextField @bind-Value="_m.CreateNotes" Label="Not" MaxLength="4000" Variant="Variant.Outlined" /></MudItem>
+                    </MudGrid>
+                }
+            }
+
+            @if (_previewProblem is { } previewProblem)
+            {
+                <div role="alert" class="sa-event-problem mt-2">
+                    <strong>@(_previewUnknown ? "Önizleme alınamadı: sunucudan cevap gelmedi." : previewProblem.Title)</strong>
+                    <p class="so-panel-text--sm">@(_previewUnknown ? "Önizleme hiçbir şey kaydetmez; tekrar deneyebilirsiniz." : previewProblem.Explanation) @(previewProblem.Code == "ServiceAccountEventStale" ? null : ServiceAccountProblems.FieldMessage(previewProblem))</p>
+                </div>
+            }
+            string? incomplete = _m.Incomplete(Detail.Permissions);
+            <div class="sa-event-actions">
+                <MudButton Variant="Variant.Text" OnClick="@(() => Go(1))">Geri: Ne oldu?</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="PreviewAsync" aria-disabled="@(incomplete is not null || Busy ? "true" : "false")"
+                           aria-describedby="@(incomplete is null ? null : "sa-event-why-2")">İleri: Önizleme</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="Cancel">Vazgeç</MudButton>
+            </div>
+            @if (incomplete is not null) { <p id="sa-event-why-2" class="so-panel-text--sm">@incomplete</p> }
+        }
+        else if (_step == 3 && _preview is { } preview)
+        {
+            <h3 class="sa-event-heading" tabindex="-1" @ref="_heading">Adım 3 / 3 · Önizleme: kaydetmeden önce kontrol edin</h3>
+            <h4 class="sa-event-sub">Şunlar kaydedilecek</h4>
+            @if (preview.Items.Count == 0) { <p class="so-panel-text">Kaydedilecek bir şey yok.</p> }
+            <ul class="sa-event-items">
+                @foreach (EventPreviewItem item in preview.Items)
+                {
+                    <li>
+                        <div>
+                            <strong>@ServiceAccountEventText.ItemKind(item.Kind)</strong> @ServiceAccountEventText.Operation(item.Operation) — @item.Label
+                            @if (item.Kind == "Action") { <SoStatusBadge Label="@ServiceAccountEventText.Reported" Tone="SoStatusBadge.BadgeTone.Caution" Icon="@Icons.Material.Filled.HelpOutline" /> }
+                            @if (!item.Allowed) { <SoStatusBadge Label="@ServiceAccountEventText.Denied(item.DeniedReason)" Tone="SoStatusBadge.BadgeTone.Critical" Icon="@Icons.Material.Filled.Block" /> }
+                        </div>
+                        @if (item.Fields.Any(f => f.Value is not null))
+                        {
+                            <dl class="sa-event-fields">
+                                @foreach (EventField field in item.Fields.Where(f => f.Value is not null))
+                                {
+                                    <dt>@ServiceAccountEventText.FieldName(field.Name)</dt><dd>@ServiceAccountEventText.FieldValue(field, Detail, Teams)</dd>
+                                }
+                            </dl>
+                        }
+                    </li>
+                }
+            </ul>
+            <h4 class="sa-event-sub">Kaydedilmeyecek</h4>
+            <ul class="sa-event-not">
+                @foreach (string code in preview.NotRecorded) { <li><MudIcon Icon="@Icons.Material.Filled.DoNotDisturbOn" Size="Size.Small" aria-hidden="true" /> @ServiceAccountEventText.NotRecorded(code)</li> }
+            </ul>
+            @if (preview.Warnings.Count > 0)
+            {
+                <h4 class="sa-event-sub">Uyarılar</h4>
+                <ul class="sa-event-not">
+                    @foreach (EventWarning warning in preview.Warnings) { <li><MudIcon Icon="@Icons.Material.Filled.Warning" Size="Size.Small" aria-hidden="true" /> @ServiceAccountEventText.Warning(warning.Code)</li> }
+                </ul>
+            }
+            @if (preview.CloseReadiness is { } readiness)
+            {
+                <h4 class="sa-event-sub">Talep kapatılabilir mi? (bilgi; kaydederken sunucu yeniden bakar)</h4>
+                @if (readiness.CanClose) { <p class="so-panel-text">Bu kayıtlardan sonra talep Tamamlandı olarak kapatılabilir@(_previewed?.CloseRequest is null ? "; kapatmayı seçmediniz, talep açık kalır." : ".")</p> }
+                else { <SaCloseMissingList Missing="readiness.Missing" /> }
+            }
+
+            @if (!preview.CanCommit)
+            {
+                <p id="sa-event-why-3" class="so-panel-text--sm sa-event-warn">Yapılamayan bir madde var. Tümü ya da hiçbiri kaydedilir; bu haliyle kaydedilemez.</p>
+            }
+            @if (_commitState is not null)
+            {
+                <div role="alert" class="sa-event-problem mt-2">
+                    @switch (_commitState)
+                    {
+                        case CommitState.Unknown:
+                            <strong>Sonuç bilinmiyor: sunucudan cevap gelmedi.</strong>
+                            <p class="so-panel-text--sm">Kayıt yapılmış da olabilir, yapılmamış da. Hesabı yenileyip İşler ve Yazışmalar sekmelerini kontrol edin. Yeniden göndermek güvenlidir: aynı gönderim anahtarı ikinci kayıt oluşturmaz.</p>
+                            <div class="sa-event-actions">
+                                <MudButton Variant="Variant.Outlined" OnClick="CommitAsync">Yeniden gönder</MudButton>
+                                <MudButton Variant="Variant.Text" OnClick="RefreshAsync">Hesabı yenile</MudButton>
+                            </div>
+                            break;
+                        case CommitState.Stale:
+                            <strong>Hesap değişti; önizlemeyi yenileyin.</strong>
+                            <p class="so-panel-text--sm">Önizlemeden sonra hesap veya talep değişti; hiçbir kayıt yapılmadı. Güncel hesap yüklendi, girdiğiniz bilgiler duruyor.</p>
+                            <MudButton Variant="Variant.Outlined" OnClick="PreviewAsync">Önizlemeyi yenile</MudButton>
+                            break;
+                        case CommitState.CloseRefused:
+                            <strong>Talep bu kayıtlarla kapatılamıyor; hiçbir kayıt yapılmadı.</strong>
+                            @if (_refused is { } refused) { <SaCloseMissingList Missing="refused.Missing" /> }
+                            else { <p class="so-panel-text--sm">Sunucu eksiklerin listesini göndermedi.</p> }
+                            <MudButton Variant="Variant.Outlined" OnClick="DropCloseAsync">Talebi kapatmadan önizlemeyi yenile</MudButton>
+                            break;
+                        case CommitState.KeyReused:
+                            <strong>@_commitProblem?.Title</strong>
+                            <p class="so-panel-text--sm">@_commitProblem?.Explanation Hesabı yenileyip kontrol edin; gerekirse akışı yeniden başlatın.</p>
+                            <div class="sa-event-actions">
+                                <MudButton Variant="Variant.Text" OnClick="RefreshAsync">Hesabı yenile</MudButton>
+                                <MudButton Variant="Variant.Outlined" OnClick="Restart">Akışı yeniden başlat</MudButton>
+                            </div>
+                            break;
+                        case CommitState.NotSent:
+                            <strong>Gönderilmedi: başka bir işlem sürüyor.</strong>
+                            <p class="so-panel-text--sm">Hiçbir şey gönderilmedi. Biraz sonra yeniden Kaydet'e basın.</p>
+                            break;
+                        default:
+                            <strong>Kaydedilemedi, hiçbir kayıt oluşmadı.</strong>
+                            <p class="so-panel-text--sm">@_commitProblem?.Title. @_commitProblem?.Explanation @ServiceAccountProblems.FieldMessage(_commitProblem)</p>
+                            break;
+                    }
+                </div>
+            }
+            <div class="sa-event-actions">
+                <MudButton Variant="Variant.Text" OnClick="@(() => Go(2))">Geri: Ayrıntılar</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save" OnClick="CommitAsync"
+                           aria-disabled="@(!preview.CanCommit || Busy ? "true" : "false")" aria-describedby="@(preview.CanCommit ? null : "sa-event-why-3")">Kaydet</MudButton>
+                <MudButton Variant="Variant.Text" OnClick="Cancel">Vazgeç</MudButton>
+            </div>
+        }
+        else if (_step == 4 && _result is { } result)
+        {
+            <h3 class="sa-event-heading" tabindex="-1" @ref="_heading">@(result.Replayed ? "Bu gelişme daha önce kaydedilmişti" : "Kaydedildi")</h3>
+            <p class="so-panel-text" role="status">
+                @(result.Replayed ? "Aynı gönderim daha önce kaydedilmiş; yeni kayıt oluşmadı. Kayıtlar aşağıda." : "Kayıtlar tek işlemde birlikte kaydedildi.")
+                İşlem bildirimi doğrulanmış sayılmaz.
+            </p>
+            <ul class="sa-event-items">
+                @foreach (EventCreatedRecord record in result.Created) { <li>@ServiceAccountEventText.Created(record)</li> }
+            </ul>
+            @if (_preview?.FollowUps is { Count: > 0 } followUps)
+            {
+                <h4 class="sa-event-sub">Hâlâ yapılacaklar (yapılmadı)</h4>
+                <ul class="sa-event-not">
+                    @foreach (EventFollowUp followUp in followUps)
+                    {
+                        <li>
+                            @ServiceAccountEventText.FollowUp(followUp.Kind)
+                            @if (ServiceAccountEventText.FollowUpTab(followUp.Kind) is { } tab)
+                            {
+                                <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => OnOpenTab.InvokeAsync((int)tab))">Sekmeyi aç</MudButton>
+                            }
+                            else if (followUp.Kind == "OpenPlan")
+                            {
+                                <MudButton Size="Size.Small" Variant="Variant.Text" Href="service-accounts/plans">Planlar</MudButton>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+            <div class="sa-event-actions">
+                <MudButton Variant="Variant.Outlined" OnClick="Cancel">Kapat</MudButton>
+            </div>
+        }
+    }
+</section>
+
+@code {
+    private static readonly string[] _stepNames = ["Ne oldu?", "Ayrıntılar", "Önizleme"];
+
+    private bool _open;
+    private int _step = 1;
+    private Guid _key;
+    private SaEventDraftModel _m = new();
+    private EventDraft? _previewed;
+    private EventPreview? _preview;
+    private EventCommitResult? _result;
+    private UiProblem? _previewProblem, _commitProblem, _hintProblem;
+    private bool _previewUnknown, _hintsBusy, _focus;
+    private CommitState? _commitState;
+    private CloseReadiness? _refused;
+    private string? _mailText;
+    private MailHints? _hints;
+    private ElementReference _heading;
+    private int _seenSignal;
+
+    private enum CommitState { Failed, Unknown, Stale, CloseRefused, KeyReused, NotSent }
+
+    /// <summary>What the person typed (tests drive the flow through it; nothing here holds pasted mail text).</summary>
+    internal SaEventDraftModel Draft => _m;
+
+    /// <summary>The pasted mail text while it is in the box; cleared once hints arrive.</summary>
+    internal string? MailText { get => _mailText; set => _mailText = value; }
+
+    /// <summary>Loaded account detail.</summary>
+    [Parameter, EditorRequired] public AccountDetail Detail { get; set; } = default!;
+
+    /// <summary>Directory teams for pickers.</summary>
+    [Parameter] public IReadOnlyList<TeamView> Teams { get; set; } = [];
+
+    /// <summary>The server's <c>eventGuidanceAvailable</c> (migration 036 applied); false hides the flow.</summary>
+    [Parameter] public bool Available { get; set; }
+
+    /// <summary>A page call is in flight.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Where to open the flow from outside (a next step or a request); applied when <see cref="StartSignal"/> changes.</summary>
+    [Parameter] public SaEventStart? Start { get; set; }
+
+    /// <summary>Incremented by the page each time the flow should open with <see cref="Start"/>.</summary>
+    [Parameter] public int StartSignal { get; set; }
+
+    /// <summary>Preview call (writes nothing).</summary>
+    [Parameter, EditorRequired] public Func<EventDraft, Task<SaCallResult<EventPreview>>> Preview { get; set; } = default!;
+
+    /// <summary>Commit call (one transaction).</summary>
+    [Parameter, EditorRequired] public Func<EventDraft, Task<SaCallResult<EventCommitResult>>> Commit { get; set; } = default!;
+
+    /// <summary>Mail hint call (stateless; nothing stored).</summary>
+    [Parameter, EditorRequired] public Func<string, Task<SaCallResult<MailHints>>> Hints { get; set; } = default!;
+
+    /// <summary>Reloads the account from the server.</summary>
+    [Parameter] public EventCallback OnRefresh { get; set; }
+
+    /// <summary>Opens a detail tab (follow-ups).</summary>
+    [Parameter] public EventCallback<int> OnOpenTab { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (StartSignal != _seenSignal)
+        {
+            _seenSignal = StartSignal;
+            if (Available && ServiceAccountEventText.WhyNoFlow(Detail.Permissions) is null)
+            {
+                Open(Start);
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focus)
+        {
+            _focus = false;
+            try
+            {
+                await _heading.FocusAsync();
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or Microsoft.JSInterop.JSException or TaskCanceledException)
+            {
+                // Focus is a convenience; a disconnected circuit or a prerender must not break the flow.
+            }
+        }
+    }
+
+    /// <summary>Opens the flow with a new idempotency key; a pre-selected event goes straight to its details.</summary>
+    internal void Open(SaEventStart? start)
+    {
+        _open = true;
+        _key = Guid.NewGuid();
+        _m = new SaEventDraftModel();
+        (_previewed, _preview, _result, _previewProblem, _commitProblem, _commitState, _refused, _hints, _hintProblem, _mailText) =
+            (null, null, null, null, null, null, null, null, null, null);
+        if (start?.EventKind is { } kind && ServiceAccountEventText.CardsFor(Detail.Permissions).Any(c => c.Kind == kind))
+        {
+            _m.Kind = kind;
+            _m.RequestId = start.RequestId is { } request && ServiceAccountEventText.LinkableRequests(Detail, kind).Any(r => r.Id == request) ? request : null;
+            Go(2);
+        }
+        else
+        {
+            Go(1);
+        }
+    }
+
+    private void Go(int step)
+    {
+        _step = step;
+        _focus = true;
+        if (step < 3)
+        {
+            _commitState = null;
+        }
+    }
+
+    internal void Choose(string kind) => _m.Kind = kind;
+
+    private void SwitchKind(string kind)
+    {
+        _m.Kind = kind;
+        if (_m.RequestId is { } request && !ServiceAccountEventText.LinkableRequests(Detail, kind).Any(r => r.Id == request))
+        {
+            _m.RequestId = null;
+        }
+    }
+
+    internal void ToDetails()
+    {
+        if (_m.Kind is not null)
+        {
+            SwitchKind(_m.Kind);
+            Go(2);
+        }
+    }
+
+    private void DateChanged(DateTime? value) => (_m.OccurredOn, _m.DateAssumed) = (value, false);
+
+    private void UnknownChanged(bool unknown) => (_m.DateUnknown, _m.OccurredOn, _m.DateAssumed) = (unknown, unknown ? null : _m.OccurredOn, false);
+
+    private void RequestChanged(Guid? request) => (_m.RequestId, _m.CloseRequest) = (request, request is not null && _m.CloseRequest);
+
+    private void UseDate(MailHintDate date) => (_m.OccurredOn, _m.DateUnknown, _m.DateAssumed) = (date.Value.ToDateTime(TimeOnly.MinValue), false, date.Kind == "AssumedYear");
+
+    internal async Task HintAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_mailText) || _hintsBusy)
+        {
+            return;
+        }
+
+        _hintsBusy = true;
+        _hintProblem = null;
+        SaCallResult<MailHints> answer = await Hints(_mailText);
+        _hintsBusy = false;
+        if (answer.Value is { } hints)
+        {
+            _hints = hints;
+            _mailText = null;
+        }
+        else
+        {
+            _hintProblem = answer.Problem ?? UiProblemFactory.NetworkFailure();
+        }
+    }
+
+    internal async Task PreviewAsync()
+    {
+        if (Busy || _m.Incomplete(Detail.Permissions) is not null)
+        {
+            return;
+        }
+
+        _previewProblem = null;
+        _previewUnknown = false;
+        _commitState = null;
+        EventDraft draft = _m.Build(Detail);
+        SaCallResult<EventPreview> answer = await Preview(draft);
+        if (answer.Value is { } preview)
+        {
+            (_previewed, _preview, _mailText) = (draft, preview, null);
+            Go(3);
+            return;
+        }
+
+        _previewProblem = answer.Problem ?? UiProblemFactory.NetworkFailure();
+        _previewUnknown = answer.OutcomeUnknown;
+        if (_step != 2)
+        {
+            Go(2);
+        }
+    }
+
+    internal async Task CommitAsync()
+    {
+        if (Busy || _previewed is null || _preview is not { CanCommit: true } preview)
+        {
+            return;
+        }
+
+        _commitState = null;
+        _refused = null;
+        SaCallResult<EventCommitResult> answer = await Commit(_previewed with { IdempotencyKey = _key, PreviewDigest = preview.PreviewDigest });
+        if (answer.Value is { } result)
+        {
+            _result = result;
+            Go(4);
+            return;
+        }
+
+        _commitProblem = answer.Problem;
+        _commitState = !answer.Sent ? CommitState.NotSent
+            : answer.OutcomeUnknown ? CommitState.Unknown
+            : answer.Problem?.Code switch
+            {
+                "ServiceAccountEventStale" => CommitState.Stale,
+                "ServiceAccountEventCloseNotAllowed" => CommitState.CloseRefused,
+                "ServiceAccountEventIdempotencyKeyReused" => CommitState.KeyReused,
+                _ => CommitState.Failed
+            };
+        if (_commitState == CommitState.CloseRefused && answer.CurrentJson is { } current)
+        {
+            try
+            {
+                _refused = System.Text.Json.JsonSerializer.Deserialize<CloseReadiness>(current, ApiResponseReader.JsonOptions);
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                _refused = null;
+            }
+        }
+    }
+
+    private async Task DropCloseAsync()
+    {
+        _m.CloseRequest = false;
+        await PreviewAsync();
+    }
+
+    private Task RefreshAsync() => OnRefresh.InvokeAsync();
+
+    private void Restart() => Open(new SaEventStart(_m.Kind, _m.RequestId));
+
+    private void Cancel()
+    {
+        _open = false;
+        (_m, _previewed, _preview, _result, _mailText, _hints) = (new(), null, null, null, null, null);
+    }
+}

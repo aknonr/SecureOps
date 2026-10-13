@@ -1,3 +1,4 @@
+using SecureOps.Domain.OperationalRecords;
 using SecureOps.Shared.Contracts.OperationalRecords;
 
 namespace SecureOps.Ui.Services;
@@ -130,6 +131,45 @@ public static class JiraSubmissionView
     public static bool IsUncertain(UiProblem? problem) =>
         string.Equals(problem?.Stage, UiProblemFactory.ReconciliationStage, StringComparison.Ordinal)
         || string.Equals(problem?.Code, SecureOps.Shared.Contracts.Api.OperationalErrorCodes.WorkflowAlreadyInProgress, StringComparison.Ordinal);
+
+    /// <summary>Why an uncertain submission is uncertain, read from durable state before this page's attempt.</summary>
+    public enum UncertainKind
+    {
+        /// <summary>The server marked the outcome for reconciliation.</summary>
+        ServerFlagged,
+
+        /// <summary>Jira create started (<c>CreatingJira</c>) and the workflow claim is still active: the answer may still arrive.</summary>
+        SentAwaitingAnswer,
+
+        /// <summary>Jira create started, the claim has lapsed and no result was saved: sent, no answer.</summary>
+        SentNoAnswer,
+
+        /// <summary>Only this page's own command went unacknowledged; durable state shows no dispatch.</summary>
+        UnacknowledgedHere
+    }
+
+    /// <summary>Classifies an uncertain submission from the re-read record; survives a page reload.</summary>
+    /// <param name="record">Authoritative record.</param>
+    /// <returns>The durable reason, or <see cref="UncertainKind.UnacknowledgedHere"/> when only the page knows.</returns>
+    public static UncertainKind UncertainKindOf(OperationalRecordResponse record) =>
+        record.ReconciliationRequired ? UncertainKind.ServerFlagged
+        : record.WorkflowState == OperationalRecordWorkflowState.CreatingJira && !OperationalRecordView.HasJira(record)
+            ? record.Claimed ? UncertainKind.SentAwaitingAnswer : UncertainKind.SentNoAnswer
+        : UncertainKind.UnacknowledgedHere;
+
+    /// <summary>The server's issue address when it is an absolute HTTPS URL; anything else is not linked.</summary>
+    /// <param name="url">Server-supplied <c>jiraIssueUrl</c>.</param>
+    /// <returns>A safe link target, or <c>null</c>.</returns>
+    public static string? SafeIssueUrl(string? url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out Uri? uri) && uri.Scheme == Uri.UriSchemeHttps && string.IsNullOrEmpty(uri.UserInfo)
+            ? uri.AbsoluteUri
+            : null;
+
+    /// <summary>Local display of a durable UTC time, or an honest "unknown".</summary>
+    /// <param name="value">Server time.</param>
+    /// <returns>Operator-facing text.</returns>
+    public static string LocalTime(DateTimeOffset? value) =>
+        value is { } time ? time.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) : "Bilinmiyor";
 
     /// <summary>What happens to the source OR, as fixed by the server preview.</summary>
     /// <param name="sourceCloseRequested">The preview's close intent.</param>
