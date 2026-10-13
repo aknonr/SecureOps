@@ -3,16 +3,16 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern('^[A-Za-z0-9_]{1,40}$')]
     [string]$DatabaseSuffix,
-    [ValidateRange(26, 34)]
-    [int]$ThroughMigration = 34,
+    [ValidateRange(26, 37)]
+    [int]$ThroughMigration = 37,
     [switch]$SkipRoleScripts
 )
 
 # Windows counterpart of sa-sql-harness.sh (NOT executed in the Linux container that produced it).
 # Creates a NEW database SecureOps_Sa<suffix> on the isolated per-user LocalDB instance, applies the reviewed
-# numbered migrations in order (now 001-034; 029 numbers SA-003, 030 numbers SA-004, 031 numbers SA-005, 032 is Access,
-# 033 numbers SA-006, 034 numbers SA-007), verifies module replay refusal, the 033 and 034 database guards
-# (sa-033-guards.sql, sa-034-guards.sql) and
+# numbered migrations in order (now 001-034 and 037; 029 numbers SA-003, 030 numbers SA-004, 031 numbers SA-005, 032 is Access,
+# 033 numbers SA-006, 034 numbers SA-007, 037 numbers SA-008; 035/036 belong to parallel branches and are applied when present),
+# verifies module replay refusal, the 033, 034 and 037 database guards (sa-033-guards.sql, sa-034-guards.sql, sa-037-guards.sql) and
 # (unless -SkipRoleScripts) the module role scripts. No role member is assigned. Never targets a
 # shared or corporate server and never reuses an existing database.
 $ErrorActionPreference = 'Stop'
@@ -127,6 +127,25 @@ try {
         Write-Host 'candidate 7 replay refused as expected'
         & $sqlcmd -S $server -d $database -E -I -b -i (Join-Path $PSScriptRoot 'sa-034-guards.sql')
         if ($LASTEXITCODE -ne 0) { throw "Service Accounts 034 guard check failed; database $database retained for inspection." }
+    }
+    # -ThroughMigration 36 leaves the database like an installed system without web usage scan jobs.
+    $hasScanJobs = if ($ThroughMigration -ge 37) { (& $sqlcmd -S $server -d $database -E -I -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CASE WHEN OBJECT_ID(N'svcacct.UsageScanJobs', N'U') IS NULL THEN 0 ELSE 1 END" | Select-Object -First 1).Trim() } else { 'skip' }
+    if ($hasScanJobs -eq 'skip') { Write-Host 'Usage scan jobs (037) left out: -ThroughMigration below 37' }
+    elseif ($hasScanJobs -eq '0') {
+        Invoke-SaSql -Database $database -File 'SA-008-usage-scan-jobs.sql'
+        Write-Host 'applied SA-008-usage-scan-jobs.sql (candidate 8)'
+    } else { Write-Host 'Usage scan jobs installed through numbered 037' }
+    if ($hasScanJobs -ne 'skip') {
+        & $sqlcmd -S $server -d $database -E -I -b -i 'SA-008-usage-scan-jobs.sql' | Out-Null
+        if ($LASTEXITCODE -eq 0) { throw 'Candidate 8 replay was not refused.' }
+        Write-Host 'candidate 8 replay refused as expected'
+        if (-not $SkipRoleScripts) {
+            Invoke-SaSql -Database $database -File 'SA-008-API-permissions.sql'
+            Invoke-SaSql -Database $database -File 'SA-008-Worker-permissions.sql'
+            Write-Host 'applied SA-008-API-permissions.sql and SA-008-Worker-permissions.sql (no role member assigned)'
+        }
+        & $sqlcmd -S $server -d $database -E -I -b -i (Join-Path $PSScriptRoot 'sa-037-guards.sql')
+        if ($LASTEXITCODE -ne 0) { throw "Service Accounts 037 guard check failed; database $database retained for inspection." }
     }
 } finally { Pop-Location }
 

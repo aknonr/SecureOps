@@ -212,9 +212,22 @@ public static partial class UsageScanJobRules
         "collectorFailed" => "Toplayıcı beklenmedik biçimde durdu; bitmeyen sunucular \"çalışmadı\" sayıldı.",
         "evidenceRefused" => "Toplanan sonuç kanıt kaydı olarak kabul edilmedi; hiçbir hesaba bağlanmadı.",
         "dispatchFailed" => "İş kuyruğa verilemedi; tarama başlamadı.",
+        "notStarted" => "Worker işi zamanında almadı (Worker çalışmıyor olabilir); hiçbir sunucuya bağlanılmadı.",
         null => string.Empty,
         _ => "Tarama tamamlanamadı."
     };
+
+    /// <summary>
+    /// The run statement stored with the evidence (030 <c>RunStatement</c>, 5–400 characters): where and under which authority the
+    /// scan ran. A fake run says plainly that no server was contacted.
+    /// </summary>
+    public static string RunStatement(string collector, Guid jobId, bool cancelled)
+    {
+        string text = string.Equals(collector, "Fake", StringComparison.Ordinal)
+            ? $"SAHTE toplayıcı (yerel gösterim/test): hiçbir sunucuya bağlanılmadı, sonuçlar gerçek değildir. Web taraması, iş {jobId:N}."
+            : $"Ürün web taraması: Worker hizmeti, JEA uç noktası, okuma gMSA'sı, salt okunur. İş {jobId:N}.";
+        return cancelled ? text + " İptal edildi: yalnız biten sunucular okundu." : text;
+    }
 
     /// <summary>
     /// The end-of-scan sentence, e.g. "3 sunucuda 7 kullanım bulundu; 2 sunucuya erişilemedi veya okunamadı → yalnız onları yeniden

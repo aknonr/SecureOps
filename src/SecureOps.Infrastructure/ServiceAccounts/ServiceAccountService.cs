@@ -26,7 +26,7 @@ public sealed record SaCaller(ApplicationUser User, ServiceAccountScope Scope, S
 /// </summary>
 public sealed partial class ServiceAccountService(SqlServiceAccountRepository? repository, IApplicationAccessService access,
     IOptions<ServiceAccountOptions> options, TimeProvider clock, ILogger<ServiceAccountService> logger,
-    SecureOps.Infrastructure.Identity.IDirectoryNameSearchProvider? directory = null)
+    SecureOps.Infrastructure.Identity.IDirectoryNameSearchProvider? directory = null, UsageScanJobServices? jobs = null)
 {
     private readonly ServiceAccountOptions _options = options.Value;
 
