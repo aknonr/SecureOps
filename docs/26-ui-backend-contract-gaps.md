@@ -45,7 +45,7 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-36 — Change-plan checklist and closing have no API yet (plus two smaller plan-contract gaps) | Item 1 closed 2026-10-12 (API in #36, UI in F3); items 2 and 3 remain open |
 | G-37 — First TEST acceptance: no SID search, directory "not configured" vs "unreachable", free-text import row errors | Open (2026-10-13); the UI shows honest wording meanwhile |
 | G-38 — OR → Jira: no issue link, no persisted transfer key/time, no replay indicator, no reviewed draft for retry | Open (2026-10-13); planned as TH-8 (ADR-0033); the UI shows none of these meanwhile |
-| G-39 — Service Accounts event flow: close readiness read per request, no verification readiness, preview ids without names | Open (2026-10-13); OLAY-3 UI works around each honestly |
+| G-39 — Service Accounts event flow: close readiness read per request, no verification readiness, preview ids without names | Items 1–3 ✅ closed (2026-10-13, branch `feature/service-accounts-g39-readiness-20261013`); items 4–5 open (UI covers them honestly) |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -1266,6 +1266,16 @@ Checked against `OperationalRecordResponse` and `JiraTransferResponse` on master
 list the reviewed fields. Nothing above is read or assumed.
 
 ## G-39 — Service Accounts event flow (OLAY-3): close readiness per request, no verification readiness, ids without names
+
+**Status 2026-10-13: items 1–3 closed** on `feature/service-accounts-g39-readiness-20261013` (no migration; OpenAPI snapshot gains only the new
+fields, not regenerated). (1) Each open `RequestView` carries `closeReadiness` (Completed) from `EvaluateClose`, over close facts read for all
+open requests of the account in one query; the account page uses it and calls the route only for a request without it (older API) and for
+another outcome on demand. (2) `ServiceAccountRules.EvaluateVerification` is the verify rule's single source (`ValidateVerification` returns its
+first code; a frozen copy of the previous rule is compared on every input combination). Unverified `ActionView`s carry `verificationReadiness`
+(reader as verifier, recorded evidence note only, no date); the verify form lists the codes, dropping EvidenceRequired once a note or file is
+typed. (3) `EventField.label` names a person id only when that person already appears in the caller's account detail (owner, request
+follow-ups/contacts, performers, verifiers, ownership rows, mail contacts); no directory lookup, otherwise null and the UI keeps "Seçilen kişi".
+Items 4 and 5 stay open as written.
 
 **Raised:** 2026-10-13, OLAY-3 UI (branch `feature/service-accounts-event-guidance-ui-20261013`), against the OLAY-2a/2b/2c API on master.
 **Owner:** Service Accounts module (owner-approved scoped exception); the UI never invents these.

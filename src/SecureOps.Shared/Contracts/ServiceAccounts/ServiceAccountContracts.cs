@@ -135,7 +135,7 @@ public sealed record ActionView(
 /// (VerificationBeforeAction, DateInFuture) run only when the verify command receives the date.
 /// </summary>
 /// <param name="Ready">True when nothing is missing (the verify form still needs a valid date).</param>
-/// <param name="Missing">Rule codes in the verify command's order: Voided, NotPerformed, ActualDateRequired, EvidenceRequired (a note or file is
+/// <param name="Missing">Rule codes in the verify command's order: ActionVoided, ActionNotPerformed, ActualDateRequired, EvidenceRequired (a note or file is
 /// needed in the form), OrRequiredForDeletion.</param>
 public sealed record VerificationReadiness(bool Ready, IReadOnlyList<string> Missing);
 
