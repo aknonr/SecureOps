@@ -85,17 +85,18 @@ public sealed class InMemoryApplicationSessionRepository(IAuditWriter auditWrite
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            Dictionary<Guid, ApplicationSession> next = new(_sessions);
-            bool ended = next.TryGetValue(sessionId, out ApplicationSession? session) && session.IsActive;
-            if (ended)
+            if (!_sessions.TryGetValue(sessionId, out ApplicationSession? session) || !session.IsActive)
             {
-                next[sessionId] = session! with { EndedAtUtc = endedAtUtc, EndReason = reason };
+                return false;
             }
+
+            Dictionary<Guid, ApplicationSession> next = new(_sessions);
+            next[sessionId] = session with { EndedAtUtc = endedAtUtc, EndReason = reason };
 
             // Prepare state before audit; after successful audit, publication cannot fail or cancel.
             await AppendAuditAsync([auditEvent], cancellationToken);
             _sessions = next;
-            return ended;
+            return true;
         }
         finally
         {

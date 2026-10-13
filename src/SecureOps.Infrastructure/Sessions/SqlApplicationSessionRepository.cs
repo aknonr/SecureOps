@@ -82,7 +82,10 @@ public sealed class SqlApplicationSessionRepository : IApplicationSessionReposit
         await connection.OpenAsync(cancellationToken);
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
         int affected = await connection.ExecuteAsync(Command(sql, new { SessionId = sessionId, EndedAtUtc = endedAtUtc, EndReason = reason.ToString() }, transaction, cancellationToken));
-        await AppendAuditAsync(connection, transaction, auditEvent, cancellationToken);
+        if (affected == 1)
+        {
+            await AppendAuditAsync(connection, transaction, auditEvent, cancellationToken);
+        }
         await transaction.CommitAsync(cancellationToken);
         return affected == 1;
     }
