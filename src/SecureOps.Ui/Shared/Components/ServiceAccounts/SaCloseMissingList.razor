@@ -1,0 +1,29 @@
+@* "Why can this request not be closed": the server's list (close-readiness or a refused event close), one line per missing
+   condition with what clears it. The rule itself lives on the server (ServiceAccountRules.EvaluateClose); nothing is decided here. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<ul class="sa-missing" id="@Id">
+    @foreach (CloseMissing missing in Missing)
+    {
+        <li>
+            <MudIcon Icon="@Icons.Material.Filled.Block" Size="Size.Small" aria-hidden="true" />
+            <span>
+                @ServiceAccountEventText.Missing(missing)
+                @if (ServiceAccountEventText.Remedy(missing.Remedy) is { Length: > 0 } remedy) { <span class="so-panel-text--sm"> Ne yapılır: @remedy</span> }
+                @if (Actions is not null) { @Actions(missing) }
+            </span>
+        </li>
+    }
+</ul>
+
+@code {
+    /// <summary>Missing conditions as the server listed them.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<CloseMissing> Missing { get; set; } = [];
+
+    /// <summary>Element id (for <c>aria-describedby</c> on the button it explains).</summary>
+    [Parameter] public string? Id { get; set; }
+
+    /// <summary>Optional buttons that open the step clearing a condition.</summary>
+    [Parameter] public RenderFragment<CloseMissing>? Actions { get; set; }
+}

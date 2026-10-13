@@ -17,12 +17,21 @@ public partial class ServiceAccountDetail
     private int _revision;
     private int _tab;
     private Guid? _loadedId;
+    private SaEventStart? _eventStart;
+    private int _eventSignal;
+    private IReadOnlyDictionary<Guid, CloseReadiness> _readiness = new Dictionary<Guid, CloseReadiness>();
+
+    /// <summary>Most open requests whose close readiness the page reads after each load (one read each; the detail does not carry it).</summary>
+    private const int _readinessLimit = 20;
 
     /// <summary>Account id.</summary>
     [Parameter] public Guid Id { get; set; }
 
     /// <inheritdoc />
     protected override string RequiredCapability => ServiceAccountCapabilities.View;
+
+    /// <summary>The server's <c>eventGuidanceAvailable</c>: false until migration 036 is applied (the flow is then hidden).</summary>
+    private bool EventAvailable => _me?.EventGuidanceAvailable == true;
 
     private string? Lead => _detail is null ? null
         : $"{_detail.Summary.Domain ?? "Domain bilinmiyor"} · {(_detail.Summary.IdentityState == "Confirmed" ? "kimlik teyitli" : "kimlik geçici")}";
@@ -71,7 +80,104 @@ public partial class ServiceAccountDetail
         _detail = await Api.GetAsync<AccountDetail>($"/accounts/{Id}", token);
         _organizations = await Api.GetAsync<IReadOnlyList<OrganizationView>>("/organizations", token);
         _teams = await Api.GetAsync<IReadOnlyList<TeamView>>("/teams", token);
+        await LoadAllReadinessAsync(token);
     });
+
+    /// <summary>Re-reads the account (event flow "Hesabı yenile").</summary>
+    private Task RefreshAsync() => RunSerializedAsync(async token =>
+    {
+        _detail = await Api.GetAsync<AccountDetail>($"/accounts/{Id}", token);
+        await LoadAllReadinessAsync(token);
+    });
+
+    /// <summary>
+    /// Why each open request can or cannot be closed as Completed, from the server's close rule (close-readiness route). A hint only:
+    /// a request whose answer failed simply shows no hint, and the close command is still decided by the server.
+    /// </summary>
+    private async Task LoadAllReadinessAsync(CancellationToken token)
+    {
+        Dictionary<Guid, CloseReadiness> map = [];
+        foreach (RequestView request in (_detail?.Requests ?? []).Where(r => r.Status == "Open").Take(_readinessLimit))
+        {
+            if (await ReadReadinessAsync(request.Id, "Completed", token) is { } readiness)
+            {
+                map[request.Id] = readiness;
+            }
+        }
+
+        _readiness = map;
+    }
+
+    /// <summary>Close readiness of one request for one outcome; null when it could not be read.</summary>
+    private Task<CloseReadiness?> LoadReadinessAsync(Guid requestId, string outcome) => ReadReadinessAsync(requestId, outcome, Token);
+
+    private async Task<CloseReadiness?> ReadReadinessAsync(Guid requestId, string outcome, CancellationToken token)
+    {
+        try
+        {
+            return await Api.GetAsync<CloseReadiness>($"/requests/{requestId}/close-readiness?outcome={outcome}", token);
+        }
+        catch (SecureOpsApiException)
+        {
+            return null;
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Opens the event flow from a next step or a request (event kind and request pre-selected).</summary>
+    private void StartEvent(SaEventStart start) => (_eventStart, _eventSignal) = (start, _eventSignal + 1);
+
+    private Task<SaCallResult<EventPreview>> PreviewEventAsync(EventDraft draft) =>
+        CallAsync(token => Api.SendAsync<EventPreview>(HttpMethod.Post, $"/accounts/{Id}/events/preview", draft, token));
+
+    /// <summary>Records the previewed event; on success the server's account replaces the view (the flow then shows what remains to do).</summary>
+    private async Task<SaCallResult<EventCommitResult>> CommitEventAsync(EventDraft draft)
+    {
+        SaCallResult<EventCommitResult> answer = await CallAsync(token => Api.SendAsync<EventCommitResult>(HttpMethod.Post, $"/accounts/{Id}/events", draft, token));
+        if (answer.Value is { } result)
+        {
+            _detail = result.Detail;
+            _revision++;
+            await LoadAllReadinessAsync(Token);
+        }
+
+        return answer;
+    }
+
+    /// <summary>Field suggestions from pasted text; the text is only sent, never kept here.</summary>
+    private Task<SaCallResult<MailHints>> MailHintsAsync(string text) =>
+        CallAsync(token => Api.SendAsync<MailHints>(HttpMethod.Post, $"/accounts/{Id}/events/mail-hints", new MailHintsRequest(text), token));
+
+    /// <summary>
+    /// One call whose answer the event flow shows itself (the page problem panel stays for session and access failures). A stale
+    /// account reloads the authoritative view so a refreshed preview uses the current version; typed input stays in the flow.
+    /// </summary>
+    private async Task<SaCallResult<T>> CallAsync<T>(Func<CancellationToken, Task<T>> call) where T : class
+    {
+        T? value = null;
+        bool started = false;
+        await RunAsync(async token =>
+        {
+            started = true;
+            value = await call(token);
+        });
+        UiProblem? problem = Problem;
+        string? current = ProblemCurrentJson;
+        if (problem is { Kind: not (UiProblemKind.AccessDisabled or UiProblemKind.AccessPending or UiProblemKind.SessionExpired) })
+        {
+            Problem = null;
+        }
+
+        if (problem?.Code == "ServiceAccountEventStale" || problem?.Fields.Contains("requestNotOpen") == true)
+        {
+            await RefreshAsync();
+        }
+
+        return new SaCallResult<T>(value, problem, current, started);
+    }
 
     private async Task ExecuteAsync(SaCommand command)
     {
@@ -153,13 +259,18 @@ public partial class ServiceAccountDetail
         if (saved)
         {
             _revision++;
+            await LoadAllReadinessAsync(Token);
             return;
         }
 
         if (Problem is { Kind: UiProblemKind.Conflict })
         {
             UiProblem conflict = Problem;
-            await RunAsync(async token => _detail = await Api.GetAsync<AccountDetail>($"/accounts/{Id}", token));
+            await RunAsync(async token =>
+            {
+                _detail = await Api.GetAsync<AccountDetail>($"/accounts/{Id}", token);
+                await LoadAllReadinessAsync(token);
+            });
             Problem = conflict;
         }
     }

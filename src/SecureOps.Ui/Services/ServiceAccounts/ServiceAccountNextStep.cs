@@ -111,4 +111,21 @@ public static class ServiceAccountNextStep
 
         return steps;
     }
+
+    /// <summary>
+    /// Where "Bildir" opens the event flow for a step, or null when the step is not answered by reporting an event (an ownership or
+    /// handover decision, a verification, a scan decision or a usage entry stays in its own flow). Today only overdue requests map:
+    /// the earliest one the caller may work on, with the event that reports its expected work. The steps themselves do not change.
+    /// </summary>
+    public static SaEventStart? EventFor(SaNextStep step, AccountDetail detail)
+    {
+        if (step.Code != "requests-overdue")
+        {
+            return null;
+        }
+
+        RequestView? request = detail.Requests.Where(r => r.Status == "Open" && r.Overdue && detail.Permissions.CanWorkRequest(r.Id))
+            .OrderBy(r => r.PlanEnd ?? DateOnly.MaxValue).FirstOrDefault();
+        return request is null ? null : new SaEventStart(ServiceAccountEventText.EventForRequest(request.ActionType), request.Id);
+    }
 }

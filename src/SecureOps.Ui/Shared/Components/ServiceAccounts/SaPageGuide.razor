@@ -24,6 +24,10 @@
     {
         <div class="sa-guide-body">
             <p class="sa-guide-purpose"><strong>Bu sayfa ne işe yarar?</strong> @Purpose</p>
+            @if (!string.IsNullOrWhiteSpace(RoleNote))
+            {
+                <p class="sa-guide-purpose"><strong>Sizin için:</strong> @RoleNote</p>
+            }
             <ol class="sa-guide-details">
                 @foreach ((string title, string text) in Steps)
                 {
@@ -52,6 +56,9 @@
 
     /// <summary>What the page deliberately never does (permissions, directory or server changes).</summary>
     [Parameter] public string? Never { get; set; }
+
+    /// <summary>One or two sentences for the caller's role on this record (from the server's permissions); omitted when null.</summary>
+    [Parameter] public string? RoleNote { get; set; }
 
     /// <summary>Start with the details open (e.g. while nothing has been set up yet).</summary>
     [Parameter] public bool StartOpen { get; set; }
