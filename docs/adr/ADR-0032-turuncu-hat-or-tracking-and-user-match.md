@@ -1,6 +1,6 @@
 # ADR-0032: Turuncu Hat OR Tracking and Exact User Match (read-only)
 
-**Status:** Proposed (owner acceptance pending); implemented behind the Disabled default, no real Turuncu Hat call made
+**Status:** Accepted (owner, 2026-10-13; includes the 2026-10-13 amendment); implemented behind the Disabled default, no real Turuncu Hat call made
 **Date:** 2026-10-12 (amended 2026-10-13: registration-number match, see the amendment at the end)
 
 ## Context
