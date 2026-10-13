@@ -63,7 +63,8 @@ public sealed class SqlAssetContractTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray()!;
         migrationNames.Should().Equal(schemaNames)
-            .And.HaveCount(34)
+            .And.HaveCount(35)
+            .And.ContainSingle(name => name == "037-service-account-usage-scan-jobs.sql")
             .And.ContainSingle(name => name == "034-service-account-plan-evidence.sql")
             .And.ContainSingle(name => name == "033-service-account-change-plans.sql")
             .And.ContainSingle(name => name == "032-access-request-user-index.sql")

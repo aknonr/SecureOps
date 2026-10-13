@@ -117,7 +117,8 @@ public sealed class ServiceAccountApiCompositionTests
         }
 
         RouteEndpoint[] endpoints = [.. factory.Services.GetServices<EndpointDataSource>().SelectMany(s => s.Endpoints).OfType<RouteEndpoint>()
-            .Where(e => e.RoutePattern.RawText?.Contains("usage-scan", StringComparison.Ordinal) == true)];
+            .Where(e => e.RoutePattern.RawText?.Contains("usage-scan", StringComparison.Ordinal) == true
+                && !e.RoutePattern.RawText.Contains("usage-scan-jobs", StringComparison.Ordinal))];
         static string[] Methods(RouteEndpoint e) => [.. e.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()!.HttpMethods];
         RouteEndpoint[] writes = [.. endpoints.Where(e => !Methods(e).Contains("GET"))];
         RouteEndpoint[] reads = [.. endpoints.Where(e => Methods(e).Contains("GET"))];
@@ -127,7 +128,7 @@ public sealed class ServiceAccountApiCompositionTests
             "api/v1/service-accounts/accounts/{id:guid}/usage-scan-items/{itemId:guid}/usage",
             "api/v1/service-accounts/accounts/{id:guid}/usage-scan-items/{itemId:guid}/dismiss",
             "api/v1/service-accounts/usage-scans"
-        ], "evidence is attached (to one account, or to several accounts in one upload) and decided per account; there is no scan start route");
+        ], "evidence is attached (to one account, or to several accounts in one upload) and decided per account; web scans have their own routes");
         foreach (RouteEndpoint endpoint in writes)
         {
             endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>().Select(a => a.Policy).Should().Contain(ServiceAccountPolicies.Work);
@@ -149,6 +150,36 @@ public sealed class ServiceAccountApiCompositionTests
 
         writes.Where(e => e.RoutePattern.RawText!.EndsWith("usage-scans", StringComparison.Ordinal)).Select(e =>
             e.Metadata.GetMetadata<Microsoft.AspNetCore.Http.Metadata.IRequestSizeLimitMetadata>()!.MaxRequestBodySize).Should().Equal(5L * 1024 * 1024, 5L * 1024 * 1024);
+    }
+
+    [Fact]
+    public void UsageScanJobRoutes_StartAndRetryNeedWork_CancelIsDecidedByTheService_AndNothingIsDeleted()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient _ = factory.CreateApiClient();
+        RouteEndpoint[] endpoints = [.. factory.Services.GetServices<EndpointDataSource>().SelectMany(s => s.Endpoints).OfType<RouteEndpoint>()
+            .Where(e => e.RoutePattern.RawText?.Contains("usage-scan-jobs", StringComparison.Ordinal) == true)];
+        static string Method(RouteEndpoint e) => e.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()!.HttpMethods.Single();
+        static string[] Policies(RouteEndpoint e) => [.. e.Metadata.GetOrderedMetadata<IAuthorizeData>().Select(a => a.Policy).OfType<string>()];
+
+        // Web usage scans (USAGE-SCAN-JOB-CONTRACT.md): the API stores and queues a job and reads its progress; the Worker reads the
+        // servers through JEA. Cancel is View at the route because the starter (Work) or an administrator may cancel; the service decides.
+        endpoints.Select(e => (Method(e), e.RoutePattern.RawText!)).Should().BeEquivalentTo(new[]
+        {
+            ("GET", "api/v1/service-accounts/usage-scan-jobs/availability"),
+            ("POST", "api/v1/service-accounts/usage-scan-jobs"),
+            ("GET", "api/v1/service-accounts/usage-scan-jobs/{jobId:guid}"),
+            ("POST", "api/v1/service-accounts/usage-scan-jobs/{jobId:guid}/cancel"),
+            ("POST", "api/v1/service-accounts/usage-scan-jobs/{jobId:guid}/retry"),
+            ("GET", "api/v1/service-accounts/accounts/{id:guid}/usage-scan-jobs")
+        });
+        foreach (RouteEndpoint endpoint in endpoints)
+        {
+            string route = endpoint.RoutePattern.RawText!;
+            bool needsWork = Method(endpoint) == "POST" && !route.EndsWith("/cancel", StringComparison.Ordinal);
+            Policies(endpoint).Should().Contain(ServiceAccountPolicies.View, route);
+            (Policies(endpoint).Contains(ServiceAccountPolicies.Work)).Should().Be(needsWork, route);
+        }
     }
 
     [Fact]
