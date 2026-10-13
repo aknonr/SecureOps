@@ -26,6 +26,13 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
 - Not in this PR: `RequestView.closeReadiness` (detail lacks the verifier/evidence facts; see EVENT-GUIDANCE-DESIGN §6 note) and
   `EvaluateVerification`.
 
+## Mail hints OLAY-2b (branch `feature/service-accounts-mail-hints-20261013`, from master `6ee5d26`, not merged)
+
+- `POST accounts/{id}/events/mail-hints` (Work + account in scope, else 403/404): pasted reply text in, **suggestions only** out
+  (event kinds, OR/OCO numbers, dates); deterministic rules in one table (`EventMailHintRules`), pure function `EventMailHints`, no
+  language model, no network, nothing written, text never stored, logged or echoed. Own controller file; OpenAPI snapshot additive only.
+  Details and limits: EVENT-GUIDANCE-DESIGN §7 "OLAY-2b uygulama notu". No migration, no UI.
+
 ## Event guidance design OLAY-1 (branch `docs/service-accounts-event-guidance-design-20261013`, from master `633eed9`, not merged)
 
 - Design only, no code: [EVENT-GUIDANCE-DESIGN.md](EVENT-GUIDANCE-DESIGN.md) ("Ne oldu?" flow, event-to-record table, preview/commit contract,
