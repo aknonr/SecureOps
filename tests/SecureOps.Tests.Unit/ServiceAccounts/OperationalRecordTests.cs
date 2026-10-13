@@ -40,7 +40,7 @@ public sealed class OperationalRecordTests
     public void Sending_IsTreatedAsInFlight_UntilTheDispatchBoundAndAMarginPass()
     {
         DateTimeOffset created = new(2026, 10, 13, 8, 0, 0, TimeSpan.Zero);
-        TimeSpan bound = TimeSpan.FromSeconds(60);
+        var bound = TimeSpan.FromSeconds(60);
         OperationalRecordRules.MayStillBeInFlight(OperationalRecordState.Sending, created, created.AddSeconds(119), bound).Should().BeTrue();
         OperationalRecordRules.MayStillBeInFlight(OperationalRecordState.Sending, created, created.AddSeconds(121), bound).Should().BeFalse();
         OperationalRecordRules.MayStillBeInFlight(OperationalRecordState.OutcomeUnknown, created, created, bound).Should().BeFalse();

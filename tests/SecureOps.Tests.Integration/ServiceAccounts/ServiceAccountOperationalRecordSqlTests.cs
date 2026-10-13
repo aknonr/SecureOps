@@ -280,7 +280,7 @@ public sealed class ServiceAccountOperationalRecordSqlTests
     /// <summary>Planned and previewed by the planner, approved by the verifier; returns the plan and its first account.</summary>
     private static async Task<(ChangePlanView Plan, AccountDetail Account)> ApprovedAsync(Setup s, int accounts = 1)
     {
-        AccountDetail[] created = new AccountDetail[accounts];
+        var created = new AccountDetail[accounts];
         for (int i = 0; i < accounts; i++)
         {
             created[i] = await AccountAsync(s, "A" + i);
