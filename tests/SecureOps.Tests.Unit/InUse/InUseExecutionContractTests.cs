@@ -280,7 +280,7 @@ public sealed class InUseExecutionContractTests
         { BaseUrl = "https://source.example.invalid/ws/DataRest.svc/json", Authorization = "Basic synthetic", TenantId = 218 }),
             Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = false, ControlledTestWritesEnabled = true, SourceCloseEnabled = sourceClose }),
             Options.Create(new InUseCompletionOptions { Enabled = true, Provider = "TuruncuHat", SourceWritesEnabled = sourceWrites }));
-        InUseRemoteResult result = await client.SendAsync("Upload", lease, null, null, null, default);
+        InUseRemoteResult result = await client.SendAsync("Upload", lease, null, null, null, TestContext.Current.CancellationToken);
         result.Outcome.Should().Be(expected);
         handler.Count.Should().Be(sourceWrites ? 1 : 0);
         if (!sourceWrites)
