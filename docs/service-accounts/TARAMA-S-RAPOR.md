@@ -46,9 +46,9 @@ Commit'ler: `616fa0e` sözleşme · `a2cb401` 037 + iş + API · `311fc84` OpenA
 ## Nasıl doğrulandı / ne doğrulanmadı
 
 - **Çalıştı (Linux bulut, SDK 9.0.317 conda-forge paketinden, net8 çalışma zamanı apt'tan):** `dotnet build SecureOps.sln` 0 hata
-  0 uyarı; birim testleri 2245 geçti, 2 başarısız — ikisi de master'da aynı biçimde başarısız (bilinen Linux kaynaklı:
+  0 uyarı; birim testleri (master merge'inden sonra) 2681 geçti, 2 başarısız — ikisi de master'da aynı biçimde başarısız (bilinen Linux kaynaklı:
   `AuditConfigurationValidatorTests.Validate_WhenProductionFailOpen_Throws`, `SccmFailureEvidenceTests.StagedInvocations_*`);
-  entegrasyon: 360 geçti, 7 `AnnouncementTests` başarısız (master'da da aynı 7, SkiaSharp/Linux), SQL testleri atlandı.
+  entegrasyon: 377 geçti, 7 `AnnouncementTests` başarısız (master'da da aynı 7, SkiaSharp/Linux), SQL testleri atlandı.
   OpenAPI anlık görüntü testi geçti. `dotnet format --verify-no-changes`: Linux checkout LF olduğu için deponun CRLF kopyasında
   koşturuldu, temiz.
 - Yeni testler: birim (kurallar, durum eşlemesi, Fake ile uçtan uca, iptal, kuyrukta iptal, başlatan yetkisi kalkınca, toplayıcı
