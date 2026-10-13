@@ -1,0 +1,540 @@
+@* gMSA OR'ları (ADR-0030, PROPOSED; OR-2 with a Fake adapter, migration 035). One OR per plan account: the person first sees every
+   field that would be sent (requester mapping, environment, editable short description and description), then confirms in a
+   separate step; what is sent is exactly the previewed text (server fingerprint). The idempotency key is made when a sendable
+   preview arrives, so a retry after an unknown answer can never open a second OR. "Belirsiz" is shown as it is and is resolved by
+   a person (link a number found in Turuncu Hat, or confirm none exists). Every permission comes from the server's answer. *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+
+<section id="sa-plan-records" class="so-panel" aria-labelledby="sa-plan-records-title">
+    <div class="so-panel-head">
+        <h2 id="sa-plan-records-title" class="so-panel-title">gMSA OR'ları (Turuncu Hat)</h2>
+        @if (_view is { } header)
+        {
+            (string providerLabel, SoStatusBadge.BadgeTone providerTone) = OperationalRecordPresentation.ProviderBadge(header);
+            <SoStatusBadge Label="@providerLabel" Tone="@providerTone" Icon="@Icons.Material.Filled.Outbox" />
+        }
+    </div>
+    <p class="so-panel-text--sm">
+        Onaylı planda hesap başına bir OR açılır: AD ekibine gMSA oluşturma talebi. Önce gönderilecek her alan gösterilir, ayrı bir onayla gönderilir.
+        Otomatik yeniden gönderim yoktur; sonucu belirsiz kalan OR'u bir kişi Turuncu Hat'ta arayıp bağlar. OR'un onayı Turuncu Hat'ta yürür; bu ekran onu yalnız izler.
+        Tasarım öneri aşamasındadır (ADR-0030).
+    </p>
+
+    @if (_loading && _view is null)
+    {
+        <SoLoading Message="OR kayıtları okunuyor" />
+    }
+    else if (_view is null)
+    {
+        <SaProblem Problem="@_loadProblem" OnRetry="ReloadAsync" />
+        @if (_loadProblem is null && _loadUnknown)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" role="alert">OR kayıtlarına ulaşılamadı; durum bilinmiyor.</MudAlert>
+            <MudButton Variant="Variant.Outlined" OnClick="ReloadAsync">Yeniden oku</MudButton>
+        }
+    }
+    else
+    {
+        PlanOperationalRecordsView view = _view;
+        @if (view.Synthetic)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2" role="note">
+                Sentetik sağlayıcı: bu ortamda açılan OR'lar gerçek değildir ve Turuncu Hat'a hiçbir şey gönderilmez. Numaralar yer tutucudur.
+            </MudAlert>
+        }
+        @if (!view.CreationAvailable)
+        {
+            <p class="so-panel-text sa-or-note" role="note">
+                <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" aria-hidden="true" /> @OperationalRecordPresentation.BlockedText(view.UnavailableReason)
+            </p>
+        }
+
+        <ul class="sa-or-list" aria-label="Plan hesaplarının OR durumu">
+            @foreach (OperationalRecordAccountView account in view.Accounts)
+            {
+                string headingId = $"sa-or-{account.AccountId:N}";
+                OperationalRecordSubmissionView? current = account.Current;
+                <li class="sa-or-item" aria-labelledby="@headingId">
+                    <div class="sa-or-head">
+                        <h3 id="@headingId" class="sa-or-account">@account.AccountName</h3>
+                        @if (current is null)
+                        {
+                            <SoStatusBadge Label="Henüz OR açılmadı" Tone="SoStatusBadge.BadgeTone.Neutral" Icon="@Icons.Material.Filled.RadioButtonUnchecked" />
+                        }
+                        else
+                        {
+                            <SoStatusBadge Label="@current.StateLabel" Tone="@OperationalRecordPresentation.StateTone(current.State)" Icon="@OperationalRecordPresentation.StateIcon(current.State)" />
+                        }
+                    </div>
+                    <p class="so-panel-text--sm">Hedef gMSA adı: <strong>@account.TargetGmsaName</strong></p>
+
+                    @if (current is not null)
+                    {
+                        <SoFieldGrid>
+                            <SoField Label="OR numarası" Value="@(current.RecordNumber ?? (current.NeedsReconciliation ? "bilinmiyor" : "yok"))" />
+                            @if (current.ReasonLabel is { } reasonLabel) { <SoField Label="Neden" Value="@reasonLabel" /> }
+                            @if (OperationalRecordPresentation.VerificationLabel(current.LinkVerification) is { } verification) { <SoField Label="Bağlantı" Value="@verification" /> }
+                            <SoField Label="Ortam" Value="@current.Environment" />
+                            <SoField Label="Gönderen" Value="@current.CreatedBy" />
+                            <SoField Label="Gönderim" Value="@ChangePlanPresentation.Instant(current.CreatedAt)" />
+                            @if (current.Synthetic) { <SoField Label="Sağlayıcı" Value="Sentetik (Fake) — gerçek OR değil" /> }
+                        </SoFieldGrid>
+                        @if (current.NeedsReconciliation)
+                        {
+                            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2" role="note">
+                                @(current.State == "PartiallyCreated"
+                                    ? "Kayıt Turuncu Hat'ta oluştu ama numarası veya bir alanı doğrulanamadı. Eksikleri Turuncu Hat'ta tamamlayın, sonra numarayı aşağıdan bağlayın."
+                                    : "Sonuç belirsiz: OR açılmış olabilir. Ürün yeniden göndermez. Turuncu Hat'ta arayın, bulursanız numarayı bağlayın; yoksa açılmadığını gerekçesiyle teyit edin.")
+                                @if (OperationalRecordPresentation.PlanReference(current) is { } reference)
+                                {
+                                    <span class="sa-or-reference">Aranacak satır: <code>@reference</code></span>
+                                }
+                            </MudAlert>
+                        }
+                    }
+
+                    <div class="sa-or-actions">
+                        @if (account.CanOpen)
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Preview" Disabled="@Working"
+                                       OnClick="@(() => OpenAsync(account.AccountId))">OR aç (önce önizleme)</MudButton>
+                        }
+                        else if (view.CreationAvailable && account.OpenBlockedLabel is { } blockedLabel && current is null)
+                        {
+                            <span class="so-panel-text--sm" role="note">@blockedLabel</span>
+                        }
+                        @if (current?.State is "Created" or "Linked" or "PartiallyCreated")
+                        {
+                            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" Disabled="@Working"
+                                       OnClick="@(() => TrackAsync(account.AccountId))">OR durumunu yenile</MudButton>
+                        }
+                    </div>
+
+                    @if (_tracking.TryGetValue(account.AccountId, out SaCallResult<OperationalRecordTrackingView>? tracked))
+                    {
+                        <div class="sa-or-tracking" aria-live="polite">
+                            @if (tracked.Value is { } t)
+                            {
+                                <h4 class="sa-or-sub">Turuncu Hat durumu (salt okunur, kaydedilmez)</h4>
+                                <SoFieldGrid>
+                                    <SoField Label="Kayıt" Value="@($"{OperationalRecordPresentation.Known(t.RecordNumber)} — {t.StatusLabel}")" />
+                                    <SoField Label="Son güncelleme" Value="@OperationalRecordPresentation.Known(t.LastModified)" />
+                                    <SoField Label="Durum kodu (ham)" Value="@OperationalRecordPresentation.Known(t.RawStatus)" />
+                                    <SoField Label="Aşama kodu (ham)" Value="@OperationalRecordPresentation.Known(t.RawStage)" />
+                                    <SoField Label="Aktivite sayısı" Value="@OperationalRecordPresentation.Count(t.ActivitiesKnown, t.ActivityCount)" />
+                                    <SoField Label="Son aktivite (ham grup / durum)" Value="@($"{OperationalRecordPresentation.Known(t.LastActivityGroup)} / {OperationalRecordPresentation.Known(t.LastActivityStatus)}")" />
+                                    <SoField Label="Yorum sayısı" Value="@OperationalRecordPresentation.Count(t.CommentsKnown, t.CommentCount)" />
+                                    <SoField Label="Son yorum zamanı" Value="@OperationalRecordPresentation.Known(t.LastCommentAt)" />
+                                    <SoField Label="Kontrol zamanı" Value="@ChangePlanPresentation.Instant(t.CheckedAt)" />
+                                </SoFieldGrid>
+                                <p class="so-panel-text--sm">Kodlar Turuncu Hat'ın ham değerleridir; "onaylandı" veya "kapandı" anlamına gelmez. "bilinmiyor", Turuncu Hat'ın o bilgiyi kanıtlamadığı demektir, "yok" demek değildir.@(t.Synthetic ? " Sentetik veridir." : "")</p>
+                            }
+                            else
+                            {
+                                <SaProblem Problem="@tracked.Problem" OnRetry="@(() => TrackAsync(account.AccountId))" />
+                                @if (tracked.Problem is null) { <p class="so-panel-text--sm" role="alert">Durum okunamadı; bilinmiyor.</p> }
+                            }
+                        </div>
+                    }
+
+                    @if (_openAccount == account.AccountId)
+                    {
+                        @Flow(account)
+                    }
+
+                    @if (current is not null && (account.CanLink || account.CanConfirmNotCreated))
+                    {
+                        <SaDisclosure Title="Mutabakat: OR Turuncu Hat'ta açıldı mı?" Class="mt-2" Open="@(_reconAccount == account.AccountId)">
+                            @Reconcile(account, current)
+                        </SaDisclosure>
+                    }
+
+                    @if (account.Earlier.Count > 0 || current is { Events.Count: > 0 })
+                    {
+                        <SaDisclosure Title="@($"Gönderim geçmişi ({account.Earlier.Count + (current is null ? 0 : 1)} deneme)")" Class="mt-2">
+                            <p class="so-panel-text--sm">İşlem kanıtıdır, kişi performansı değildir.</p>
+                            <ol class="sa-or-history">
+                                @foreach (OperationalRecordSubmissionView attempt in current is null ? account.Earlier : account.Earlier.Prepend(current))
+                                {
+                                    <li>
+                                        <strong>@attempt.StateLabel</strong> · @ChangePlanPresentation.Instant(attempt.CreatedAt) · @attempt.CreatedBy
+                                        @if (attempt.RecordNumber is { } number) { <span> · @number</span> }
+                                        <ul>
+                                            @foreach (OperationalRecordEventView e in attempt.Events)
+                                            {
+                                                <li>@ChangePlanPresentation.Instant(e.At) · @(e.FromState is null ? e.ToState : e.FromState + " → " + e.ToState) · @e.Actor@(e.Reason is null ? "" : " · " + e.Reason)</li>
+                                            }
+                                        </ul>
+                                    </li>
+                                }
+                            </ol>
+                        </SaDisclosure>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+@code {
+    private PlanOperationalRecordsView? _view;
+    private UiProblem? _loadProblem;
+    private bool _loading, _loadUnknown, _working;
+    private Guid _loadedPlan;
+    private string? _loadedStatus;
+
+    // Preview and confirmation of one account at a time.
+    private Guid? _openAccount;
+    private OperationalRecordPreview? _preview;
+    private string _short = string.Empty, _description = string.Empty;
+    private string? _environment;
+    private UiProblem? _previewProblem, _submitProblem;
+    private Guid _key;
+    private bool _submitUnknown, _submitNotSent;
+
+    // Reconciliation of one account at a time.
+    private Guid? _reconAccount;
+    private string _number = string.Empty, _reason = string.Empty;
+    private OperationalRecordCandidate? _candidate;
+    private UiProblem? _reconProblem;
+    private bool _reconUnknown;
+
+    private readonly Dictionary<Guid, SaCallResult<OperationalRecordTrackingView>> _tracking = [];
+
+    /// <summary>Plan.</summary>
+    [Parameter, EditorRequired] public Guid PlanId { get; set; }
+
+    /// <summary>Plan status; a change reloads the panel.</summary>
+    [Parameter] public string? PlanStatus { get; set; }
+
+    /// <summary>A page call is in flight.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Reads the panel.</summary>
+    [Parameter, EditorRequired] public Func<Task<SaCallResult<PlanOperationalRecordsView>>> Load { get; set; } = default!;
+
+    /// <summary>Preview of one account (writes nothing).</summary>
+    [Parameter, EditorRequired] public Func<Guid, OperationalRecordPreviewRequest, Task<SaCallResult<OperationalRecordPreview>>> Preview { get; set; } = default!;
+
+    /// <summary>Sends the previewed OR once.</summary>
+    [Parameter, EditorRequired] public Func<Guid, OperationalRecordSubmitRequest, Task<SaCallResult<OperationalRecordSubmitResult>>> Submit { get; set; } = default!;
+
+    /// <summary>Looks up a number found in Turuncu Hat (writes nothing).</summary>
+    [Parameter, EditorRequired] public Func<Guid, OperationalRecordCandidateRequest, Task<SaCallResult<OperationalRecordCandidate>>> Candidate { get; set; } = default!;
+
+    /// <summary>Links a number to the unresolved submission.</summary>
+    [Parameter, EditorRequired] public Func<Guid, OperationalRecordLinkRequest, Task<SaCallResult<PlanOperationalRecordsView>>> Link { get; set; } = default!;
+
+    /// <summary>States that no OR was created.</summary>
+    [Parameter, EditorRequired] public Func<Guid, OperationalRecordNotCreatedRequest, Task<SaCallResult<PlanOperationalRecordsView>>> NotCreated { get; set; } = default!;
+
+    /// <summary>Live tracking of the account's OR.</summary>
+    [Parameter, EditorRequired] public Func<Guid, Task<SaCallResult<OperationalRecordTrackingView>>> Tracking { get; set; } = default!;
+
+    /// <summary>The current preview (tests read it).</summary>
+    internal OperationalRecordPreview? CurrentPreview => _preview;
+
+    /// <summary>The idempotency key the next confirmation sends (tests read it).</summary>
+    internal Guid Key => _key;
+
+    /// <summary>Editable short description (tests drive it).</summary>
+    internal string ShortDescription { get => _short; set => _short = value; }
+
+    /// <summary>Editable description body (tests drive it).</summary>
+    internal string Description { get => _description; set => _description = value; }
+
+    /// <summary>Chosen environment (tests drive it).</summary>
+    internal string? Environment { get => _environment; set => _environment = value; }
+
+    /// <summary>Number typed during reconciliation (tests drive it).</summary>
+    internal string Number { get => _number; set => _number = value; }
+
+    /// <summary>Reconciliation reason (tests drive it).</summary>
+    internal string Reason { get => _reason; set => _reason = value; }
+
+    private bool Working => Busy || _working;
+
+    /// <summary>The text differs from what the server last previewed: it must be previewed again before it can be sent.</summary>
+    internal bool Dirty => _preview is null || !string.Equals(_short, _preview.ShortDescription, StringComparison.Ordinal)
+        || !string.Equals(_description, _preview.Description, StringComparison.Ordinal) || !string.Equals(_environment, _preview.Environment, StringComparison.Ordinal);
+
+    /// <summary>The confirmation button is active: a sendable preview of exactly this text.</summary>
+    internal bool CanConfirm => _preview is { CanSubmit: true, Fingerprint: not null } && !Dirty && !Working;
+
+    /// <inheritdoc />
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedPlan != PlanId || !string.Equals(_loadedStatus, PlanStatus, StringComparison.Ordinal))
+        {
+            (_loadedPlan, _loadedStatus) = (PlanId, PlanStatus);
+            await ReloadAsync();
+        }
+    }
+
+    /// <summary>Reads the panel again (the server's answer replaces everything shown).</summary>
+    internal async Task ReloadAsync()
+    {
+        _loading = true;
+        SaCallResult<PlanOperationalRecordsView> answer = await Load();
+        _loading = false;
+        (_loadProblem, _loadUnknown) = (answer.Problem, answer.OutcomeUnknown || !answer.Sent);
+        if (answer.Value is { } view)
+        {
+            _view = view;
+        }
+        else if (answer.Sent)
+        {
+            _view = null;
+        }
+    }
+
+    /// <summary>Opens the preview of one account with the server's template.</summary>
+    internal async Task OpenAsync(Guid accountId)
+    {
+        (_openAccount, _preview, _previewProblem, _submitProblem, _submitUnknown) = (accountId, null, null, null, false);
+        await PreviewAsync(new OperationalRecordPreviewRequest());
+    }
+
+    /// <summary>Previews the edited text and environment (the server normalizes and answers with exactly what would be sent).</summary>
+    internal Task RefreshPreviewAsync() => PreviewAsync(new OperationalRecordPreviewRequest(_short, _description, _environment));
+
+    /// <summary>Back to the server's template, keeping the chosen environment.</summary>
+    internal Task TemplateAsync() => PreviewAsync(new OperationalRecordPreviewRequest(Environment: _environment));
+
+    private async Task PreviewAsync(OperationalRecordPreviewRequest request)
+    {
+        if (_openAccount is not { } accountId)
+        {
+            return;
+        }
+
+        _working = true;
+        SaCallResult<OperationalRecordPreview> answer = await Preview(accountId, request);
+        _working = false;
+        _previewProblem = answer.Problem;
+        if (answer.Value is { } preview)
+        {
+            _preview = preview;
+            (_short, _description, _environment) = (preview.ShortDescription, preview.Description, preview.Environment);
+            // A new sendable preview is a new decision: a new key. Retries of the same confirmation reuse it (no second OR).
+            _key = preview.CanSubmit ? Guid.NewGuid() : Guid.Empty;
+            _submitUnknown = false;
+        }
+    }
+
+    /// <summary>The separate confirmation: sends exactly the previewed content with this preview's key.</summary>
+    internal async Task ConfirmAsync()
+    {
+        if (!CanConfirm || _openAccount is not { } accountId || _preview is null)
+        {
+            return;
+        }
+
+        _working = true;
+        SaCallResult<OperationalRecordSubmitResult> answer = await Submit(accountId,
+            new OperationalRecordSubmitRequest(_preview.ShortDescription, _preview.Description, _preview.Environment, _preview.Fingerprint, _key));
+        _working = false;
+        (_submitProblem, _submitUnknown, _submitNotSent) = (answer.Problem, answer.OutcomeUnknown, !answer.Sent);
+        if (answer.Value is not null)
+        {
+            (_openAccount, _preview) = (null, null);
+            await ReloadAsync();
+        }
+        else if (answer.Problem?.Code is "ServiceAccountChangePlanStateConflict" or "ServiceAccountEventIdempotencyKeyReused")
+        {
+            // Nothing was sent; the panel shows the server's state (for example an OR another person opened meanwhile).
+            await ReloadAsync();
+        }
+    }
+
+    /// <summary>Retries an unknown confirmation with the same key: the server answers with the first result instead of a second OR.</summary>
+    internal Task RetrySameKeyAsync() => _submitUnknown ? ConfirmAsync() : Task.CompletedTask;
+
+    private void Close() => (_openAccount, _preview, _previewProblem, _submitProblem, _submitUnknown) = (null, null, null, null, false);
+
+    /// <summary>Looks up the typed number in Turuncu Hat (writes nothing).</summary>
+    internal async Task CheckNumberAsync(Guid accountId)
+    {
+        (_reconAccount, _candidate, _reconProblem, _reconUnknown) = (accountId, null, null, false);
+        _working = true;
+        SaCallResult<OperationalRecordCandidate> answer = await Candidate(accountId, new OperationalRecordCandidateRequest(_number));
+        _working = false;
+        (_candidate, _reconProblem, _reconUnknown) = (answer.Value, answer.Problem, answer.OutcomeUnknown);
+    }
+
+    /// <summary>Links the typed number with the reason.</summary>
+    internal Task LinkAsync(Guid accountId, Guid submissionId) =>
+        ReconcileAsync(accountId, () => Link(accountId, new OperationalRecordLinkRequest(submissionId, _number, _reason)));
+
+    /// <summary>States that no OR exists, with the reason.</summary>
+    internal Task NotCreatedAsync(Guid accountId, Guid submissionId) =>
+        ReconcileAsync(accountId, () => NotCreated(accountId, new OperationalRecordNotCreatedRequest(submissionId, _reason)));
+
+    private async Task ReconcileAsync(Guid accountId, Func<Task<SaCallResult<PlanOperationalRecordsView>>> call)
+    {
+        (_reconAccount, _reconProblem, _reconUnknown) = (accountId, null, false);
+        _working = true;
+        SaCallResult<PlanOperationalRecordsView> answer = await call();
+        _working = false;
+        (_reconProblem, _reconUnknown) = (answer.Problem, answer.OutcomeUnknown);
+        if (answer.Value is { } view)
+        {
+            _view = view;
+            (_reconAccount, _number, _reason, _candidate) = (null, string.Empty, string.Empty, null);
+            _tracking.Remove(accountId);
+        }
+    }
+
+    /// <summary>Reads the account's OR tracking live (not stored).</summary>
+    internal async Task TrackAsync(Guid accountId)
+    {
+        _working = true;
+        _tracking[accountId] = await Tracking(accountId);
+        _working = false;
+    }
+
+    private void SetEnvironment(string value) => _environment = value;
+
+    private RenderFragment Flow(OperationalRecordAccountView account) => __builder =>
+    {
+        string flowId = $"sa-or-flow-{account.AccountId:N}";
+        <div class="sa-or-flow" role="group" aria-labelledby="@flowId">
+            <h4 id="@flowId" class="sa-or-sub">OR önizlemesi — @account.AccountName</h4>
+            <SaProblem Problem="@_previewProblem" OnRetry="RefreshPreviewAsync" />
+            @if (_preview is null)
+            {
+                @if (_previewProblem is null) { <SoLoading Message="Önizleme hazırlanıyor" /> }
+                <MudButton Variant="Variant.Text" OnClick="Close">Vazgeç</MudButton>
+            }
+            else
+            {
+                OperationalRecordPreview p = _preview;
+                (string requesterLabel, SoStatusBadge.BadgeTone requesterTone) = OperationalRecordPresentation.RequesterBadge(p.Requester);
+                <div class="sa-or-requester">
+                    <span class="so-panel-text--sm">Bildiren (düğmeye basan kişi):</span>
+                    <SoStatusBadge Label="@requesterLabel" Tone="@requesterTone" />
+                    <span class="so-panel-text--sm">@p.Requester.Label</span>
+                </div>
+
+                <fieldset class="sa-or-environments">
+                    <legend class="so-panel-text--sm">Ortam (zorunlu)</legend>
+                    @foreach (string env in p.Environments)
+                    {
+                        <label class="sa-or-radio">
+                            <input type="radio" name="@($"sa-or-env-{account.AccountId:N}")" value="@env" checked="@(_environment == env)" @onchange="@(() => SetEnvironment(env))" />
+                            @env
+                        </label>
+                    }
+                </fieldset>
+
+                <MudTextField T="string" @bind-Value="_short" Label="Kısa açıklama" MaxLength="@p.ShortDescriptionMax" Counter="@p.ShortDescriptionMax"
+                              Immediate="true" Variant="Variant.Outlined" Required="true" Class="mt-2" />
+                <MudTextField T="string" @bind-Value="_description" Label="Açıklama (düz metin)" Lines="10" Counter="@BodyMax(p)" MaxLength="@BodyMax(p)"
+                              Immediate="true" Variant="Variant.Outlined" Required="true" Class="mt-2" />
+                <p class="so-panel-text--sm">Açıklamanın son satırı otomatik eklenir ve değiştirilemez (mutabakatta OR'u bulmak için): <code class="sa-or-reference">@p.PlanReference</code></p>
+                <div class="sa-or-actions">
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Preview" Disabled="@Working" OnClick="RefreshPreviewAsync">Önizlemeyi güncelle</MudButton>
+                    <MudButton Variant="Variant.Text" Disabled="@Working" OnClick="TemplateAsync">Şablona dön</MudButton>
+                </div>
+
+                <h5 class="sa-or-sub">Gönderilecek alanlar (son önizleme)</h5>
+                <dl class="sa-or-fields">
+                    @foreach (OperationalRecordFieldView field in p.Fields)
+                    {
+                        <dt>@field.Name <span class="so-panel-text--sm">(@field.Source)</span></dt>
+                        <dd class="sa-or-value">@field.Value</dd>
+                    }
+                </dl>
+
+                @if (Dirty)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true" role="status">Metni veya ortamı değiştirdiniz. Göndermeden önce "Önizlemeyi güncelle"yi seçin: gönderilen metin önizlenen metnin aynısı olmalı.</MudAlert>
+                }
+                else if (!p.CanSubmit)
+                {
+                    <MudAlert Severity="@(p.BlockedReason == "environmentRequired" ? Severity.Info : Severity.Warning)" Dense="true" role="alert">@(p.BlockedLabel ?? "Bu önizleme gönderilemez.")</MudAlert>
+                }
+
+                <div class="sa-or-confirm" role="group" aria-label="Ayrı onay">
+                    <p class="so-panel-text--sm">
+                        <strong>Ayrı onay:</strong> bu içerikle Turuncu Hat'ta bir OR açılır; Bildiren ve etkilenen kullanıcı siz olursunuz. Bu bir onay adımı değildir,
+                        OR'un onayı Turuncu Hat'ta yürür. Ürün OR'u kapatamaz veya geri alamaz.@(p.Synthetic ? " Bu ortamda sağlayıcı sentetiktir; gerçek OR açılmaz." : "")
+                    </p>
+                    <div class="sa-or-actions">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Send" Disabled="@(!CanConfirm)" OnClick="ConfirmAsync">Bu içerikle OR aç</MudButton>
+                        <MudButton Variant="Variant.Text" Disabled="@Working" OnClick="Close">Vazgeç</MudButton>
+                    </div>
+                </div>
+                <SaProblem Problem="@_submitProblem" />
+                @if (_submitNotSent)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true" role="status">Başka bir işlem sürüyordu; istek gönderilmedi. Tekrar deneyin.</MudAlert>
+                }
+                @if (_submitUnknown)
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true" role="alert">
+                        Cevap alınamadı: OR açılmış olabilir. Önce listeyi yenileyin. Yeniden denemek aynı işlem anahtarını kullanır; sunucu ilk sonucu döndürür, ikinci OR açılmaz.
+                    </MudAlert>
+                    <div class="sa-or-actions">
+                        <MudButton Variant="Variant.Outlined" Disabled="@Working" OnClick="ReloadAsync">Listeyi yenile</MudButton>
+                        <MudButton Variant="Variant.Outlined" Disabled="@Working" OnClick="RetrySameKeyAsync">Aynı anahtarla yeniden dene</MudButton>
+                    </div>
+                }
+            }
+        </div>
+    };
+
+    private RenderFragment Reconcile(OperationalRecordAccountView account, OperationalRecordSubmissionView current) => __builder =>
+    {
+        bool mine = _reconAccount == account.AccountId;
+        <p class="so-panel-text--sm">
+            Turuncu Hat'ta plan referansıyla arayın. Bulursanız numarayı kontrol edip bağlayın (bulunamayan numara "doğrulanamadı" olarak bağlanır).
+            Bulamazsanız açılmadığını gerekçesiyle teyit edin; teyitten sonra yeni bir OR açılabilir. Yanlış bir "açılmadı" teyidi ikinci bir OR'a yol açabilir.
+        </p>
+        <MudTextField T="string" @bind-Value="_number" Label="Turuncu Hat'taki OR numarası" Placeholder="OR-123456" MaxLength="24" Immediate="true" Variant="Variant.Outlined"
+                      Disabled="@(!account.CanLink)" />
+        @if (account.CanLink)
+        {
+            <MudButton Variant="Variant.Outlined" Class="mt-1" StartIcon="@Icons.Material.Filled.Search" Disabled="@(Working || string.IsNullOrWhiteSpace(_number))"
+                       OnClick="@(() => CheckNumberAsync(account.AccountId))">Numarayı Turuncu Hat'ta kontrol et</MudButton>
+        }
+        @if (mine && _candidate is { } c)
+        {
+            <div class="sa-or-tracking" aria-live="polite">
+                <SoFieldGrid>
+                    <SoField Label="Numara" Value="@c.Number" />
+                    <SoField Label="Arama sonucu" Value="@c.LookupLabel" />
+                    <SoField Label="Başlık" Value="@OperationalRecordPresentation.Known(c.Title)" />
+                    <SoField Label="Başlık gönderimle aynı mı" Value="@(c.TitleMatchesSubmission switch { true => "Evet", false => "Hayır — doğru OR olduğundan emin olun", null => "bilinmiyor" })" />
+                    @if (c.Tracking is { } t)
+                    {
+                        <SoField Label="Son güncelleme" Value="@OperationalRecordPresentation.Known(t.LastModified)" />
+                        <SoField Label="Aktivite / yorum" Value="@($"{OperationalRecordPresentation.Count(t.ActivitiesKnown, t.ActivityCount)} / {OperationalRecordPresentation.Count(t.CommentsKnown, t.CommentCount)}")" />
+                    }
+                </SoFieldGrid>
+                @if (c.Synthetic) { <p class="so-panel-text--sm">Sentetik arama sonucudur.</p> }
+            </div>
+        }
+        <MudTextField T="string" @bind-Value="_reason" Label="Gerekçe (zorunlu)" Lines="2" MaxLength="1000" Immediate="true" Variant="Variant.Outlined" Class="mt-2" />
+        <div class="sa-or-actions">
+            @if (account.CanLink)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(Working || string.IsNullOrWhiteSpace(_number) || string.IsNullOrWhiteSpace(_reason))"
+                           OnClick="@(() => LinkAsync(account.AccountId, current.Id))">Bu OR'u bağla</MudButton>
+            }
+            @if (account.CanConfirmNotCreated)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" Disabled="@(Working || string.IsNullOrWhiteSpace(_reason))"
+                           OnClick="@(() => NotCreatedAsync(account.AccountId, current.Id))">OR açılmadığını teyit et</MudButton>
+            }
+        </div>
+        @if (mine)
+        {
+            <SaProblem Problem="@_reconProblem" />
+            @if (_reconUnknown) { <MudAlert Severity="Severity.Warning" Dense="true" role="alert">Cevap alınamadı; kaydedilip kaydedilmediği bilinmiyor. Listeyi yenileyin.</MudAlert> }
+        }
+    };
+
+    private static int BodyMax(OperationalRecordPreview preview) => Math.Max(1, preview.DescriptionMax - preview.PlanReference.Length - 2);
+}
