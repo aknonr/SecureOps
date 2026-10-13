@@ -265,6 +265,9 @@ public static class ServiceAccountRules
         return unmet;
     }
 
+    /// <summary>Whether a performed action of <paramref name="actionType"/> counts for a request of <paramref name="requestType"/> (the close rule's match).</summary>
+    public static bool RequestAccepts(ServiceAccountActionType requestType, ServiceAccountActionType actionType) => Matches(requestType, actionType);
+
     private static bool Matches(ServiceAccountActionType requestType, ServiceAccountActionType actionType) =>
         requestType == actionType
         || requestType == ServiceAccountActionType.GmsaHandover && actionType == ServiceAccountActionType.GmsaConversion

@@ -63,7 +63,8 @@ public sealed class SqlAssetContractTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray()!;
         migrationNames.Should().Equal(schemaNames)
-            .And.HaveCount(34)
+            .And.HaveCount(35)
+            .And.ContainSingle(name => name == "036-service-account-events.sql")
             .And.ContainSingle(name => name == "034-service-account-plan-evidence.sql")
             .And.ContainSingle(name => name == "033-service-account-change-plans.sql")
             .And.ContainSingle(name => name == "032-access-request-user-index.sql")
@@ -400,6 +401,37 @@ public sealed class SqlAssetContractTests
         candidate.Should().NotContain("ChangePlanItem").And.NotContain("GRANT").And.NotContain("DROP TABLE").And.NotContain("ALTER ROLE")
             .And.NotContain("INSERT").And.NotContain("UPDATE ").And.NotContain("DELETE ").And.NotContainEquivalentOf("password");
     }
+    [Fact]
+    public void AccountEventMigration_IsAdditive_AppendOnly_HasNoTextColumn_AndGrantsOnlySelectInsert()
+    {
+        string root = FindRepositoryRoot();
+        string migration = File.ReadAllText(Path.Combine(root, "sql", "migrations", "036-service-account-events.sql"));
+        string schema = File.ReadAllText(Path.Combine(root, "sql", "schema", "036-service-account-events.sql"));
+        string candidate = File.ReadAllText(Path.Combine(root, "sql", "pending", "service-accounts", "SA-009-account-events.sql"));
+        string grants = File.ReadAllText(Path.Combine(root, "sql", "pending", "service-accounts", "SA-009-API-permissions.sql"));
+
+        migration.Should().Contain(":r ../schema/036-service-account-events.sql");
+        schema.Should().Contain("requires reviewed 025").And.Contain(":r ../pending/service-accounts/SA-009-account-events.sql");
+        candidate.Should().Contain("already applied; compare definitions, do not replay").And.Contain("THROW 51410");
+        foreach (string table in new[] { "AccountEvents", "AccountEventItems" })
+        {
+            candidate.Should().Contain($"CREATE TABLE svcacct.{table}(");
+            candidate.Should().MatchRegex($@"CREATE TRIGGER svcacct\.TR_Sa{table}_AppendOnly ON svcacct\.{table} AFTER UPDATE, DELETE AS\s+BEGIN THROW 51411");
+            grants.Should().Contain($"GRANT SELECT, INSERT ON OBJECT::svcacct.{table} TO svcacct_api_runtime;");
+        }
+
+        // E5: one key per account. Design §5.6: no mail body, sender, name, address or other free-text column (no nvarchar at all).
+        candidate.Should().Contain("CONSTRAINT UQ_SaAccountEvents_Key UNIQUE (AccountId, IdempotencyKey)");
+        string ddl = string.Join('\n', candidate.Split('\n').Where(l => !l.TrimStart().StartsWith("--", StringComparison.Ordinal))).Split("*/", 2)[1];
+        // "PasswordChanged" is an event kind value; no column may hold a password, a body or any other text.
+        ddl.Should().NotContainEquivalentOf("nvarchar").And.NotContainEquivalentOf("varbinary").And.NotContain("ALTER TABLE").And.NotContain("DROP ").And.NotContain("GRANT");
+        Regex.Matches(ddl, @"^\s+(\w+) [a-z]+", RegexOptions.Multiline).Select(m => m.Groups[1].Value)
+            .Should().NotContain(c => c.Contains("Password", StringComparison.OrdinalIgnoreCase) || c.Contains("Body", StringComparison.OrdinalIgnoreCase)
+                || c.Contains("Subject", StringComparison.OrdinalIgnoreCase) || c.Contains("Sender", StringComparison.OrdinalIgnoreCase));
+        Regex.Matches(ddl, @"CREATE TABLE").Should().HaveCount(2, "036 adds only the event header and item tables");
+        grants.Should().NotContain("UPDATE").And.NotContain("DELETE").And.NotContain("ALTER ROLE").And.NotContain("svcacct_worker");
+    }
+
     [Fact]
     public void RequestedGmsaNameMigration_AddsTwoNullableColumns_RefusesReplay_AndGrantsNothing()
     {

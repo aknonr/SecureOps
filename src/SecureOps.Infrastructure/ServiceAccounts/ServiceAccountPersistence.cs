@@ -60,6 +60,14 @@ public static class SaErrors
     public const string ChangePlanState = "ServiceAccountChangePlanStateConflict";
     /// <summary>Plan evidence (migration 034: Evidence owner type ChangePlan) is not installed on this database.</summary>
     public const string ChangePlanEvidenceNotInstalled = "ServiceAccountChangePlanEvidenceNotInstalled";
+    /// <summary>Account event tables (migration 036) are not installed on this database.</summary>
+    public const string EventsNotInstalled = "ServiceAccountEventsNotInstalled";
+    /// <summary>The account or the linked request changed after the preview (or the digest differs); nothing was written.</summary>
+    public const string EventStale = "ServiceAccountEventStale";
+    /// <summary>The idempotency key was already used on this account with a different draft; nothing was written.</summary>
+    public const string IdempotencyKeyReused = "ServiceAccountEventIdempotencyKeyReused";
+    /// <summary>The request cannot be closed after these records (missing conditions in <c>current</c>); nothing was written.</summary>
+    public const string CloseNotAllowed = "ServiceAccountEventCloseNotAllowed";
 }
 
 /// <summary>Scope inputs loaded for one caller.</summary>

@@ -194,6 +194,52 @@ public sealed class ServiceAccountApiCompositionTests
     }
 
     [Fact]
+    public void EventRoutes_NeedWork_AreBounded_AndRefusalsMapToStableStatuses()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient _ = factory.CreateApiClient();
+        RouteEndpoint[] prefixed = [.. factory.Services.GetServices<EndpointDataSource>().SelectMany(s => s.Endpoints).OfType<RouteEndpoint>()
+            .Where(e => e.RoutePattern.RawText?.StartsWith("api/v1/service-accounts/accounts/{id:guid}/events", StringComparison.Ordinal) == true)];
+        // Mail hints (OLAY-2b, its own controller and 128 KB bound) share the prefix; any other route under it must be reviewed here.
+        static Type? Controller(RouteEndpoint e) => e.Metadata.GetMetadata<Microsoft.AspNetCore.Mvc.Controllers.ControllerActionDescriptor>()?.ControllerTypeInfo.AsType();
+        prefixed.Select(e => (Controller(e), e.RoutePattern.RawText!)).Should().BeEquivalentTo(new[]
+        {
+            (typeof(SecureOps.Api.Controllers.ServiceAccounts.ServiceAccountEventsController), "api/v1/service-accounts/accounts/{id:guid}/events/preview"),
+            (typeof(SecureOps.Api.Controllers.ServiceAccounts.ServiceAccountEventsController), "api/v1/service-accounts/accounts/{id:guid}/events"),
+            (typeof(SecureOps.Api.Controllers.ServiceAccounts.ServiceAccountMailHintsController), "api/v1/service-accounts/accounts/{id:guid}/events/mail-hints")
+        });
+        RouteEndpoint[] endpoints = [.. prefixed.Where(e => Controller(e) == typeof(SecureOps.Api.Controllers.ServiceAccounts.ServiceAccountEventsController))];
+        endpoints.Select(e => (e.Metadata.GetMetadata<HttpMethodMetadata>()!.HttpMethods.Single(), e.RoutePattern.RawText!)).Should().BeEquivalentTo(new[]
+        {
+            ("POST", "api/v1/service-accounts/accounts/{id:guid}/events/preview"),
+            ("POST", "api/v1/service-accounts/accounts/{id:guid}/events")
+        }, "a preview and a commit only: no GET of mail text, no update or delete");
+        foreach (RouteEndpoint endpoint in endpoints)
+        {
+            endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>().Select(a => a.Policy).Should().Contain(ServiceAccountPolicies.Work);
+            endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Http.Metadata.IRequestSizeLimitMetadata>()!.MaxRequestBodySize.Should().Be(64L * 1024);
+        }
+
+        ControllerBase controller = new Probe { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() } };
+        foreach ((string code, string? field, int status) in new[]
+        {
+            (SaErrors.Invalid, "blockNotAllowed:action", StatusCodes.Status400BadRequest),
+            (SaErrors.Invalid, "requestAccountMismatch", StatusCodes.Status400BadRequest),
+            (SaErrors.IdempotencyKey, "idempotencyKey", StatusCodes.Status400BadRequest),
+            (SaErrors.Forbidden, "eventItemDenied", StatusCodes.Status403Forbidden),
+            (SaErrors.EventStale, "previewDigest", StatusCodes.Status409Conflict),
+            (SaErrors.IdempotencyKeyReused, "idempotencyKey", StatusCodes.Status409Conflict),
+            (SaErrors.CloseNotAllowed, "closeRequest", StatusCodes.Status422UnprocessableEntity),
+            (SaErrors.EventsNotInstalled, null, StatusCodes.Status503ServiceUnavailable)
+        })
+        {
+            ObjectResult result = ServiceAccountReplies.Reply(controller, SaResult<EventPreview>.Fail(code, field)).Result.Should().BeOfType<ObjectResult>().Subject;
+            result.StatusCode.Should().Be(status, code + " " + field);
+            result.Value.Should().BeAssignableTo<ProblemDetails>().Which.Extensions["code"].Should().Be(code);
+        }
+    }
+
+    [Fact]
     public void ChangePlanRefusals_MapToStableStatuses()
     {
         ControllerBase controller = new Probe { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() } };

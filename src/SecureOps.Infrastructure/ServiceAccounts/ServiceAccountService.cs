@@ -42,7 +42,7 @@ public sealed partial class ServiceAccountService(SqlServiceAccountRepository? r
             return new SaResult<ServiceAccountMe>(new ServiceAccountMe(true,
                 [.. ServiceAccountCapabilities.All.Where(caller.Can)],
                 caller.Scope.All ? "All" : caller.Scope.Organizations.Count > 0 ? "Organization" : caller.Scope.Teams.Count > 0 ? "Team" : "None",
-                orgs, teams, !caller.Scope.IsEmpty));
+                orgs, teams, !caller.Scope.IsEmpty, await repository.AccountEventsInstalledAsync(cancellationToken)));
         }, cancellationToken);
 
     /// <summary>What needs the caller's attention on entry (own teams' requests; coordinator scope counts).</summary>
