@@ -81,6 +81,20 @@ internal sealed class ServiceAccountSqlFixture
         new(Repository, _access, Options.Create(new ServiceAccountOptions { Provider = "SqlServer" }), TimeProvider.System, new SafeSqlLogger(SqlDiagnostics),
             directory);
 
+    /// <summary>The same service wired to the OR ports (ADR-0030, OR-2: Fake or Disabled creator, Fake ITSM lookup, tracking and user match).</summary>
+    public ServiceAccountService WithOperationalRecords(ServiceAccountOperationalRecordPorts ports, ServiceAccountOptions? options = null) =>
+        new(Repository, _access, Options.Create(options ?? new ServiceAccountOptions { Provider = "SqlServer" }), TimeProvider.System,
+            new SafeSqlLogger(SqlDiagnostics), null, ports);
+
+    /// <summary>A synthetic user whose server-held login name and registration number feed the ITSM user match (ADR-0032).</summary>
+    public async Task<SynUser> UserWithItsmIdentityAsync(string? loginName, string? uid, params string[] capabilities)
+    {
+        SynUser user = await UserAsync(capabilities);
+        ApplicationUser named = user.User with { LoginName = loginName, Uid = uid };
+        _users[named.CorporateIdentity] = named;
+        return user with { User = named };
+    }
+
     public IConfiguration Configuration { get; }
 
     public SqlServiceAccountRepository Repository { get; }
