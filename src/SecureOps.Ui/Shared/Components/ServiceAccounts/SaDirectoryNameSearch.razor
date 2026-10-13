@@ -3,10 +3,13 @@
    exactly one record in the caller's scope. Choosing a result grants nothing, confirms no ownership and changes nothing in
    the directory; exact account lookup stays on its own page. *@
 @using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services
 
 <section class="so-panel" aria-labelledby="sa-directory-search">
     <h2 id="sa-directory-search" class="so-panel-title">Dizinde ada göre ara</h2>
     <p class="so-panel-text--sm">
+        Bir <strong>kişiyi</strong> kurumsal dizinde ada göre bulur ve o kişinin hesabına karşılık gelen servis hesabı kaydı varsa bağlantısını
+        verir. Aşağıdaki liste süzgecinden farklıdır: o yalnız kayıtlı servis hesaplarını süzer, dizine bakmaz.
         Ad veya ad soyad yazın (en az @MinimumLetters harf). En çok @MaximumResults sonuç gösterilir; daha fazlası varsa aramayı daraltın.
         Seçim yetki vermez, hesap sahipliğini onaylamaz ve dizinde değişiklik yapmaz. Hesap adını biliyorsanız
         <a href="identity-lookup">tam hesap sorgusunu</a> kullanın.
@@ -19,11 +22,27 @@
     </div>
     <p id="sa-directory-hint" class="so-panel-text--sm mt-1">@Hint</p>
 
-    @if (Result is { } result)
+    @* Distinct states: not searched yet (nothing shown), searching, failed (directory unreachable or not set up: the answer is
+       unknown), no match, matches. A failure is never shown as "no match". *@
+    @if (Busy && Queried is not null)
+    {
+        <p role="status" class="so-panel-text--sm mt-2">Dizinde aranıyor…</p>
+    }
+    else if (Problem is not null)
+    {
+        <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2" role="alert">
+            Arama tamamlanmadı: @Problem.Title. Sonuç bilinmiyor; bu, kişinin dizinde olmadığı anlamına gelmez.
+            @if (Problem.Code == "ServiceAccountDirectoryUnavailable") { <text>Dizin bu ortamda ayarlı olmayabilir ya da şu an erişilemiyor olabilir (ikisi bu ekranda ayırt edilemiyor).</text> }
+            else { @Problem.Explanation }
+            @if (Problem.Retryable) { <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="SearchAsync">Tekrar dene</MudButton> }
+        </MudAlert>
+    }
+    else if (Result is { } result)
     {
         @if (result.Matches.Count == 0)
         {
-            <SoEmptyState Title="Eşleşen kişi bulunamadı" Description="Yazımı kontrol edin; Türkçe karakterler (İ/ı, ş, ğ) aynen veya ASCII yazılabilir." />
+            <SoEmptyState Title="@($"“{Queried}” için dizinde eşleşme bulunamadı")"
+                Description="Dizin yanıt verdi ve bu ada uyan kişi döndürmedi. Yazımı kontrol edin; Türkçe karakterler (İ/ı, ş, ğ) aynen veya ASCII yazılabilir. Bu, kişinin dizinde hiç olmadığını göstermez." />
         }
         else
         {
@@ -67,10 +86,16 @@
 </section>
 
 @code {
-    private string? _query;
+    private string? _query, _lastQuery;
 
     /// <summary>Last answer, or null before the first search.</summary>
     [Parameter] public DirectoryNameSearchResponse? Result { get; set; }
+
+    /// <summary>Failure of the last search (directory unreachable or not set up, rejected query); null when it completed.</summary>
+    [Parameter] public UiProblem? Problem { get; set; }
+
+    /// <summary>The query of the search whose answer, failure or wait is shown (the page that owns the answer supplies it).</summary>
+    [Parameter] public string? SearchedQuery { get; set; }
 
     /// <summary>Call in flight.</summary>
     [Parameter] public bool Busy { get; set; }
@@ -90,13 +115,20 @@
     /// <summary>Maximum results (mirrors the server rule).</summary>
     [Parameter] public int MaximumResults { get; set; } = 10;
 
+    private string? Queried => SearchedQuery ?? _lastQuery;
+
     private int Letters => (_query ?? string.Empty).Count(char.IsLetter);
 
     private bool Searchable => Letters >= MinimumLetters;
 
     private string Hint => Searchable ? "Aramaya hazır." : $"Aramak için en az {MinimumLetters} harf yazın ({Letters}/{MinimumLetters}).";
 
-    private Task SearchAsync() => Searchable ? OnSearch.InvokeAsync(_query!.Trim()) : Task.CompletedTask;
+    private Task SearchAsync()
+    {
+        if (!Searchable) { return Task.CompletedTask; }
+        _lastQuery = _query!.Trim();
+        return OnSearch.InvokeAsync(_lastQuery);
+    }
 
     private Task EnterAsync(KeyboardEventArgs args) => args.Key == "Enter" ? SearchAsync() : Task.CompletedTask;
 }

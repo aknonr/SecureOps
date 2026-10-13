@@ -32,6 +32,21 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
   close-readiness, deterministic mail hints, migration 036 reserved, threat table E1-E14, split OLAY-2a/2b/2c/3). Owner questions S1-S8 open.
   Reported is not verified: the flow never writes Verified. OLAY-3 (UI) waits for F4.
 
+## First TEST acceptance — UI fixes (F4; branch `feature/service-accounts-first-acceptance-ui-20261013`, merged #42 → master `101c1f5`)
+
+- List shortcut buttons did nothing while the list was open (Blazor updates parameters, `OnParametersSet` only set `_status`). Now a changed
+  query string re-applies exactly that shortcut's filter (all other filters cleared), returns to page 1 and re-reads; no change, no re-read.
+- Counts: the list says what its total counts ("kapsamınızdaki tüm hesaplar" vs the applied filter) and, for `status=proposed` from the card,
+  whether it equals the card's number. Cards carry hints ("farklı hesap", "talep/bildirim sayısı, hesap değil"); the shortcut shows the count.
+  Both numbers count distinct in-scope accounts with a Proposed ownership; no API gap.
+- List search field is "Hesap adı" (the API never searched SID); filters apply on Listele/Enter, said on the page. Directory name search has
+  distinct states: waiting, could not search (unknown, may be not set up or unreachable), no match for the searched name, matches, truncated.
+- Usage-scan texts: the system does not scan; read-only JEA scanning is a separate capability without Information Security approval (ADR-0024 R2).
+- Short guide fix (list "Bul" step). Import rows: "Excel satırı N", a one-line reason for Conflict/Invalid/OutOfScope, error lines name sheet and row,
+  and a missing server detail is stated. The event-oriented guide ("Ne oldu?") is OLAY-1, not here.
+- Gaps recorded: `docs/26-ui-backend-contract-gaps.md` G-37. Tests: `ServiceAccountFirstAcceptanceUiTests` (renders the real list page with a
+  synthetic API; reverting the fix makes the shortcut tests fail). Not verified: the real browser journey and corporate TEST.
+
 ## Change plan d, PR 2 (branch `feature/service-accounts-change-plan-checklist-20261012`, from the PR 1 branch `db56856`, not merged)
 
 - Contract first (`a737d2b`, pushed for F and G): `GET/POST change-plans/{id}/items/{itemId}/checks`, `POST .../evidence`,

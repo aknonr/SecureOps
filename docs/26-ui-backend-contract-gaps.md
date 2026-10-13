@@ -43,6 +43,7 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-34 — Concurrent first registrations can deadlock in the access store | Fixed in source and synthetic LocalDB — 032 index / one registration retry; installed TEST unchanged; module tests remain serialised |
 | G-35 — Unsafe API requests lack a central CSRF guard | Locally verified repair; corporate Negotiate/IIS/F5 acceptance pending |
 | G-36 — Change-plan checklist and closing have no API yet (plus two smaller plan-contract gaps) | Item 1 closed 2026-10-12 (API in #36, UI in F3); items 2 and 3 remain open |
+| G-37 — First TEST acceptance: no SID search, directory "not configured" vs "unreachable", free-text import row errors | Open (2026-10-13); the UI shows honest wording meanwhile |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -1216,6 +1217,25 @@ corporate systems, provider writes, merge and deployment remain outside scope.
 **Honest states in the UI today:** 404 on a plan (missing or any account out of scope: same body), 409 with the server's current view
 (`previewStale`, `planNotPreviewed`, `planNotEditable`, `planClosed`, or the concurrency conflict), 400 with per-account results, 403 with
 `approverIsPlanner` / `approverChangedPlan`, 503 `ServiceAccountChangePlansNotInstalled` (033 missing: nothing is written).
+
+## G-37 — First TEST acceptance: three small contract gaps behind honest UI wording
+
+**Raised:** 2026-10-13, UI fixes after the owner's first acceptance on TEST (branch `feature/service-accounts-first-acceptance-ui-20261013`).
+**Owner:** Service Accounts module (owner-approved scoped exception); the UI never invents these.
+
+1. **No SID search in the account list.** `GET accounts?search=` matches `NormalizedName` only (`SqlServiceAccountRepository.Accounts.cs`).
+   The list field was labelled "Hesap adı veya SID"; the UI now says "Hesap adı" and states that SID and the directory are not searched.
+   Needed only if the owner wants SID search: a `sid` filter (exact, case-insensitive) on the list route.
+2. **Directory name search cannot tell "not configured" from "unreachable".** `POST directory/name-search` answers both with 503
+   `ServiceAccountDirectoryUnavailable` (the audit row differs: `NotConfigured` vs `ProviderUnavailable`/`Timeout`). The UI therefore says
+   "the directory may be not set up or unreachable" and never shows a failed search as "no match". Needed: a distinct stable code
+   (for example `ServiceAccountDirectoryNotConfigured`) so the UI can name the cause.
+3. **Import row errors are free text.** `ImportRowView.Errors` is a list of strings without a column or stable code, so the UI can name the
+   sheet and Excel row but not the offending column, and cannot translate the reason. Needed: `{ column, code }` items (codes translated
+   by the UI like `ServiceAccountProblems.FieldText`). Until then an `Invalid` row with an empty `Errors` list is shown as "the server sent no detail".
+
+Counts: no gap. "Sahiplik kararı bekleyen hesap" (work summary) and `status=proposed` (list) both count distinct accounts with a `Proposed`
+ownership inside the caller's scope; the list now says what its total counts and whether it equals the card.
 
 ## Note: enums cross the wire as numbers
 
