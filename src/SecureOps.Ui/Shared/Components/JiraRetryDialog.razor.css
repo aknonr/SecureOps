@@ -12,3 +12,21 @@
     line-height: 1.5;
     color: var(--so-text-muted);
 }
+
+/* Bordered and led by a bold refusal, so the blocked state does not rely on colour. */
+.so-dialog-note--blocked {
+    padding: var(--so-space-2) var(--so-space-3);
+    border-left: 4px solid var(--so-danger);
+    color: var(--so-text);
+}
+
+.so-dialog-details { margin: 0 0 var(--so-space-3); }
+
+.so-dialog-body {
+    margin: var(--so-space-2) 0 0;
+    max-height: 12rem;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 0.85rem;
+}

@@ -94,3 +94,18 @@
 @media (max-width: 480px) {
     .so-jira-submit { padding: var(--so-space-3); }
 }
+
+/* Underlined and icon-marked, so the external link is not signalled by colour alone. */
+.so-jira-submit-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--so-space-1);
+    color: var(--so-accent);
+    text-decoration: underline;
+    overflow-wrap: anywhere;
+}
+
+.so-jira-submit-link:focus-visible {
+    outline: 2px solid var(--so-accent);
+    outline-offset: 2px;
+}

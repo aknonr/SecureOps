@@ -6,8 +6,9 @@
     resolved by JiraSubmissionView from the re-read record first, so a command response is shown as
     an acknowledgement until the saved record carries the issue key.
 
-    Everything rendered is the server's: the preview mapping, the persisted key, the transfer key and
-    the support reference. No Jira address is composed here; the contract does not carry one.
+    Everything rendered is the server's: the preview mapping, the persisted key and its save time, the
+    transfer key, the issue address and the support reference. No Jira address is composed here: a
+    link is rendered only from the server's https jiraIssueUrl, otherwise the key stays plain text.
 *@
 
 <section class="so-jira-submit so-jira-submit--@Phase.ToString().ToLowerInvariant()"
@@ -38,13 +39,27 @@
                     }
                 </SoField>
                 <SoField Label="Jira bağlantısı">
-                    <span class="so-field-empty">Sunucu bağlantı adresi sağlamıyor; anahtarı Jira'da arayın.</span>
+                    @if (JiraSubmissionView.SafeIssueUrl(Record.JiraIssueUrl) is { } issueUrl)
+                    {
+                        <a class="so-jira-submit-link" href="@issueUrl" target="_blank" rel="noopener noreferrer" data-jira-link>
+                            @Record.JiraIssueKey kaydını Jira'da aç
+                            <MudIcon Icon="@Icons.Material.Outlined.OpenInNew" Size="Size.Small" aria-hidden="true" />
+                            <span class="sr-only">(yeni sekmede açılır)</span>
+                        </a>
+                    }
+                    else
+                    {
+                        <span class="so-field-empty">Sunucu bağlantı adresi sağlamıyor; anahtarı Jira'da arayın.</span>
+                    }
+                </SoField>
+                <SoField Label="Anahtarın kaydedildiği zaman (yerel)">
+                    <span data-key-persisted-at>@JiraSubmissionView.LocalTime(Record.JiraIssueKeyPersistedAt)</span>
                 </SoField>
                 <SoField Label="Kaynak OR">
                     <code class="so-code">@Record.OrCode</code>
                     @(Record.SourceCloseRequested ? " · kapatma istendi" : " · açık bırakıldı")
                 </SoField>
-                @if (Attempt?.Transfer is { IdempotencyKey: { Length: > 0 } transferKey })
+                @if ((Record.TransferIdempotencyKey ?? Attempt?.Transfer?.IdempotencyKey) is { Length: > 0 } transferKey)
                 {
                     <SoField Label="Sunucu aktarım anahtarı">
                         <code class="so-code so-code--sm">@transferKey</code>
@@ -65,6 +80,10 @@
                     @if (Attempt?.Problem?.Code == OperationalErrorCodes.JiraAlreadyCreated)
                     {
                         <strong> Son istek ikinci bir kayıt oluşturmadı; mevcut kayıt korundu.</strong>
+                    }
+                    @if (Attempt?.Transfer is { Replayed: true })
+                    {
+                        <strong data-replayed> Son istek Jira'ya gönderilmedi: aynı komut daha önce tamamlanmıştı ve sunucu kayıtlı sonucu döndürdü.</strong>
                     }
                 </span>
             </p>
@@ -93,6 +112,12 @@
                     <code class="so-code so-code--sm">@transfer.CorrelationId</code>
                 </SoField>
             </SoFieldGrid>
+            @if (transfer.Replayed)
+            {
+                <p class="so-jira-submit-note" data-replayed>
+                    Bu yanıt aynı komutun daha önce tamamlanmış sonucudur; bu istekte Jira'ya yeni çağrı yapılmadı.
+                </p>
+            }
             <ul class="so-jira-submit-steps">
                 <li>Kayıtlı durumu görmek için sayfanın üstündeki Yenile düğmesini kullanın. Yenileme yeni bir Jira isteği göndermez.</li>
                 <li>Anahtar kayıtlı durumda görünmüyorsa yeni gönderim yapmadan destek referansıyla platform yöneticisine bildirin.</li>
@@ -111,7 +136,29 @@
             break;
 
         case JiraSubmissionView.Phase.Uncertain:
+            @if (UncertainKind is JiraSubmissionView.UncertainKind.SentAwaitingAnswer or JiraSubmissionView.UncertainKind.SentNoAnswer)
+            {
+                @* Read from durable state, so this survives a page reload: the server recorded that the
+                   Jira request started and has saved no result. *@
+                <SoFieldGrid MinColumnWidth="200px">
+                    <SoField Label="Kayıtlı aşama">@OperationalRecordView.StateLabel(Record.WorkflowState) · kayıtlı Jira anahtarı yok</SoField>
+                    <SoField Label="Son kayıtlı değişiklik (yerel)">@JiraSubmissionView.LocalTime(Record.UpdatedAt)</SoField>
+                    <SoField Label="İşlem kilidi">
+                        @(Record.Claimed ? "Etkin · bitiş " + JiraSubmissionView.LocalTime(Record.ClaimExpiresAt) : "Sona erdi; istek sonuçlanmadan bitti")
+                    </SoField>
+                    @if (Record.TransferIdempotencyKey is { Length: > 0 } pendingKey)
+                    {
+                        <SoField Label="Sunucu aktarım anahtarı">
+                            <code class="so-code so-code--sm">@pendingKey</code>
+                        </SoField>
+                    }
+                </SoFieldGrid>
+            }
             <ol class="so-jira-submit-steps">
+                @if (UncertainKind == JiraSubmissionView.UncertainKind.SentAwaitingAnswer)
+                {
+                    <li>İstek hâlâ sürüyor olabilir. Kilit bitişinden sonra Yenile ile kayıtlı durumu okuyun; bu sırada yeni gönderim yapmayın.</li>
+                }
                 <li>Jira sahibiyle birlikte, Jira'nın onaylı arayüzünde <code class="so-code">@Record.OrCode</code> operasyonel kaydına ait bir kayıt olup olmadığını kontrol edin. Boş arama sonucu tek başına kaydın olmadığını kanıtlamaz.</li>
                 <li>Bulunan kayıt kimliğini veya belirsizliği destek referansıyla platform yöneticisine bildirin. Mutabakat kaydedilmeden yeni gönderim yapmayın.</li>
                 <li>Kayıtlı durumu görmek için Yenile düğmesini kullanın. Yenileme yeni bir Jira isteği göndermez.</li>
@@ -273,6 +320,8 @@
     [Parameter]
     public int FocusRequest { get; set; }
 
+    private JiraSubmissionView.UncertainKind UncertainKind => JiraSubmissionView.UncertainKindOf(Record);
+
     private string? SupportReference =>
         Attempt?.Problem?.CorrelationId ?? Attempt?.Transfer?.CorrelationId ?? Record.CorrelationId;
 
@@ -285,7 +334,12 @@
             : "Jira kaydı mevcut",
         JiraSubmissionView.Phase.Acknowledged => "İstek yanıtlandı; Jira kaydı doğrulanmadı",
         JiraSubmissionView.Phase.Rejected => "Gönderim reddedildi",
-        JiraSubmissionView.Phase.Uncertain => "Sonuç belirsiz; mutabakat gerekli",
+        JiraSubmissionView.Phase.Uncertain => UncertainKind switch
+        {
+            JiraSubmissionView.UncertainKind.SentAwaitingAnswer => "Gönderildi; yanıt henüz kaydedilmedi",
+            JiraSubmissionView.UncertainKind.SentNoAnswer => "Gönderildi, yanıt kaydedilmedi; mutabakat gerekli",
+            _ => "Sonuç belirsiz; mutabakat gerekli"
+        },
         JiraSubmissionView.Phase.ReviewOnly => "İnceleme taslağı; gönderilemez",
         _ => "Gönderime hazır değil"
     };
@@ -303,8 +357,14 @@
             "Sunucu isteği yanıtladı, ancak yeniden okunan kayıtta kayıtlı bir Jira anahtarı yok. Bu yanıt oluşturulmuş bir Jira kaydı olarak kabul edilmez.",
         JiraSubmissionView.Phase.Rejected =>
             "Yeniden okunan kayıtta Jira anahtarı yok ve sonuç belirsiz olarak işaretlenmedi.",
-        JiraSubmissionView.Phase.Uncertain =>
-            "Jira'da kayıt oluşup oluşmadığı doğrulanamadı. Yeni bir gönderim mükerrer kayıt oluşturabileceği için gönderim ve yeniden deneme bu ekranda kapalıdır.",
+        JiraSubmissionView.Phase.Uncertain => UncertainKind switch
+        {
+            JiraSubmissionView.UncertainKind.SentAwaitingAnswer =>
+                "Sunucu Jira isteğini başlattı ve işlem kilidi hâlâ etkin; sonuç henüz kaydedilmedi. Yeni bir gönderim mükerrer kayıt oluşturabileceği için gönderim ve yeniden deneme bu ekranda kapalıdır.",
+            JiraSubmissionView.UncertainKind.SentNoAnswer =>
+                "Sunucu Jira isteğini başlattı, ancak sonuç kaydedilmeden işlem kilidi sona erdi. Jira'da kayıt oluşmuş olabilir. Yeni bir gönderim mükerrer kayıt oluşturabileceği için gönderim ve yeniden deneme bu ekranda kapalıdır.",
+            _ => "Jira'da kayıt oluşup oluşmadığı doğrulanamadı. Yeni bir gönderim mükerrer kayıt oluşturabileceği için gönderim ve yeniden deneme bu ekranda kapalıdır."
+        },
         JiraSubmissionView.Phase.ReviewOnly =>
             "Bu taslak operatör beyanına dayanır; yayımlama onayı veya uygunluk vermez.",
         _ => UnavailableReason ?? "Jira kaydı oluşturmadan önce önizleme alın."
