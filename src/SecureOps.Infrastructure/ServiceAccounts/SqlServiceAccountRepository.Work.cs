@@ -361,8 +361,9 @@ public sealed partial class SqlServiceAccountRepository
                 CAST(CASE WHEN NULLIF(e.EvidenceNote, '') IS NOT NULL OR NULLIF(e.VerificationNote, '') IS NOT NULL OR e.VerificationEvidenceId IS NOT NULL THEN 1 ELSE 0 END AS bit),
                 CAST(CASE WHEN EXISTS (SELECT 1 FROM svcacct.ExternalRecordLinks l JOIN svcacct.ExternalRecords x ON x.Id = l.ExternalRecordId
                     WHERE l.EntityType = 'Action' AND l.EntityId = e.Id AND x.RecordType = 'OR') THEN 1 ELSE 0 END AS bit),
-                CAST(CASE WHEN e.VoidedAt IS NOT NULL THEN 1 ELSE 0 END AS bit)
-            FROM svcacct.ActionEvents e WHERE e.RequestId = @requestId;
+                CAST(CASE WHEN e.VoidedAt IS NOT NULL THEN 1 ELSE 0 END AS bit), e.Id
+            FROM svcacct.ActionEvents e WHERE e.RequestId = @requestId
+            ORDER BY e.CreatedAt DESC, e.Id;
             """, new { requestId }, null, cancellationToken));
         (string Status, string Type, bool Owned)? request = await grid.ReadSingleOrDefaultAsync<(string Status, string Type, bool Owned)?>();
         if (request is not { } r)
@@ -370,9 +371,10 @@ public sealed partial class SqlServiceAccountRepository
             return null;
         }
 
-        ActionFacts[] actions = [.. (await grid.ReadAsync<(string Type, string Result, string Kind, DateOnly? Actual, DateOnly? Verified, bool HasVerifier, bool HasEvidence, bool HasOr, bool Voided)>())
+        ActionFacts[] actions = [.. (await grid.ReadAsync<(string Type, string Result, string Kind, DateOnly? Actual, DateOnly? Verified, bool HasVerifier, bool HasEvidence, bool HasOr, bool Voided,
+                Guid Id)>())
             .Select(a => new ActionFacts(Enum.Parse<ServiceAccountActionType>(a.Type), Enum.Parse<ServiceAccountActionResult>(a.Result),
-                Enum.Parse<ServiceAccountRecordKind>(a.Kind), a.Actual, a.Verified, a.HasVerifier, a.HasEvidence, a.HasOr, a.Voided))];
+                Enum.Parse<ServiceAccountRecordKind>(a.Kind), a.Actual, a.Verified, a.HasVerifier, a.HasEvidence, a.HasOr, a.Voided, a.Id))];
         return (Enum.Parse<ServiceAccountRequestStatus>(r.Status), Enum.Parse<ServiceAccountActionType>(r.Type), actions, r.Owned);
     }
 

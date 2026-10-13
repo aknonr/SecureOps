@@ -106,6 +106,15 @@ public sealed class ServiceAccountsController(ServiceAccountService service) : C
     public async Task<ActionResult<AccountDetail>> CloseRequestAsync(Guid id, CloseWorkRequest request, CancellationToken cancellationToken) =>
         ServiceAccountReplies.Reply(this, await service.CloseRequestAsync(User, Context(), id, request, cancellationToken));
 
+    /// <summary>
+    /// Why this request can or cannot be closed with <c>outcome</c> (default Completed): every missing condition from the same
+    /// server rule the close command uses. Read only; same scope as the account detail (out of scope = 404).
+    /// </summary>
+    [HttpGet("requests/{id:guid}/close-readiness")]
+    [ProducesResponseType(typeof(CloseReadiness), StatusCodes.Status200OK)]
+    public async Task<ActionResult<CloseReadiness>> CloseReadinessAsync(Guid id, [FromQuery] string? outcome = null, CancellationToken cancellationToken = default) =>
+        ServiceAccountReplies.Reply(this, await service.CloseReadinessAsync(User, Context(), id, outcome, cancellationToken));
+
     /// <summary>Reports a planned or performed action; the related request stays open.</summary>
     [HttpPost("accounts/{id:guid}/actions")]
     [Authorize(Policy = ServiceAccountPolicies.Work)]
