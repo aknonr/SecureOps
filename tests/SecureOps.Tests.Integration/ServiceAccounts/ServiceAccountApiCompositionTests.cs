@@ -156,8 +156,11 @@ public sealed class ServiceAccountApiCompositionTests
     {
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient _ = factory.CreateApiClient();
+        // The OR routes (ADR-0030, own controller) share the prefix and are reviewed in OperationalRecordRoutes_PoliciesMethodsAndBound.
         RouteEndpoint[] endpoints = [.. factory.Services.GetServices<EndpointDataSource>().SelectMany(s => s.Endpoints).OfType<RouteEndpoint>()
-            .Where(e => e.RoutePattern.RawText?.StartsWith("api/v1/service-accounts/change-plans", StringComparison.Ordinal) == true)];
+            .Where(e => e.RoutePattern.RawText?.StartsWith("api/v1/service-accounts/change-plans", StringComparison.Ordinal) == true
+                && e.Metadata.GetMetadata<Microsoft.AspNetCore.Mvc.Controllers.ControllerActionDescriptor>()?.ControllerTypeInfo.AsType()
+                    != typeof(SecureOps.Api.Controllers.ServiceAccounts.ServiceAccountOperationalRecordsController))];
         static string Method(RouteEndpoint e) => e.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()!.HttpMethods.Single();
         static string[] Policies(RouteEndpoint e) => [.. e.Metadata.GetOrderedMetadata<IAuthorizeData>().Select(a => a.Policy).OfType<string>()];
 
@@ -267,6 +270,91 @@ public sealed class ServiceAccountApiCompositionTests
                 problem.Extensions["field"].Should().Be(field);
             }
         }
+    }
+
+    [Fact]
+    public void OperationalRecordRoutes_PoliciesMethodsAndBound()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient _ = factory.CreateApiClient();
+        RouteEndpoint[] prefixed = [.. factory.Services.GetServices<EndpointDataSource>().SelectMany(s => s.Endpoints).OfType<RouteEndpoint>()
+            .Where(e => e.RoutePattern.RawText?.StartsWith("api/v1/service-accounts/", StringComparison.Ordinal) == true
+                && e.RoutePattern.RawText.Contains("operational-record", StringComparison.Ordinal))];
+        static string Method(RouteEndpoint e) => e.Metadata.GetMetadata<HttpMethodMetadata>()!.HttpMethods.Single();
+
+        // ADR-0030 (PROPOSED), OR-2: every route sits under the plan and the plan account; writes are POST only; there is no
+        // DELETE, no update of a sent OR and no route that retries a submission.
+        prefixed.Select(e => (Method(e), e.RoutePattern.RawText!)).Should().BeEquivalentTo(new[]
+        {
+            ("GET", "api/v1/service-accounts/change-plans/{id:guid}/operational-records"),
+            ("POST", "api/v1/service-accounts/change-plans/{id:guid}/accounts/{accountId:guid}/operational-record/preview"),
+            ("POST", "api/v1/service-accounts/change-plans/{id:guid}/accounts/{accountId:guid}/operational-record"),
+            ("POST", "api/v1/service-accounts/change-plans/{id:guid}/accounts/{accountId:guid}/operational-record/candidate"),
+            ("POST", "api/v1/service-accounts/change-plans/{id:guid}/accounts/{accountId:guid}/operational-record/link"),
+            ("POST", "api/v1/service-accounts/change-plans/{id:guid}/accounts/{accountId:guid}/operational-record/not-created"),
+            ("GET", "api/v1/service-accounts/change-plans/{id:guid}/accounts/{accountId:guid}/operational-record/tracking")
+        });
+        foreach (RouteEndpoint endpoint in prefixed)
+        {
+            string[] policies = [.. endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>().Select(a => a.Policy).OfType<string>()];
+            policies.Should().Contain(ServiceAccountPolicies.View, endpoint.RoutePattern.RawText);
+            policies.Except([ServiceAccountPolicies.View]).Should().BeEquivalentTo(Method(endpoint) == "GET" ? [] : new[] { ServiceAccountPolicies.Work },
+                endpoint.RoutePattern.RawText);
+            endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Http.Metadata.IRequestSizeLimitMetadata>()!.MaxRequestBodySize.Should().Be(64L * 1024);
+        }
+    }
+
+    [Fact]
+    public void OperationalRecordRefusals_MapToStableStatuses()
+    {
+        ControllerBase controller = new Probe { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() } };
+        foreach ((string code, string? field, int status) in new[]
+        {
+            (SaErrors.OperationalRecordCreationDisabled, (string?)null, StatusCodes.Status503ServiceUnavailable),
+            (SaErrors.OperationalRecordsNotInstalled, null, StatusCodes.Status503ServiceUnavailable),
+            (SaErrors.ChangePlanState, "orPreviewStale", StatusCodes.Status409Conflict),
+            (SaErrors.ChangePlanState, "submissionExists", StatusCodes.Status409Conflict),
+            (SaErrors.ChangePlanState, "requesterNotMatched", StatusCodes.Status409Conflict),
+            (SaErrors.ChangePlanState, "requesterLocationMissing", StatusCodes.Status409Conflict),
+            (SaErrors.ChangePlanState, "submissionInFlight", StatusCodes.Status409Conflict),
+            (SaErrors.ChangePlanState, "recordNumberInUse", StatusCodes.Status409Conflict),
+            (SaErrors.ChangePlanState, "recordMismatch", StatusCodes.Status409Conflict),
+            (SaErrors.IdempotencyKeyReused, "idempotencyKey", StatusCodes.Status409Conflict),
+            (SaErrors.IdempotencyKey, "idempotencyKey", StatusCodes.Status400BadRequest),
+            (SaErrors.Invalid, "environment", StatusCodes.Status400BadRequest)
+        })
+        {
+            ObjectResult result = ServiceAccountReplies.Reply(controller, SaResult<OperationalRecordSubmitResult>.Fail(code, field)).Result
+                .Should().BeOfType<ObjectResult>().Subject;
+            result.StatusCode.Should().Be(status, code + " " + field);
+            result.Value.Should().BeAssignableTo<ProblemDetails>().Which.Extensions["code"].Should().Be(code);
+        }
+    }
+
+    [Fact]
+    public async Task OperationalRecordCreation_IsDisabledByDefault_AndTheModuleGetsTheDisabledProvider()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient _ = factory.CreateApiClient();
+        factory.Services.GetRequiredService<SecureOps.Infrastructure.ItsmRequests.IItsmRequestCreator>()
+            .Should().BeOfType<SecureOps.Infrastructure.ItsmRequests.DisabledItsmRequestCreator>("fail closed: nothing configures a provider");
+        await ApproveAsync(factory, "demo:platform-admin", "Admin");
+        using HttpClient admin = factory.CreateApiClient();
+        admin.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
+        (await admin.PostAsync($"/api/v1/service-accounts/change-plans/{Guid.NewGuid()}/accounts/{Guid.NewGuid()}/operational-record",
+            JsonContent.Create(new { fingerprint = new string('a', 64), idempotencyKey = Guid.NewGuid() })))
+            .StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable, "the module itself is disabled in this composition; nothing is sent");
+    }
+
+    [Theory]
+    [InlineData("TuruncuHat")]
+    [InlineData("Unknown")]
+    public void OperationalRecordCreation_RefusesAnUnimplementedOrUnknownProviderAtStartup(string provider)
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory().WithWebHostBuilder(b => b.UseSetting("ItsmRequestCreation:Provider", provider));
+        Action start = () => factory.CreateClient().Dispose();
+        // The host fails before serving anything; the validation message names the setting (it may arrive wrapped by the host).
+        start.Should().Throw<Exception>().Where(e => e.ToString().Contains("ItsmRequestCreation:Provider", StringComparison.Ordinal));
     }
 
     [Fact]
