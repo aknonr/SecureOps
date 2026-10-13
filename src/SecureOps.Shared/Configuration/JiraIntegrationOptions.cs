@@ -12,6 +12,12 @@ public sealed class JiraIntegrationOptions
     /// <summary>HTTPS provider base URL.</summary>
     public string BaseUrl { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Optional absolute HTTPS address that, followed by an issue key, opens the issue for operators
+    /// (for example <c>https://jira.contoso.example/browse/</c>). Empty means no issue link is offered.
+    /// </summary>
+    public string IssueBrowseBaseUrl { get; set; } = string.Empty;
+
     /// <summary>Complete runtime Authorization header value; scheme remains deployment-owned.</summary>
     public string Authorization { get; set; } = string.Empty;
 

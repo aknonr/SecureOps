@@ -1,6 +1,6 @@
 # ADR-0031: Turuncu Hat Read-Only ITSM Record Lookup and Write Scope
 
-**Status:** Proposed (owner acceptance pending); lookup implemented behind Disabled default, no real Turuncu Hat call verified
+**Status:** Accepted (owner, 2026-10-13); lookup implemented behind Disabled default, no real Turuncu Hat call verified
 **Date:** 2026-10-12
 
 ## Context
@@ -81,3 +81,24 @@ It does not cover write paths, API endpoints, OpenAPI, SQL or UI, and it does no
 - ADR-0004, ADR-0009, ADR-0012, ADR-0030 (reserved, Service Accounts OR creation)
 - `docs/integrations/turuncu-hat-itsm-record-lookup.md`
 - `docs/26-enterprise-turuncu-hat-jira-adapters.md`, `docs/integrations/turuncu-hat-jira-contract-gaps.md`
+
+## Amendment 2026-10-12 (TH-4, ADR-0032)
+
+The Turuncu Hat team and the vendor document answered part of the activation gate: `NoEncode=true` returns Turkish
+characters unencoded, `QueryPermissions` defaults to SELECT, and `RecordCount` is a total across pages with a
+0-based `PageNo`. The adapter now sends `NoEncode=true`, never sends `QueryPermissions`, and its page rule is pinned
+by tests with the vendor shapes. Decision 3 ("no `NoEncode`" in the contract document) is superseded accordingly.
+OR status/stage field names, status code meanings and time zones remain open. Tracking and exact user match are
+decided in ADR-0032, not here.
+
+## Amendment 2026-10-13 (TH-6, ADR-0033): decision 5 and the existing write paths
+
+Owner decision 2026-10-13. Decision 5 also applies to two write paths designed before this ADR. Each keeps its own
+gate, default off, and is neither opened nor widened here:
+
+- In Use completion writes (report attachment upload, dynamic property updates, approval of the WASAS BPM
+  activity; ADR-0020): `InUseCompletion:Enabled=false`, no Turuncu Hat transport registered.
+- The ADR-0012 BPM closure after a persisted Jira key: `OperationalRecords:SourceCloseEnabled=false`.
+
+Activating either needs its own owner approval. Jira creation is not a Turuncu Hat write; it is governed by
+ADR-0009, ADR-0012 and ADR-0033.

@@ -761,3 +761,51 @@ another approach is acceptable is the reviewer's decision.
 > 28/28 on a fresh DB under the least-privilege API role, persisted-access composition test passing.
 > Pending: migration number, corporate role bundles/scope grants, Windows/LocalDB/IIS/HTTP/Excel
 > checks, browser journey on the real composition, review of the bounded slices (no size exception).
+
+## Archived README preamble (moved 2026-10-13; dated 2026-09-28 to 2026-10-03)
+
+Moved verbatim from `README.md` so the design note starts with current facts; superseded by the owner
+decision of 2026-10-03 (README "Authority") and by `PROGRESS.md`.
+
+Owner decision (2026-10-03): Claude owns this module end to end — see "Authority and baseline". SA-003 is numbered
+029 (ADR-0026) and SA-004 (usage scans, ADR-0027) is numbered 030; source inventory is 001-030. Not applied to the
+installed TEST system; see PROGRESS.md.
+
+Owner-approved local successor (2026-10-03): all seven current Service Accounts
+capabilities belong to the genuine protected Admin bundle, with explicit module
+scope and self-grant protections unchanged. New 028 is an additive role-bundle
+amendment only; see [ADMIN-OPERATIONS-20261003.md](ADMIN-OPERATIONS-20261003.md).
+Source changes are isolated on .NET 8; the sealed 0e85c9d candidate is unchanged.
+This is not target SQL execution, deployment or .NET 10 integration approval.
+
+Owner-approved local correction (2026-10-02): protected Admin navigation and independent
+general AD name search, with explicit scope and no target changes:
+[ADMIN-ACCESS-AND-GENERAL-LOOKUP-20261002.md](ADMIN-ACCESS-AND-GENERAL-LOOKUP-20261002.md).
+Source inventory is now 001-027; the sealed 5264635 packages and prior evidence are unchanged.
+
+Previous combined review (2026-10-02): PR #4 and final PR #6 are integrated with current master/PR #5.
+SQL discovery is 001-026: numbered 025/026 include the retained SA-001/SA-002 payloads;
+grants remain separate and unassigned. See [COMBINED-INTEGRATION-20261002.md](COMBINED-INTEGRATION-20261002.md).
+This is local source verification, not installation or corporate acceptance.
+
+Previous integration status (2026-10-01): pinned `b4fdf8d` plus `7e227ed` delta is integrated locally
+on `feature/service-accounts-pinned-integration-20260929`, based on `e997c5b`.
+Not deployed or corporately accepted. Combined Windows evidence and limitations:
+[INTEGRATION-FOLLOWUP-20261001.md](INTEGRATION-FOLLOWUP-20261001.md).
+The canonical requirements register remains [integrated-test-activation.md](../integrated-test-activation.md).
+Business rules: [SPEC.md](SPEC.md). Current state: [PROGRESS.md](PROGRESS.md); historical stage evidence: [PROGRESS-HISTORY.md](PROGRESS-HISTORY.md).
+The authority/baseline history below describes the original isolated development,
+not the current integration state.
+
+- Scoped owner exception (2026-09-28): Claude implements domain, contracts, infrastructure,
+  API, SQL candidate, UI and tests **for this module only**. Codex keeps existing workflows,
+  platform architecture, release engineering and final integration. Repository-wide ownership
+  rules in `AGENTS.md`/`CLAUDE.md` are unchanged.
+- Codex's integrated source (`deda848…`, branch `feature/sdm-integrated-test-20260928`) was not
+  published when this work started (remote had only `master`, `feature/sql-runtime-hardening-20260902`,
+  `feature/ui-or-sdm-jira-only-confirmation-20260928`, `fix/phase1a-closure-hardening`). The
+  temporary baseline is the verified UI handoff commit
+  `a3037175bb0bb9ecc7ab5c36c7c28607726469ce`. **Codex must reconcile this branch with the
+  integrated source before acceptance.** Stale `master` was not used. The integrated branch has
+  since been published at `e997c5b68cebcd23716860a9b06fdc25ebbb4493` (tested product `deda848…`);
+  see PROGRESS-HISTORY.md for the read-only reconciliation preview. Nothing was merged or rebased here.

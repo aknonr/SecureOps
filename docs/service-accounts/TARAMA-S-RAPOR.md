@@ -1,15 +1,18 @@
 # TARAMA-S raporu — web kullanım taraması, modül tarafı (2026-10-13)
 
-Dal `feature/service-accounts-web-usage-scan-20261013` (master `e79ac0b`'den). PR açılmadı, merge yapılmadı.
+Dal `feature/service-accounts-web-usage-scan-20261013`. PR açılmadı, merge yapılmadı. **Not:** dal bayat bir `origin/master`
+referansından (`b64068a`) açılmıştı; fark edince güncel master (`e79ac0b`, 036/OLAY dahil) dala merge edildi (geçmiş yeniden
+yazılmadı). Bu yüzden aday adı SA-008 → **SA-010** (SA-008 ve 035 OR-2'ye, 036 SA-009'a ait) ve hata numaraları 51410–51415 →
+**51430–51435** (51410–51412 036'da kullanılıyor) yapıldı; ilk commit mesajlarında eski ad geçer.
 Commit'ler: `616fa0e` sözleşme · `a2cb401` 037 + iş + API · `311fc84` OpenAPI ekleri + SQL testleri + DBA-037 · `fd632c7` UI ·
-son commit belgeler ve bu rapor.
+`b073aee` belgeler · ardından master merge'i ve yeniden adlandırma.
 
 ## Ne değişti
 
 - **Sözleşme (ilk commit, Codex için):** `USAGE-SCAN-JOB-CONTRACT.md`; `IServiceAccountUsageCollector` + `IUsageCollectionObserver`
   (girdi: 1–20 hesap, 1–500 sunucu, sınırlar, iptal; çıktı: sunucu başına sonuç), durumlar Tamam/Erişilemedi/UçNoktaYok/YetkiYok/
   ZamanAşımı/Bozuk (+ yalnız modülün koyduğu Çalışmadı), deterministik `FakeServiceAccountUsageCollector` (ağ yok).
-- **Migration 037 (SA-008):** `UsageScanJobs`, `UsageScanJobAccounts` (süzülmüş benzersiz dizin: hesap başına tek etkin tarama),
+- **Migration 037 (SA-010):** `UsageScanJobs`, `UsageScanJobAccounts` (süzülmüş benzersiz dizin: hesap başına tek etkin tarama),
   `UsageScanJobServers`; koruma tetikleyicileri (silme yok, biten sunucu/iş değişmez); API ve Worker izin betikleri; harness adımı,
   `sa-037-guards.sql`, `sa-037-dba-checks.sql`, `DBA-037-TR.md`.
 - **İş:** mevcut Hangfire kuyruğunda `UsageScanJobRunner` (yeniden deneme kapalı, SQL kirası ile korumalı); başlatanın yetkisi
@@ -57,7 +60,7 @@ son commit belgeler ve bu rapor.
 
 ## Açık sorular / riskler
 
-1. **Sürüm aracı:** `scripts/release/Get-ReleaseSqlPlan.ps1` "tam 001–N zinciri" ister; 037 (035/036 olmadan) bunu bilerek reddeder
+1. **Sürüm aracı:** `scripts/release/Get-ReleaseSqlPlan.ps1` "tam 001–N zinciri" ister; 037 (035 olmadan) bunu bilerek reddeder
    ve `tests/release/*` bu dalda kırılabilir (çalıştırılmadı, pwsh yok). Gözden geçirilmiş güncelleme Codex'in işi.
 2. **R2-4 ile fark:** ADR "her sunucu bittikçe aynı append-only tablolara" diyor; 030'un başlığı (dosya, özet, sayılar) değiştirilemez
    olduğundan sunucu bittikçe sonuç 037 iş tablosuna, tek kanıt kaydı iş bitince 030'a yazılıyor. Canlı görünüm aynı. Ayrıntılı neden

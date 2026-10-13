@@ -21,8 +21,7 @@ public sealed partial class TuruncuHatOperationalRecordClient
             || !Regex.IsMatch(p.Value, @"\A(?:p_|c_)[A-Za-z0-9_]{1,100}\z", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100))
             || new[] { "password", "token", "session", "secret", "authorization" }.Any(s => p.Value.Contains(s, StringComparison.OrdinalIgnoreCase))))
         { throw new InvalidDataException("Only direct Virtual PC User/RFC field candidates are accepted."); }
-        if (!_operationalOptions.ReadOnlyIntegrationMode || _operationalOptions.ControlledTestWritesEnabled
-            || _operationalOptions.SourceCloseEnabled || !long.TryParse(sourceId, NumberStyles.None, CultureInfo.InvariantCulture, out long id) || id <= 0)
+        if (!DiagnosticWriteFencesClosed || !long.TryParse(sourceId, NumberStyles.None, CultureInfo.InvariantCulture, out long id) || id <= 0)
         { throw new InvalidDataException("Diagnostic requires an exact identity and all write fences."); }
         using JsonDocument root = await QueryAsync("SMSS_oRFF",
             [$"#%id%#={id} AND #%m_active%#='True' AND #%p_dcc%# IN (4241) AND #%p_rel_group%# IN (68)"],

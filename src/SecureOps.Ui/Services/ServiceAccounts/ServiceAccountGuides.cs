@@ -19,7 +19,7 @@ public static class ServiceAccountGuides
     public static Guide List { get; } = new("Servis Hesapları",
         "Kapsamınızdaki bütün servis hesaplarını bulduğunuz ve açtığınız ana sayfa. Üstte size ve ekibinize düşen işler, altta filtrelenebilir liste vardır.",
         [
-            ("Bul", "Hesap adı/SID, durum, kurum, ekip, domain veya vade ile filtreleyin; \"Yalnız ekibimin işleri\" ile kendi işlerinizi süzün. Yetkiniz varsa dizinde ada göre arama ile kişiden hesaba gidebilirsiniz."),
+            ("Bul", "Hesap adı (bir parçası yeter; SID aranmaz), durum, kurum, ekip, domain veya vade ile süzün ve Listele'ye basın; \"Yalnız ekibimin işleri\" ile kendi işlerinizi ayırın. Üstteki özet düğmeleri kendi süzgeciyle listeyi hemen açar. Yetkiniz varsa dizinde ada göre arama kişiyi bulur; bu, hesap listesi aramasından ayrıdır."),
             ("Aç", "Hesaba tıklayın: sahibi, kullanım yerleri, açık talepler ve geçmişi tek sayfada görünür."),
             ("İşle", "Hesap sayfasında talep açın veya yapılan işlemi bildirin."),
             ("Takip et", "Geciken ve tarih bekleyen işler listede ve \"Ekibimin işleri\"nde öne çıkar; raporlara otomatik yansır.")
@@ -38,6 +38,29 @@ public static class ServiceAccountGuides
             ("Doğrula ve kapat", "Doğrulama yetkisi olan kişi kanıtı inceleyip onaylar; silme veya gMSA dönüşümü doğrulanınca hesap kapanır.")
         ],
         _noServerChange + " gMSA dönüşümünü sunucuda ekip yapar; sistem planı, kanıtı ve doğrulamayı tutar.");
+
+    /// <summary>
+    /// "Sizin için" line of the account guide (EVENT-GUIDANCE-DESIGN.md §9), from the server's permissions on this account. Short, in
+    /// the owner's words; the event sentence changes when the event flow is not installed (migration 036).
+    /// </summary>
+    public static string DetailRole(SecureOps.Shared.Contracts.ServiceAccounts.AccountPermissions permissions, bool eventsAvailable)
+    {
+        const string verify = "Bildirilen işlemler doğrulama bekler; doğrulamak için tarih, doğrulayan ve kanıt gerekir. \"Bir gelişme mi oldu?\" bildirim kaydeder, doğrulamaz.";
+        if (permissions.Work)
+        {
+            string work = eventsAvailable
+                ? "Hesapta bir şey olduysa \"Bir gelişme mi oldu?\"ya basın, ne olduğunu seçin. Ürün hangi kayıtların yapılacağını gösterir; siz onaylayınca hepsi birlikte kaydedilir. Kaydedilen şey \"kişi bildirdi\"dir; doğrulama ayrıdır."
+                : "Hesapta bir şey olduysa yazışmayı, işlem bildirimini ve talebi İşler ve Yazışmalar sekmelerinden kaydedin; \"Bir gelişme mi oldu?\" bu ortamda henüz açık değil. Kaydedilen şey \"kişi bildirdi\"dir; doğrulama ayrıdır.";
+            return permissions.Verify ? work + " " + verify : work;
+        }
+
+        if (permissions.CanWorkAnyRequest)
+        {
+            return "Size atanmış talep için gelişmeyi bildirebilirsiniz. Hesabın sahipliğini ve diğer talepleri değiştiremezsiniz.";
+        }
+
+        return permissions.Verify ? verify : "Bu hesapta kayıt yapamazsınız; gelişmeleri sorumlu ekibe iletin.";
+    }
 
     /// <summary>Team work.</summary>
     public static Guide Work { get; } = new("Ekibimin işleri",

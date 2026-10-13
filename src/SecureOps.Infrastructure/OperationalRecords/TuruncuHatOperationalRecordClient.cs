@@ -20,6 +20,7 @@ public sealed partial class TuruncuHatOperationalRecordClient : IOperationalReco
     private readonly ITuruncuHatSessionManager _sessions;
     private readonly TuruncuHatOptions _options;
     private readonly OperationalRecordsOptions _operationalOptions;
+    private readonly InUseCompletionOptions _inUseCompletionOptions;
     private readonly EnterpriseIntegrationHealthState _health;
     private readonly EnterpriseIntegrationTelemetry _telemetry;
     private readonly ILogger<TuruncuHatOperationalRecordClient> _logger;
@@ -30,6 +31,7 @@ public sealed partial class TuruncuHatOperationalRecordClient : IOperationalReco
         ITuruncuHatSessionManager sessions,
         IOptions<TuruncuHatOptions> options,
         IOptions<OperationalRecordsOptions> operationalOptions,
+        IOptions<InUseCompletionOptions> inUseCompletionOptions,
         EnterpriseIntegrationHealthState health,
         EnterpriseIntegrationTelemetry telemetry,
         ILogger<TuruncuHatOperationalRecordClient> logger)
@@ -38,6 +40,7 @@ public sealed partial class TuruncuHatOperationalRecordClient : IOperationalReco
         _sessions = sessions;
         _options = options.Value;
         _operationalOptions = operationalOptions.Value;
+        _inUseCompletionOptions = inUseCompletionOptions.Value;
         _health = health;
         _telemetry = telemetry;
         _logger = logger;

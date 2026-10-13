@@ -60,6 +60,7 @@ public sealed partial class ResourceSqlTests
         var source = new TuruncuHatOperationalRecordClient(new HttpClient(handler) { BaseAddress = new Uri("https://source.invalid/") },
             sessions, Options.Create(new TuruncuHatOptions { RelatedGroupId = 68, ExcludedDccIds = [4241] }),
             Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = true }),
+            Options.Create(new InUseCompletionOptions()),
             new EnterpriseIntegrationHealthState(), new EnterpriseIntegrationTelemetry(), NullLogger<TuruncuHatOperationalRecordClient>.Instance);
         IInUseRepository repository = newFixtureOnly ? new InMemoryInUseRepository(Substitute.For<IAuditWriter>()) : new SqlInUseRepository(configuration);
         var service = new InUseService(repository, source, access, users, new InMemoryCommandIdempotencyStore(TimeProvider.System), NullLogger<InUseService>.Instance,

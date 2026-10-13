@@ -7,8 +7,7 @@ public sealed partial class TuruncuHatOperationalRecordClient
     /// <summary>Bounded operator probe of script-backed completion selectors; never writes or establishes closure.</summary>
     public async Task<JsonElement> DiagnoseCompletionAsync(string sourceId, CancellationToken token)
     {
-        if (!_operationalOptions.ReadOnlyIntegrationMode || _operationalOptions.ControlledTestWritesEnabled
-            || _operationalOptions.SourceCloseEnabled || !InUseAspectParser.NumericId(sourceId))
+        if (!DiagnosticWriteFencesClosed || !InUseAspectParser.NumericId(sourceId))
         { throw new InvalidDataException("Completion evidence requires an exact identity and all write fences."); }
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
         deadline.CancelAfter(TimeSpan.FromSeconds(45));
@@ -52,6 +51,11 @@ public sealed partial class TuruncuHatOperationalRecordClient
             WritesPerformed = false
         });
     }
+
+    /// <summary>Operator probes run only in a strictly read-only composition: the global fence and every independent
+    /// write gate (OR source close, In Use source writes) must be off, so probe evidence never mixes with an armed write path.</summary>
+    private bool DiagnosticWriteFencesClosed => _operationalOptions.ReadOnlyIntegrationMode && !_operationalOptions.ControlledTestWritesEnabled
+        && !_operationalOptions.SourceCloseEnabled && !_inUseCompletionOptions.SourceWritesEnabled;
 
     private static JsonElement CompletionRows(JsonElement document, int limit)
     {

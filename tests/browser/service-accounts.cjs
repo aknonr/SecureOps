@@ -151,7 +151,7 @@ async function problem(page) {
         await step('list: server filter and keyboard search', async () => {
             await navigate(page, adminUi, 'service-accounts');
             await page.getByRole('status').filter({ hasText: /\d+ hesap/ }).waitFor();
-            const search = page.getByLabel('Hesap adı veya SID', { exact: true });
+            const search = page.getByLabel('Hesap adı', { exact: true });
             await search.fill('SYN_SVC_' + suffix);
             await search.press('Enter');
             await page.getByRole('status').filter({ hasText: '5 hesap' }).waitFor();
@@ -235,7 +235,7 @@ async function problem(page) {
         await step('one mail linked to three accounts from the list', async () => {
             await navigate(page, adminUi, 'service-accounts');
             await page.getByRole('status').filter({ hasText: /\d+ hesap/ }).waitFor();
-            await page.getByLabel('Hesap adı veya SID', { exact: true }).fill('SYN_SVC_' + suffix);
+            await page.getByLabel('Hesap adı', { exact: true }).fill('SYN_SVC_' + suffix);
             await page.getByRole('button', { name: 'Listele' }).click();
             for (const account of accounts.slice(0, 3)) {
                 await page.getByLabel(`${account} hesabını seç`).check();
@@ -287,7 +287,7 @@ async function problem(page) {
             await signIn(leadPage, leadUi);
             await navigate(leadPage, leadUi, 'service-accounts');
             await leadPage.getByRole('status').filter({ hasText: /\d+ hesap/ }).waitFor();
-            const search = leadPage.getByLabel('Hesap adı veya SID', { exact: true });
+            const search = leadPage.getByLabel('Hesap adı', { exact: true });
             await search.fill('SYN_SVC_' + suffix);
             await search.press('Enter');
             await leadPage.getByRole('status').filter({ hasText: '1 hesap' }).waitFor();

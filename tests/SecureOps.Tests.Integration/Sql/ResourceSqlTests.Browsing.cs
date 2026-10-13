@@ -21,7 +21,9 @@ public sealed partial class ResourceSqlTests
         OperationalRecordPage first = await repository.BrowseAsync(query, false, _token);
         OperationalRecordPage second = await new SqlOperationalRecordRepository(Configuration()).BrowseAsync(query with { Page = 2 }, false, _token);
         first.Total.Should().Be(12);
+        first.UnknownSourceCreatedAtCount.Should().Be(12);
         first.Items.Should().HaveCount(10);
+        first.Items.Should().OnlyContain(r => r.JiraIssueKeyPersistedAt == null);
         second.Total.Should().Be(12);
         second.Items.Should().HaveCount(2);
         first.Items.Select(r => r.Id).Intersect(second.Items.Select(r => r.Id)).Should().BeEmpty();

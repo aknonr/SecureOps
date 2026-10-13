@@ -10,6 +10,7 @@ namespace SecureOps.Domain.ServiceAccounts;
 /// <param name="HasEvidence">Whether evidence (note or file) is recorded.</param>
 /// <param name="HasOrReference">Whether an OR record is linked.</param>
 /// <param name="Voided">Whether the action was voided.</param>
+/// <param name="ActionId">Action identity, when known; lets a close evaluation point at the action that still needs work.</param>
 public sealed record ActionFacts(
     ServiceAccountActionType ActionType,
     ServiceAccountActionResult Result,
@@ -19,7 +20,36 @@ public sealed record ActionFacts(
     bool HasVerifier,
     bool HasEvidence,
     bool HasOrReference,
-    bool Voided);
+    bool Voided,
+    Guid? ActionId = null);
+
+/// <summary>What a person can do to clear one missing close condition; the UI opens the matching step.</summary>
+public enum CloseRemedy
+{
+    /// <summary>Nothing to do on this request (for example it is already closed).</summary>
+    None,
+    /// <summary>Report a performed action of the expected type on this request.</summary>
+    ReportAction,
+    /// <summary>Complete or verify an existing action (verification needs the Verify capability).</summary>
+    VerifyAction,
+    /// <summary>Confirm the account's ownership in the ownership decision flow.</summary>
+    ConfirmOwnership,
+    /// <summary>Give a close reason.</summary>
+    GiveReason
+}
+
+/// <summary>One missing close condition.</summary>
+/// <param name="Code">Stable rule code (<see cref="ServiceAccountRules.Errors"/>), the same code the close command returns.</param>
+/// <param name="Remedy">The step that clears it.</param>
+/// <param name="SubCodes">For <see cref="ServiceAccountRules.Errors.VerifiedClosureRequired"/>: the unmet conditions of the closest candidate action.</param>
+/// <param name="ExpectedActionType">For <see cref="ServiceAccountRules.Errors.NoMatchingAction"/>: the request type whose performed action is missing.</param>
+/// <param name="RelatedActionId">The candidate action the sub-conditions refer to, when one exists.</param>
+public sealed record CloseGap(
+    string Code,
+    CloseRemedy Remedy,
+    IReadOnlyList<string> SubCodes,
+    ServiceAccountActionType? ExpectedActionType = null,
+    Guid? RelatedActionId = null);
 
 /// <summary>Business rules 3-9. Pure, deterministic, shared by API validation, import and reports.</summary>
 public static class ServiceAccountRules
@@ -57,6 +87,10 @@ public static class ServiceAccountRules
         public const string OwnershipNotConfirmed = "OwnershipNotConfirmed";
         /// <summary>Only a deletion or a gMSA conversion can be recorded as the account's closure.</summary>
         public const string ClosureKindNotAllowed = "ClosureKindNotAllowed";
+        /// <summary>Close sub-condition: the candidate action is reported but not verified.</summary>
+        public const string NotVerified = "NotVerified";
+        /// <summary>Close sub-condition: the candidate action is not recorded as the account's closure.</summary>
+        public const string NotClosureKind = "NotClosureKind";
     }
 
     /// <summary>Rule 8: a non-void Performed or Verified action is a performed-action report; counted once.</summary>
@@ -144,35 +178,95 @@ public static class ServiceAccountRules
     /// <summary>
     /// Rule 9: closing one request is explicit and validated against its own linked actions only.
     /// Completed requires a matching performed action; a deletion request requires a verified closure.
+    /// Returns the first missing condition of <see cref="EvaluateClose"/>, or null.
     /// </summary>
     public static string? ValidateClose(ServiceAccountRequestStatus status, ServiceAccountActionType requestType,
+        ServiceAccountCloseOutcome outcome, string? reason, IEnumerable<ActionFacts> linkedActions, bool ownershipConfirmed = false) =>
+        EvaluateClose(status, requestType, outcome, reason, linkedActions, ownershipConfirmed) is [var first, ..] ? first.Code : null;
+
+    /// <summary>
+    /// Single source of the close rule (rule 9): every missing condition, first one first (the code <see cref="ValidateClose"/>
+    /// returns). Empty means the request can be closed with this outcome now; the close command still revalidates.
+    /// </summary>
+    public static IReadOnlyList<CloseGap> EvaluateClose(ServiceAccountRequestStatus status, ServiceAccountActionType requestType,
         ServiceAccountCloseOutcome outcome, string? reason, IEnumerable<ActionFacts> linkedActions, bool ownershipConfirmed = false)
     {
         if (status == ServiceAccountRequestStatus.Closed)
         {
-            return Errors.AlreadyClosed;
+            return [new CloseGap(Errors.AlreadyClosed, CloseRemedy.None, [])];
         }
 
         if (outcome != ServiceAccountCloseOutcome.Completed)
         {
-            return string.IsNullOrWhiteSpace(reason) ? Errors.ReasonRequired : null;
+            return string.IsNullOrWhiteSpace(reason) ? [new CloseGap(Errors.ReasonRequired, CloseRemedy.GiveReason, [])] : [];
         }
 
         if (requestType == ServiceAccountActionType.OwnershipConfirmation)
         {
-            return ownershipConfirmed ? null : Errors.OwnershipNotConfirmed;
+            return ownershipConfirmed ? [] : [new CloseGap(Errors.OwnershipNotConfirmed, CloseRemedy.ConfirmOwnership, [])];
         }
 
         ActionFacts[] matching = [.. linkedActions.Where(a => IsPerformedReport(a) && Matches(requestType, a.ActionType))];
+        List<CloseGap> missing = [];
         if (matching.Length == 0)
         {
-            return Errors.NoMatchingAction;
+            missing.Add(new CloseGap(Errors.NoMatchingAction, CloseRemedy.ReportAction, [], requestType));
         }
 
-        return requestType == ServiceAccountActionType.Deletion && !matching.Any(IsVerifiedClosure)
-            ? Errors.VerifiedClosureRequired
-            : null;
+        if (requestType == ServiceAccountActionType.Deletion && !matching.Any(IsVerifiedClosure))
+        {
+            // The closest candidate has the fewest unmet conditions; ties keep the caller's order (OrderBy is stable).
+            ActionFacts? closest = matching.OrderBy(a => UnmetClosureConditions(a).Count).FirstOrDefault();
+            missing.Add(new CloseGap(Errors.VerifiedClosureRequired, CloseRemedy.VerifyAction,
+                closest is null ? [] : UnmetClosureConditions(closest), null, closest?.ActionId));
+        }
+
+        return missing;
     }
+
+    /// <summary>The <see cref="IsVerifiedClosure"/> conditions a matching performed action does not meet yet, in a fixed order.</summary>
+    private static IReadOnlyList<string> UnmetClosureConditions(ActionFacts action)
+    {
+        List<string> unmet = [];
+        if (action.Result != ServiceAccountActionResult.Verified || action.VerifiedOn is null)
+        {
+            unmet.Add(Errors.NotVerified);
+        }
+
+        if (action.RecordKind != ServiceAccountRecordKind.Closure)
+        {
+            unmet.Add(Errors.NotClosureKind);
+        }
+
+        if (action.ActualOn is not { } actual)
+        {
+            unmet.Add(Errors.ActualDateRequired);
+        }
+        else if (action.VerifiedOn is { } verified && verified < actual)
+        {
+            unmet.Add(Errors.VerificationBeforeAction);
+        }
+
+        if (!action.HasVerifier)
+        {
+            unmet.Add(Errors.VerifierRequired);
+        }
+
+        if (!action.HasEvidence)
+        {
+            unmet.Add(Errors.EvidenceRequired);
+        }
+
+        if (action.ActionType == ServiceAccountActionType.Deletion && !action.HasOrReference)
+        {
+            unmet.Add(Errors.OrRequiredForDeletion);
+        }
+
+        return unmet;
+    }
+
+    /// <summary>Whether a performed action of <paramref name="actionType"/> counts for a request of <paramref name="requestType"/> (the close rule's match).</summary>
+    public static bool RequestAccepts(ServiceAccountActionType requestType, ServiceAccountActionType actionType) => Matches(requestType, actionType);
 
     private static bool Matches(ServiceAccountActionType requestType, ServiceAccountActionType actionType) =>
         requestType == actionType

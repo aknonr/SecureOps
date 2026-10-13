@@ -24,8 +24,15 @@
                         <strong class="sa-next-title">@step.Title</strong>
                         <div class="so-panel-text--sm">@step.Reason</div>
                     </div>
-                    <MudButton Size="Size.Small" Variant="@(index == 0 ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" OnClick="@(() => OnOpen.InvokeAsync((int)step.Tab))"
-                               aria-label="@($"{step.Title}: {TabName(step.Tab)} sekmesini aç")">@TabName(step.Tab) sekmesi</MudButton>
+                    <div class="sa-next-actions">
+                        <MudButton Size="Size.Small" Variant="@(index == 0 ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" OnClick="@(() => OnOpen.InvokeAsync((int)step.Tab))"
+                                   aria-label="@($"{step.Title}: {TabName(step.Tab)} sekmesini aç")">@TabName(step.Tab) sekmesi</MudButton>
+                        @if (EventAvailable && ServiceAccountNextStep.EventFor(step, Detail) is { } start)
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Campaign" OnClick="@(() => OnReport.InvokeAsync(start))"
+                                       aria-label="@($"{step.Title}: gelişmeyi bildir")">Bildir</MudButton>
+                        }
+                    </div>
                 </li>
             }
         </ol>
@@ -40,6 +47,12 @@
 
     /// <summary>Opens the tab where the step is worked on (tab index).</summary>
     [Parameter] public EventCallback<int> OnOpen { get; set; }
+
+    /// <summary>The event flow is installed (the server's eventGuidanceAvailable); otherwise no "Bildir" is offered.</summary>
+    [Parameter] public bool EventAvailable { get; set; }
+
+    /// <summary>Opens the event flow with the step's event and request pre-selected.</summary>
+    [Parameter] public EventCallback<SaEventStart> OnReport { get; set; }
 
     /// <inheritdoc />
     protected override void OnParametersSet() => _steps = ServiceAccountNextStep.Compute(Detail);

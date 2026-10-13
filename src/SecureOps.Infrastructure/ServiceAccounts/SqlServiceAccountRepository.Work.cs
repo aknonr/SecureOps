@@ -353,6 +353,13 @@ public sealed partial class SqlServiceAccountRepository
         Guid requestId, CancellationToken cancellationToken)
     {
         await using SqlConnection connection = await OpenAsync(cancellationToken);
+        return await RequestCloseFactsAsync(connection, null, requestId, cancellationToken);
+    }
+
+    /// <summary>Close facts read on the caller's connection, inside its transaction when one is given (sees the transaction's own writes).</summary>
+    private static async Task<(ServiceAccountRequestStatus Status, ServiceAccountActionType Type, IReadOnlyList<ActionFacts> Actions, bool OwnershipConfirmed)?> RequestCloseFactsAsync(
+        SqlConnection connection, SqlTransaction? transaction, Guid requestId, CancellationToken cancellationToken)
+    {
         using SqlMapper.GridReader grid = await connection.QueryMultipleAsync(Cmd("""
             SELECT r.Status, r.ActionType, CAST(CASE WHEN a.CurrentOwnerTeamId IS NOT NULL OR a.CurrentOwnerPersonId IS NOT NULL THEN 1 ELSE 0 END AS bit)
             FROM svcacct.WorkRequests r JOIN svcacct.Accounts a ON a.Id = r.AccountId WHERE r.Id = @requestId;
@@ -361,18 +368,20 @@ public sealed partial class SqlServiceAccountRepository
                 CAST(CASE WHEN NULLIF(e.EvidenceNote, '') IS NOT NULL OR NULLIF(e.VerificationNote, '') IS NOT NULL OR e.VerificationEvidenceId IS NOT NULL THEN 1 ELSE 0 END AS bit),
                 CAST(CASE WHEN EXISTS (SELECT 1 FROM svcacct.ExternalRecordLinks l JOIN svcacct.ExternalRecords x ON x.Id = l.ExternalRecordId
                     WHERE l.EntityType = 'Action' AND l.EntityId = e.Id AND x.RecordType = 'OR') THEN 1 ELSE 0 END AS bit),
-                CAST(CASE WHEN e.VoidedAt IS NOT NULL THEN 1 ELSE 0 END AS bit)
-            FROM svcacct.ActionEvents e WHERE e.RequestId = @requestId;
-            """, new { requestId }, null, cancellationToken));
+                CAST(CASE WHEN e.VoidedAt IS NOT NULL THEN 1 ELSE 0 END AS bit), e.Id
+            FROM svcacct.ActionEvents e WHERE e.RequestId = @requestId
+            ORDER BY e.CreatedAt DESC, e.Id;
+            """, new { requestId }, transaction, cancellationToken));
         (string Status, string Type, bool Owned)? request = await grid.ReadSingleOrDefaultAsync<(string Status, string Type, bool Owned)?>();
         if (request is not { } r)
         {
             return null;
         }
 
-        ActionFacts[] actions = [.. (await grid.ReadAsync<(string Type, string Result, string Kind, DateOnly? Actual, DateOnly? Verified, bool HasVerifier, bool HasEvidence, bool HasOr, bool Voided)>())
+        ActionFacts[] actions = [.. (await grid.ReadAsync<(string Type, string Result, string Kind, DateOnly? Actual, DateOnly? Verified, bool HasVerifier, bool HasEvidence, bool HasOr, bool Voided,
+                Guid Id)>())
             .Select(a => new ActionFacts(Enum.Parse<ServiceAccountActionType>(a.Type), Enum.Parse<ServiceAccountActionResult>(a.Result),
-                Enum.Parse<ServiceAccountRecordKind>(a.Kind), a.Actual, a.Verified, a.HasVerifier, a.HasEvidence, a.HasOr, a.Voided))];
+                Enum.Parse<ServiceAccountRecordKind>(a.Kind), a.Actual, a.Verified, a.HasVerifier, a.HasEvidence, a.HasOr, a.Voided, a.Id))];
         return (Enum.Parse<ServiceAccountRequestStatus>(r.Status), Enum.Parse<ServiceAccountActionType>(r.Type), actions, r.Owned);
     }
 
@@ -395,35 +404,42 @@ public sealed partial class SqlServiceAccountRepository
         return MutateAsync(accountId, "Action", id, "ActionReported", new { Type = type.ToString(), Result = result.ToString(), Kind = kind.ToString(), request.ActualOn },
             null, actor, async (connection, transaction, now) =>
             {
-                string precision = request.ActualAt is not null ? "Instant" : request.ActualOn is not null ? "DateOnly" : "Unknown";
-                DateOnly? actualOn = request.ActualAt is { } at ? ReportCalendar.LocalDate(at) : request.ActualOn;
-                int inserted = await connection.ExecuteAsync(Cmd("""
-                    INSERT INTO svcacct.ActionEvents(Id, AccountId, RequestId, ActionType, Result, RecordKind, ActualOn, ActualAt, ActualPrecision, PerformerTeamId,
-                        PerformerPersonId, EvidenceNote, CreatedAt, CreatedBy, UpdatedAt, UpdatedBy)
-                    SELECT @id, @accountId, @RequestId, @Type, @Result, @Kind, @actualOn, @ActualAt, @precision, @PerformerTeamId, @PerformerPersonId, @EvidenceNote,
-                        @now, @UserId, @now, @UserId
-                    WHERE @RequestId IS NULL OR EXISTS (SELECT 1 FROM svcacct.WorkRequests WHERE Id = @RequestId AND AccountId = @accountId);
-                    """, new
-                {
-                    id,
-                    accountId,
-                    request.RequestId,
-                    Type = type.ToString(),
-                    Result = result.ToString(),
-                    Kind = kind.ToString(),
-                    actualOn,
-                    request.ActualAt,
-                    precision,
-                    request.PerformerTeamId,
-                    request.PerformerPersonId,
-                    EvidenceNote = ServiceAccountText.Clean(request.EvidenceNote),
-                    now,
-                    actor.UserId
-                },
-                    transaction, cancellationToken));
+                int inserted = await InsertActionAsync(connection, transaction, id, accountId, request, type, result, kind, actor, now, cancellationToken);
                 await ReferencesAsync(connection, transaction, request.References ?? [], "Action", id, accountId, actor, now, cancellationToken);
                 return inserted;
             }, cancellationToken);
+    }
+
+    /// <summary>Inserts one action report inside the caller's transaction (no history or audit); 0 when the request is not the account's.</summary>
+    private static Task<int> InsertActionAsync(SqlConnection connection, SqlTransaction transaction, Guid id, Guid accountId, ReportActionRequest request,
+        ServiceAccountActionType type, ServiceAccountActionResult result, ServiceAccountRecordKind kind, SaActor actor, DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        string precision = request.ActualAt is not null ? "Instant" : request.ActualOn is not null ? "DateOnly" : "Unknown";
+        DateOnly? actualOn = request.ActualAt is { } at ? ReportCalendar.LocalDate(at) : request.ActualOn;
+        return connection.ExecuteAsync(Cmd("""
+            INSERT INTO svcacct.ActionEvents(Id, AccountId, RequestId, ActionType, Result, RecordKind, ActualOn, ActualAt, ActualPrecision, PerformerTeamId,
+                PerformerPersonId, EvidenceNote, CreatedAt, CreatedBy, UpdatedAt, UpdatedBy)
+            SELECT @id, @accountId, @RequestId, @Type, @Result, @Kind, @actualOn, @ActualAt, @precision, @PerformerTeamId, @PerformerPersonId, @EvidenceNote,
+                @now, @UserId, @now, @UserId
+            WHERE @RequestId IS NULL OR EXISTS (SELECT 1 FROM svcacct.WorkRequests WHERE Id = @RequestId AND AccountId = @accountId);
+            """, new
+        {
+            id,
+            accountId,
+            request.RequestId,
+            Type = type.ToString(),
+            Result = result.ToString(),
+            Kind = kind.ToString(),
+            actualOn,
+            request.ActualAt,
+            precision,
+            request.PerformerTeamId,
+            request.PerformerPersonId,
+            EvidenceNote = ServiceAccountText.Clean(request.EvidenceNote),
+            now,
+            actor.UserId
+        }, transaction, cancellationToken));
     }
 
     /// <summary>Moves a planned action to performed (same identity) or completes missing fields.</summary>
@@ -544,12 +560,14 @@ public sealed partial class SqlServiceAccountRepository
         return entityId;
     }
 
-    private static async Task ReferencesAsync(SqlConnection connection, SqlTransaction transaction, IEnumerable<SaExternalRef> references, string entityType, Guid entityId,
-        Guid? accountId, SaActor actor, DateTimeOffset now, CancellationToken cancellationToken)
+    /// <summary>Links each reference to the entity (creating the external record when new); returns the external record ids in order.</summary>
+    private static async Task<IReadOnlyList<Guid>> ReferencesAsync(SqlConnection connection, SqlTransaction transaction, IEnumerable<SaExternalRef> references,
+        string entityType, Guid entityId, Guid? accountId, SaActor actor, DateTimeOffset now, CancellationToken cancellationToken)
     {
+        List<Guid> records = [];
         foreach (SaExternalRef reference in references)
         {
-            await connection.ExecuteAsync(Cmd("""
+            records.Add(await connection.ExecuteScalarAsync<Guid>(Cmd("""
                 DECLARE @recordId uniqueidentifier = (SELECT Id FROM svcacct.ExternalRecords WITH (UPDLOCK, HOLDLOCK) WHERE RecordType = @Type AND NormalizedNumber = @Number);
                 IF @recordId IS NULL
                 BEGIN
@@ -560,6 +578,7 @@ public sealed partial class SqlServiceAccountRepository
                 IF NOT EXISTS (SELECT 1 FROM svcacct.ExternalRecordLinks WHERE ExternalRecordId = @recordId AND EntityType = @entityType AND EntityId = @entityId)
                     INSERT INTO svcacct.ExternalRecordLinks(ExternalRecordId, EntityType, EntityId, AccountId, LinkedAt, LinkedBy)
                     VALUES(@recordId, @entityType, @entityId, @accountId, @now, @UserId);
+                SELECT @recordId;
                 """, new
             {
                 reference.Type,
@@ -571,7 +590,9 @@ public sealed partial class SqlServiceAccountRepository
                 accountId,
                 now,
                 actor.UserId
-            }, transaction, cancellationToken));
+            }, transaction, cancellationToken)));
         }
+
+        return records;
     }
 }

@@ -1,5 +1,17 @@
 # sql/
 
+## Service Account Events 036, 2026-10-13
+
+Inventory is 001-034 plus 036; **035 is reserved for OR-2** (not on this branch). **036-service-account-events** requires reviewed
+025 and includes `pending/service-accounts/SA-009-account-events.sql` unchanged: two append-only tables, `svcacct.AccountEvents`
+(one per recorded event, `(AccountId, IdempotencyKey)` unique) and `svcacct.AccountEventItems` (which records the event produced).
+No mail body, sender, name or other text column. UPDATE/DELETE is refused by trigger (51411); a replay stops before any change
+(51410). Grants: `SA-009-API-permissions.sql` (SELECT, INSERT only). Binaries with this code keep working before 036 (`GET me`
+says `eventGuidanceAvailable=false`, the event routes answer 503 `ServiceAccountEventsNotInstalled`). Synthetic LocalDB only;
+installed TEST was not upgraded. DBA addendum: [DBA-036-TR.md](../docs/service-accounts/DBA-036-TR.md); harness
+`tests/sql/service-accounts/sa-036-guards.sql`. The release selector (`scripts/release/Get-ReleaseSqlPlan.ps1`) still expects a
+gap-free 001-034 chain and refuses this inventory until its owner updates it.
+
 ## Service Account Plan Evidence 034, 2026-10-12
 
 Inventory is 001-034 (033, the change-plan tables, is on the same unmerged branch line). **034-service-account-plan-evidence**

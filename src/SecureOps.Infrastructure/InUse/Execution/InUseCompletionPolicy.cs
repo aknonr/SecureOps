@@ -6,7 +6,8 @@ using SecureOps.Shared.Contracts.InUse;
 
 namespace SecureOps.Infrastructure.InUse.Execution;
 
-/// <summary>Independent write fences; fixture activation is allowed only in isolated local compositions.</summary>
+/// <summary>Independent write fences; fixture activation is allowed only in isolated local compositions.
+/// Corporate source writes use their own InUseCompletion:SourceWritesEnabled gate, never the OR source-close gate (ADR-0020 amendment 2026-10-13).</summary>
 public sealed class InUseCompletionPolicy(IOptions<InUseCompletionOptions> options,
     IOptions<OperationalRecordsOptions> operations, string environment)
 {
@@ -20,7 +21,7 @@ public sealed class InUseCompletionPolicy(IOptions<InUseCompletionOptions> optio
         options.Value.TimeoutSeconds,
         operations.Value.ReadOnlyIntegrationMode,
         operations.Value.ControlledTestWritesEnabled,
-        operations.Value.SourceCloseEnabled,
+        options.Value.SourceWritesEnabled,
         environment
     })));
 
@@ -39,7 +40,8 @@ public sealed class InUseCompletionPolicy(IOptions<InUseCompletionOptions> optio
             && source.Synthetic && source.IdentityScope?.StartsWith("simulation:", StringComparison.Ordinal) == true
             && Path.IsPathFullyQualified(options.Value.FixtureDirectory))
         { return new(true, "SyntheticOnly", "Yalnız sentetik yerel kaynak: ek doğrulandıktan sonra WASAS onayı iletilir; OR kapanışı ve sonraki ekip ayrı izlenir."); }
-        if (operations.Value.ReadOnlyIntegrationMode || !operations.Value.ControlledTestWritesEnabled || !operations.Value.SourceCloseEnabled)
+        if (operations.Value.ReadOnlyIntegrationMode || !operations.Value.ControlledTestWritesEnabled || environment != "Test"
+            || !options.Value.SourceWritesEnabled)
         { return new(false, "WriteFence", "Kaynak yazma kontrolleri kapalı. Arşivleme ve indirme kullanılabilir."); }
         return options.Value.Provider == "TuruncuHat"
             ? new(false, "SourceContractsMissing", "Dinamik vaka hedefi ve koşullu güncelleme, tekil görev eşzamanlılığı ve ek kimliği/içerik doğrulaması için kaynak sözleşmesi eksik. Son OR durumu manuel kontrol edilebilir; arşivleme kullanılabilir.")

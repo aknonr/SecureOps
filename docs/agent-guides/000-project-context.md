@@ -1,5 +1,26 @@
 # 000 — Project Context
 
+Background for a first task in the repo; binding rules are in `AGENTS.md`.
+
+## The project in one paragraph
+
+An internal Windows operations platform for a shift team at CONTOSO (placeholder name). It ingests monitoring alarms and operational records (SolarWinds → HPE OpsBridge / monthly.thy.com → Turuncuhat ITSM; Jira), runs **read-only** diagnostics on Windows servers through a JEA-constrained PowerShell endpoint, keeps an append-only audit trail in SQL Server, and gives shift engineers a Blazor Server UI. Later phases add rule-based analysis (6), self-hosted AI (7) and approval-based remediation (8). It is **not** a SIEM, APM, PAM replacement, people-search tool, remediation tool (before Phase 8), AI product, or employee-monitoring system.
+
+## Fixed decisions (details in `docs/adr/`)
+
+| Area | Decision |
+|---|---|
+| Stack | .NET 8 (`net8.0`, C# 12, SDK pinned in `global.json`), ASP.NET Core API, Worker Service — ADR-0001. .NET 8 support ends 2026-11-10; moving to .NET 10 needs an ADR. |
+| UI | Blazor Server + MudBlazor 6.16 (not React/Angular) — ADR-0001, ADR-0007 |
+| Data | SQL Server via Dapper (parameterized SQL) and numbered scripts in `sql/schema/` / `sql/migrations/`; append-only audit — ADR-0001 (amended 2026-10-01) |
+| Jobs | Hangfire on SQL Server, hosted by the Worker — ADR-0003 |
+| Automation | PowerShell Remoting + JEA only; Ansible optional from Phase 6 — ADR-0003 |
+| Access | Authentication source → corporate principal → approval → role → capability; authentication claims never grant access directly — ADR-0010, ADR-0022 |
+| Hosting | IIS on Windows Server, in-process — ADR-0007 |
+| AI | Self-hosted only, Phase 7 — ADR-0005 |
+
+Other decided areas (identity lookup, operational records/Jira, sessions, OIDC, SDM evaluation, resources, In Use, announcements, reporting, service accounts) each have their own ADR; read the one for the area you touch.
+
 ## Systems around the platform
 
 - **SolarWinds** — alarm source. **HPE OpsBridge / monthly.thy.com** — event-detail layer. **Turuncuhat** — central ITSM + IVR workflow. **Jira** — operational-record target (ADR-0009, ADR-0012). **BeyondTrust** — PAM (read-only correlation). Existing Ansible/AWX is not touched.

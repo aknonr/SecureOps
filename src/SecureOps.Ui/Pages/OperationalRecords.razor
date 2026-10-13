@@ -26,10 +26,20 @@
                 @foreach (OperationalRecordWorkflowState state in Enum.GetValues<OperationalRecordWorkflowState>())
                 { <option value="@state">@OperationalRecordView.StateLabel(state)</option> }
             </select></label>
-            <label class="so-field"><span>Sıralama</span><select aria-label="Sıralama" @bind="_sort" @bind:after="FilterAsync">
-                <option value="updated">Son güncellenen</option><option value="oldest">En eski kaynak tarihi</option><option value="code">OR kodu</option>
+            <label class="so-field"><span>Sıralama</span><select aria-label="Sıralama" aria-describedby="@(DateUnknown ? "or-date-order-note" : null)" @bind="_sort" @bind:after="FilterAsync">
+                <option value="updated">Son güncellenen</option>
+                @* Kept selectable only while already chosen, so the select never shows a value it cannot hold. *@
+                <option value="oldest" disabled="@(DateUnknown && _sort != "oldest")">En eski kaynak tarihi@(DateUnknown ? " (kullanılamıyor)" : "")</option>
+                <option value="code">OR kodu</option>
             </select></label>
         </div>
+        @if (DateUnknown)
+        {
+            <p id="or-date-order-note" class="so-panel-text so-panel-text--sm" data-date-order-note>
+                @_page!.UnknownSourceCreatedAtCount kaydın kaynak oluşturma tarihi kaynaktan okunmadı; bilinmeyen tarih eski sayılamayacağı için tarihe göre sıralama kullanılamıyor.
+                @if (_sort == "oldest") { <span>Tarihi bilinmeyen kayıtlar en sonda listelenir; başka bir sıralama seçin.</span> }
+            </p>
+        }
         <p class="so-panel-text so-panel-text--sm">Kayıtlı veriler gösterilir. Kaynağı yenile, sınırlı bir içe aktarım yapar; aşağıdaki sayı Turuncu Hat toplamı değildir.</p>
         @if (_refreshNotice is not null) { <p role="status">@_refreshNotice</p> }
         @if (_refreshProblem is not null) { <SoProblemPanel Problem="_refreshProblem" /> }
@@ -88,6 +98,8 @@
     private int _number = 1, _size = 25, _generation;
     private bool _loading, _refreshing;
     private readonly CancellationTokenSource _lifetime = new();
+    // The server counts matching records without a source creation time; ordering them by date would mislead.
+    private bool DateUnknown => _page is { UnknownSourceCreatedAtCount: > 0 };
 
     protected override async Task OnInitializedAsync()
     {

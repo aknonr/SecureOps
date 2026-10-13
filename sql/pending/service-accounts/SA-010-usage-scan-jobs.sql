@@ -1,5 +1,5 @@
 /*
-  Service Accounts module — candidate 8 (SA-008), numbered 037 by the module owner (web usage scan, 2026-10-13).
+  Service Accounts module — candidate 10 (SA-010), numbered 037 by the module owner (web usage scan, 2026-10-13).
   Requires 025 and 030 (svcacct.Accounts, svcacct.UsageScans). Contract: docs/service-accounts/USAGE-SCAN-JOB-CONTRACT.md;
   decision: ADR-0024 Revision 2 (R2-4) and the owner decision of 2026-10-13.
   Additive only: three new tables for the state of a running web scan; no existing table, constraint, row, role or grant changes.
@@ -12,16 +12,16 @@
     validated document (bounded bytes) and the matched items as JSON for the live view. A finished server row never changes.
   Rows are never deleted (trigger). No secret column exists; documents pass the ADR-0027 parser (secret guard first) before
   they are stored. Refuses replay. Run with SQLCMD -I -b. No down script: rollback retains these objects (see DBA-037-TR.md).
-  Runtime grants: SA-008-API-permissions.sql and SA-008-Worker-permissions.sql.
+  Runtime grants: SA-010-API-permissions.sql and SA-010-Worker-permissions.sql.
 */
 SET XACT_ABORT ON;
 SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 IF OBJECT_ID(N'svcacct.Accounts', N'U') IS NULL OR OBJECT_ID(N'svcacct.UsageScans', N'U') IS NULL
-    THROW 51410, 'Service Accounts candidate 8 requires 025 and 030.', 1;
+    THROW 51430, 'Service Accounts candidate 10 requires 025 and 030.', 1;
 IF OBJECT_ID(N'svcacct.UsageScanJobs', N'U') IS NOT NULL OR OBJECT_ID(N'svcacct.UsageScanJobAccounts', N'U') IS NOT NULL
     OR OBJECT_ID(N'svcacct.UsageScanJobServers', N'U') IS NOT NULL
-    THROW 51410, 'Service Accounts candidate 8 already applied; compare definitions, do not replay.', 1;
+    THROW 51430, 'Service Accounts candidate 10 already applied; compare definitions, do not replay.', 1;
 BEGIN TRANSACTION;
 CREATE TABLE svcacct.UsageScanJobs(
     Id uniqueidentifier NOT NULL CONSTRAINT PK_SaScanJobs PRIMARY KEY,
@@ -95,7 +95,7 @@ GO
 CREATE TRIGGER svcacct.TR_SaScanJobs_Guard ON svcacct.UsageScanJobs AFTER UPDATE, DELETE AS
 BEGIN
     SET NOCOUNT ON;
-    IF NOT EXISTS (SELECT 1 FROM inserted) THROW 51411, 'Usage scan jobs are never deleted.', 1;
+    IF NOT EXISTS (SELECT 1 FROM inserted) THROW 51431, 'Usage scan jobs are never deleted.', 1;
     -- A finished job is a closed record; its fixed columns never change after creation.
     IF EXISTS (SELECT 1 FROM deleted d JOIN inserted i ON i.Id = d.Id
                WHERE d.State IN ('Completed','Cancelled','Failed')
@@ -103,26 +103,26 @@ BEGIN
                   OR i.PlannedServers <> d.PlannedServers OR i.PlanSha256 <> d.PlanSha256 OR i.Collector <> d.Collector
                   OR i.StartedBy <> d.StartedBy OR i.CreatedAt <> d.CreatedAt
                   OR ISNULL(CONVERT(nvarchar(36), i.RetryOfJobId), N'') <> ISNULL(CONVERT(nvarchar(36), d.RetryOfJobId), N''))
-        THROW 51411, 'A finished usage scan job or its fixed columns cannot change.', 1;
+        THROW 51431, 'A finished usage scan job or its fixed columns cannot change.', 1;
 END;
 GO
 CREATE TRIGGER svcacct.TR_SaScanJobAccounts_Guard ON svcacct.UsageScanJobAccounts AFTER UPDATE, DELETE AS
 BEGIN
     SET NOCOUNT ON;
-    IF NOT EXISTS (SELECT 1 FROM inserted) THROW 51412, 'Usage scan job accounts are never deleted.', 1;
+    IF NOT EXISTS (SELECT 1 FROM inserted) THROW 51432, 'Usage scan job accounts are never deleted.', 1;
     IF EXISTS (SELECT 1 FROM deleted d JOIN inserted i ON i.JobId = d.JobId AND i.AccountId = d.AccountId
                WHERE (d.IsActive = 0 AND i.IsActive = 1) OR i.SearchedName <> d.SearchedName
                   OR (d.LinkOutcome IS NOT NULL AND ISNULL(i.LinkOutcome, '') <> d.LinkOutcome))
-        THROW 51412, 'A released account or a recorded link outcome cannot change.', 1;
+        THROW 51432, 'A released account or a recorded link outcome cannot change.', 1;
 END;
 GO
 CREATE TRIGGER svcacct.TR_SaScanJobServers_Guard ON svcacct.UsageScanJobServers AFTER UPDATE, DELETE AS
 BEGIN
     SET NOCOUNT ON;
-    IF NOT EXISTS (SELECT 1 FROM inserted) THROW 51413, 'Usage scan job servers are never deleted.', 1;
+    IF NOT EXISTS (SELECT 1 FROM inserted) THROW 51433, 'Usage scan job servers are never deleted.', 1;
     IF EXISTS (SELECT 1 FROM deleted d JOIN inserted i ON i.JobId = d.JobId AND i.ServerName = d.ServerName
                WHERE d.State = 'Done' OR i.Ordinal <> d.Ordinal)
-        THROW 51413, 'A finished server result cannot change.', 1;
+        THROW 51433, 'A finished server result cannot change.', 1;
 END;
 GO
 COMMIT TRANSACTION;

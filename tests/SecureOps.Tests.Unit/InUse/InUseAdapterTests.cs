@@ -166,6 +166,15 @@ public sealed partial class InUseAdapterTests
     }
 
     [Fact]
+    public async Task Diagnostic_InUseSourceWriteGateArmed_MakesNoRequestEvenUnderReadOnlyFence()
+    {
+        using var handler = new Handler("{}");
+        await FluentActions.Awaiting(() => Client(handler, inUseSourceWrites: true).DiagnoseAsync("100", CancellationToken.None))
+            .Should().ThrowAsync<InvalidDataException>();
+        handler.Requests.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Diagnostic_DifferentRoot_PreventsTraversal()
     {
         using var handler = new Handler("{\"QueryResult\":{\"Items\":[" + _row + "]}}");
@@ -354,12 +363,13 @@ public sealed partial class InUseAdapterTests
         handler.Requests.Should().HaveCount(2);
     }
 
-    private static TuruncuHatOperationalRecordClient Client(Handler handler, bool readOnly = true)
+    private static TuruncuHatOperationalRecordClient Client(Handler handler, bool readOnly = true, bool inUseSourceWrites = false)
     {
         ITuruncuHatSessionManager sessions = Substitute.For<ITuruncuHatSessionManager>();
         sessions.GetSessionAsync(Arg.Any<CancellationToken>()).Returns("synthetic-session");
         return new(new HttpClient(handler) { BaseAddress = new Uri("https://source.invalid/") }, sessions,
             Options.Create(new TuruncuHatOptions { RelatedGroupId = 68, ExcludedDccIds = [4241] }), Options.Create(new OperationalRecordsOptions { ReadOnlyIntegrationMode = readOnly }),
+            Options.Create(new InUseCompletionOptions { SourceWritesEnabled = inUseSourceWrites }),
             new EnterpriseIntegrationHealthState(), new EnterpriseIntegrationTelemetry(), NullLogger<TuruncuHatOperationalRecordClient>.Instance);
     }
     private sealed class Handler(string body, string? related = null, HttpStatusCode relatedStatus = HttpStatusCode.OK,

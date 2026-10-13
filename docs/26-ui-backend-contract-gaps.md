@@ -43,6 +43,9 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-34 — Concurrent first registrations can deadlock in the access store | Fixed in source and synthetic LocalDB — 032 index / one registration retry; installed TEST unchanged; module tests remain serialised |
 | G-35 — Unsafe API requests lack a central CSRF guard | Locally verified repair; corporate Negotiate/IIS/F5 acceptance pending |
 | G-36 — Change-plan checklist and closing have no API yet (plus two smaller plan-contract gaps) | Item 1 closed 2026-10-12 (API in #36, UI in F3); items 2 and 3 remain open |
+| G-37 — First TEST acceptance: no SID search, directory "not configured" vs "unreachable", free-text import row errors | Open (2026-10-13); the UI shows honest wording meanwhile |
+| G-38 — OR → Jira: no issue link, no persisted transfer key/time, no replay indicator, no reviewed draft for retry | Open (2026-10-13); planned as TH-8 (ADR-0033); the UI shows none of these meanwhile |
+| G-39 — Service Accounts event flow: close readiness read per request, no verification readiness, preview ids without names | Open (2026-10-13); OLAY-3 UI works around each honestly |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -620,18 +623,22 @@ advanced a record to `Previewed`; create produced a real Jira key through the fa
 rejected with `OperationalRecordChanged` and the closed and missing fixtures with
 `OperationalRecordNoLongerOpen`, none of them creating a Jira issue.
 
-What it does **not** establish:
+What it does **not** establish (updated 2026-10-13; the original note predates the real providers):
 
-- **No real source.** There is still no Turuncu Hat provider. `Fake` is a fixture set, not a
-  connector, and it is refused outside Development, Demo, and Test.
-- **No real Jira.** `FakeJiraClient` always succeeds and is idempotent by key. Genuine Jira failure
-  modes — timeouts, auth rejection, field validation, and above all an *unknown* outcome — cannot
-  occur against it. Reconciliation and retry-blocked were verified by rendering, not by a real
-  provider producing them.
+- **Real source: read-only only.** The `TuruncuHat` source provider now exists and its read-only
+  query was verified in TEST on 2026-09-04 (`docs/26-enterprise-turuncu-hat-jira-adapters.md`).
+  Synthetic runs use paired `Simulation` (or legacy `Fake`), refused outside Development, Demo, and
+  Test; they say nothing about real source data.
+- **No real Jira create.** The `Corporate` Jira adapter exists, but no issue has been created against
+  corporate Jira. Synthetic clients cannot produce genuine failure modes — timeouts, auth rejection,
+  field validation, and above all an *unknown* outcome. Reconciliation and retry-blocked were verified
+  by rendering and by test-host doubles, not by corporate Jira. The Jira-only rollout steps are in
+  ADR-0033.
 - **No live claim contention.** With fast fake providers, commands complete before a read can observe
   a live claim, so "claimed by another operator" was verified from authoritative fields and unit
   tests rather than by two operators colliding in practice.
-- **No SQL repository.** Verification ran on the in-memory repository; migration 004 was not executed.
+- **SQL only in isolated tests.** The SQL repository and migrations now exist and are exercised on
+  test-owned LocalDB; this original synthetic run used the in-memory repository.
 
 ---
 
@@ -1216,6 +1223,68 @@ corporate systems, provider writes, merge and deployment remain outside scope.
 **Honest states in the UI today:** 404 on a plan (missing or any account out of scope: same body), 409 with the server's current view
 (`previewStale`, `planNotPreviewed`, `planNotEditable`, `planClosed`, or the concurrency conflict), 400 with per-account results, 403 with
 `approverIsPlanner` / `approverChangedPlan`, 503 `ServiceAccountChangePlansNotInstalled` (033 missing: nothing is written).
+
+## G-37 — First TEST acceptance: three small contract gaps behind honest UI wording
+
+**Raised:** 2026-10-13, UI fixes after the owner's first acceptance on TEST (branch `feature/service-accounts-first-acceptance-ui-20261013`).
+**Owner:** Service Accounts module (owner-approved scoped exception); the UI never invents these.
+
+1. **No SID search in the account list.** `GET accounts?search=` matches `NormalizedName` only (`SqlServiceAccountRepository.Accounts.cs`).
+   The list field was labelled "Hesap adı veya SID"; the UI now says "Hesap adı" and states that SID and the directory are not searched.
+   Needed only if the owner wants SID search: a `sid` filter (exact, case-insensitive) on the list route.
+2. **Directory name search cannot tell "not configured" from "unreachable".** `POST directory/name-search` answers both with 503
+   `ServiceAccountDirectoryUnavailable` (the audit row differs: `NotConfigured` vs `ProviderUnavailable`/`Timeout`). The UI therefore says
+   "the directory may be not set up or unreachable" and never shows a failed search as "no match". Needed: a distinct stable code
+   (for example `ServiceAccountDirectoryNotConfigured`) so the UI can name the cause.
+3. **Import row errors are free text.** `ImportRowView.Errors` is a list of strings without a column or stable code, so the UI can name the
+   sheet and Excel row but not the offending column, and cannot translate the reason. Needed: `{ column, code }` items (codes translated
+   by the UI like `ServiceAccountProblems.FieldText`). Until then an `Invalid` row with an empty `Errors` list is shown as "the server sent no detail".
+
+Counts: no gap. "Sahiplik kararı bekleyen hesap" (work summary) and `status=proposed` (list) both count distinct accounts with a `Proposed`
+ownership inside the caller's scope; the list now says what its total counts and whether it equals the card.
+
+## G-38 — OR → Jira: four read-contract gaps and one behaviour to keep
+
+**Raised:** OR → Jira submission UI (2026-09-28, `src/SecureOps.Ui/README.md`, "Backend contract needs");
+registered here 2026-10-13 (TH-6). **Owner:** In Use / OR → SDM work under ADR-0033 (planned as TH-8, UI as TH-9).
+Checked against `OperationalRecordResponse` and `JiraTransferResponse` on master `dc2060a`: none of items 1-4 exists.
+
+1. **No issue link.** Needed: nullable `jiraIssueUrl` (absolute https, derived by the server from configuration,
+   never composed from the key in the UI) on `OperationalRecordResponse` and `JiraTransferResponse`.
+2. **Duplicate protection is not visible after a reload.** `JiraTransferResponse` carries `idempotencyKey`, but
+   `OperationalRecordResponse` carries neither the transfer key nor the UTC time the Jira key was persisted.
+   Needed: both on `OperationalRecordResponse`.
+3. **"Created now" and "already existed" look the same.** Needed: a replay indicator on `JiraTransferResponse`
+   (for example `replayed: true` when an existing key was returned without a new Jira call).
+4. **Retry confirmation cannot show what Jira will receive.** For a `JiraCreateFailed` record no preview exists.
+   Needed: a read-only view of the persisted reviewed draft (fields and mapping version).
+5. **Keep (not a gap):** the deterministic actor/command/target fallback command key for create and retry. The UI
+   sends no `Idempotency-Key` and relies on it to absorb transport resends.
+
+**UI meanwhile:** the Jira key is shown as text without a link; after a reload only the persisted state is shown
+(an in-flight "sent, no answer" survives only as `CreatingJira`); the retry dialog states its effect but cannot
+list the reviewed fields. Nothing above is read or assumed.
+
+## G-39 — Service Accounts event flow (OLAY-3): close readiness per request, no verification readiness, ids without names
+
+**Raised:** 2026-10-13, OLAY-3 UI (branch `feature/service-accounts-event-guidance-ui-20261013`), against the OLAY-2a/2b/2c API on master.
+**Owner:** Service Accounts module (owner-approved scoped exception); the UI never invents these.
+
+1. **`RequestView.closeReadiness` is not in the account detail** (deferred in OLAY-2a, EVENT-GUIDANCE-DESIGN §6). The account page reads
+   `GET requests/{id}/close-readiness?outcome=Completed` once per open request after each load or save (at most 20), and the chosen
+   other outcome on demand. A request whose read fails shows "could not read; the server decides" and its close button stays usable.
+   Needed (performance only): readiness on each open `RequestView`, computed from the same close facts the close command uses.
+2. **No verification readiness (`EvaluateVerification`).** "Doğrula" hints come only from the closure sub-codes the close readiness
+   reports for the closest candidate action (`RelatedActionId`) and from the verify form's own missing date; a refused verification still
+   shows the server's code. Needed if the owner wants "why can this not be verified" before submitting: a read with the verify rule's
+   missing list for one action.
+3. **Preview fields carry directory ids, not names.** `EventPreview.items[].fields` sends `contactPersonId`, `performerPersonId`,
+   `personId` (and team ids) as GUIDs. The UI resolves team ids from the team list it already has and shows people as "Seçilen kişi".
+   Needed: the label next to the id (as `SaRef`), so the person sees exactly which person will be written.
+4. **Commit result carries no follow-ups.** `EventCommitResult` has `created` but not `followUps`; the UI shows the follow-ups of the
+   preview the person confirmed (same draft, so same list). Needed only if follow-ups ever depend on the written state.
+5. **No `DateAssumed` warning from the server.** A year-less mail date is marked `AssumedYear` by mail-hints; the preview does not
+   know a date came from a hint, so the UI keeps its own "year assumed" note under the date field until the person changes the date.
 
 ## Note: enums cross the wire as numbers
 

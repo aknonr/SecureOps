@@ -1,12 +1,9 @@
 using System.Diagnostics;
 using System.Net;
-using System.Net.Http.Json;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SecureOps.Infrastructure.OperationalRecords;
 using SecureOps.Shared.Configuration;
-using SecureOps.Shared.Contracts.Api;
 
 namespace SecureOps.Infrastructure.ItsmRecords;
 
@@ -32,6 +29,8 @@ public sealed class TuruncuHatItsmRecordLookup(
     private const int _maxTitleLength = 500;
     private const int _maxCodeLength = 256;
 
+    private readonly TuruncuHatItsmQueryClient _query = new(httpClient, sessions, turuncuHat.Value, logger);
+
     // Person fields (requester, affected user, owner) are deliberately absent. OR status is not selected until a
     // field name is evidenced for SMSS_oRFF; selecting an unproven field could fail every OR lookup.
     private static readonly string[] _orSelects = ["id", "p_code", "p_name", "p_rel_group"];
@@ -52,7 +51,7 @@ public sealed class TuruncuHatItsmRecordLookup(
         }
 
         string? baseObject = kind == ItsmRecordKind.Or ? lookup.Value.OrBaseObject : lookup.Value.OcoBaseObject;
-        if (!IsSafeIdentifier(baseObject))
+        if (!TuruncuHatItsmQueryClient.IsSafeIdentifier(baseObject))
         {
             return Finish(kind, ItsmRecordLookupResult.Unknown(kind, normalized, ItsmRecordLookupReason.NotConfigured, ProviderName),
                 Stopwatch.StartNew());
@@ -64,13 +63,13 @@ public sealed class TuruncuHatItsmRecordLookup(
         string[] filters = [string.Concat("#%m_active%#='True' AND #%p_code%#='", normalized, "'")];
         try
         {
-            TuruncuHatItsmRecordRows? rows = await QueryAsync(baseObject!, filters, selects, cancellationToken);
+            TuruncuHatItsmRecordRows? rows = await _query.QueryAsync(baseObject!, filters, selects, null, cancellationToken);
             ItsmRecordLookupResult result = rows is null
                 ? ItsmRecordLookupResult.Unknown(kind, normalized, ItsmRecordLookupReason.AuthenticationFailed, ProviderName)
                 : Interpret(kind, normalized, rows);
             return Finish(kind, result, stopwatch);
         }
-        catch (LookupFailure failure)
+        catch (ItsmQueryFailure failure)
         {
             return Finish(kind, ItsmRecordLookupResult.Unknown(kind, normalized, failure.Reason, ProviderName), stopwatch);
         }
@@ -133,90 +132,6 @@ public sealed class TuruncuHatItsmRecordLookup(
 
     private static string? Code(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    // Returns null when the source still rejects the session after one controlled re-login.
-    private async Task<TuruncuHatItsmRecordRows?> QueryAsync(
-        string baseObject, string[] filters, string[] selects, CancellationToken cancellationToken)
-    {
-        TuruncuHatOptions wire = turuncuHat.Value;
-        string session = await Session(cancellationToken);
-        for (int attempt = 0; attempt < 2; attempt++)
-        {
-            using HttpRequestMessage request = new(HttpMethod.Post, "query")
-            {
-                Content = JsonContent.Create(new
-                {
-                    req = new { BaseObject = baseObject, Filters = filters, Selects = selects, SessionID = session, wire.TenantId }
-                }, options: LegacyContractJson.Options)
-            };
-            TuruncuHatSessionManager.ApplyHeaders(request, wire.Authorization);
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeout.CancelAfter(TimeSpan.FromSeconds(wire.RequestTimeoutSeconds));
-            try
-            {
-                using HttpResponseMessage response = await httpClient.SendAsync(
-                    request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
-                if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
-                {
-                    if (attempt == 0)
-                    {
-                        sessions.Invalidate(session);
-                        session = await Session(cancellationToken);
-                        continue;
-                    }
-
-                    return null;
-                }
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    logger.LogWarning("Turuncu Hat ITSM lookup query failed. StatusCode: {StatusCode}.", (int)response.StatusCode);
-                    throw new LookupFailure((int)response.StatusCode >= 500
-                        ? ItsmRecordLookupReason.Unavailable
-                        : ItsmRecordLookupReason.Rejected);
-                }
-
-                using JsonDocument document = await BoundedJsonHttpContent.ReadAsync(
-                    response.Content, wire.MaxResponseBytes, timeout.Token);
-                return TuruncuHatItsmRecordRowReader.Read(document.RootElement, selects);
-            }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-                throw new LookupFailure(ItsmRecordLookupReason.Timeout);
-            }
-            catch (HttpRequestException)
-            {
-                throw new LookupFailure(ItsmRecordLookupReason.Unavailable);
-            }
-            catch (TuruncuHatQueryResultException resultException)
-            {
-                logger.LogWarning("Turuncu Hat ITSM lookup query reported an application error. ErrorNo: {ErrorNo}.",
-                    resultException.ErrorNo);
-                throw new LookupFailure(ItsmRecordLookupReason.Rejected);
-            }
-            catch (Exception exception) when (exception is JsonException or InvalidDataException or KeyNotFoundException)
-            {
-                throw new LookupFailure(ItsmRecordLookupReason.InvalidResponse);
-            }
-        }
-
-        return null;
-    }
-
-    private async Task<string> Session(CancellationToken cancellationToken)
-    {
-        try
-        {
-            return await sessions.GetSessionAsync(cancellationToken);
-        }
-        catch (ExternalIntegrationException exception)
-        {
-            throw new LookupFailure(
-                exception.ErrorCode == OperationalErrorCodes.OperationalSourceAuthenticationFailed
-                    ? ItsmRecordLookupReason.AuthenticationFailed
-                    : ItsmRecordLookupReason.Unavailable);
-        }
-    }
-
     private ItsmRecordLookupResult Finish(ItsmRecordKind kind, ItsmRecordLookupResult result, Stopwatch stopwatch)
     {
         string operation = kind == ItsmRecordKind.Or ? "itsm-lookup-or" : "itsm-lookup-oco";
@@ -232,12 +147,5 @@ public sealed class TuruncuHatItsmRecordLookup(
 
         return result;
     }
-
-    private static bool IsSafeIdentifier(string? value) =>
-        value is { Length: > 0 and <= 128 } && value.All(c => char.IsAsciiLetterOrDigit(c) || c is '_');
-
-    private sealed class LookupFailure(ItsmRecordLookupReason reason) : Exception("Turuncu Hat ITSM lookup failed safely.")
-    {
-        public ItsmRecordLookupReason Reason { get; } = reason;
-    }
 }
+

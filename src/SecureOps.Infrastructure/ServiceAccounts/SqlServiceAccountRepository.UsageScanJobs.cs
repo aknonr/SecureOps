@@ -8,7 +8,7 @@ using SecureOps.Infrastructure.ServiceAccounts.UsageScans.Jobs;
 
 namespace SecureOps.Infrastructure.ServiceAccounts;
 
-/// <summary>Web usage scan jobs (migration 037, SA-008). See <see cref="IUsageScanJobStore"/>.</summary>
+/// <summary>Web usage scan jobs (migration 037, SA-010). See <see cref="IUsageScanJobStore"/>.</summary>
 public sealed partial class SqlServiceAccountRepository : IUsageScanJobStore
 {
     private const int _uniqueIndexViolation = 2601;

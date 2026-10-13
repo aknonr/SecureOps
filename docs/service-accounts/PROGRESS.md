@@ -17,19 +17,69 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
 - Push on the owner's workstation: Git Credential Manager holds two GitHub accounts, so name the owner's:
   `git -c credential.https://github.com.username=aknonr push origin <branch>`.
 
-## Web usage scan, TARAMA-S (branch `feature/service-accounts-web-usage-scan-20261013`, from master `e79ac0b`, not merged)
+## Web usage scan, TARAMA-S (branch `feature/service-accounts-web-usage-scan-20261013`, from master `b64068a`, master `e79ac0b` merged in, not merged)
 
 - Owner decision 2026-10-13: the product runs the same read-only scan from the web; Worker is a Windows service; access is
   direct WinRM + Kerberos + JEA (rules 1 and 3 unchanged). Contract first (`616fa0e`): `USAGE-SCAN-JOB-CONTRACT.md`,
   `IServiceAccountUsageCollector` + deterministic fake. The Worker JEA runner, service setup and endpoint package are TARAMA-C
   (Codex, separate branch).
-- Migration 037 (SA-008, `DBA-037-TR.md`): job/account/server tables, one active scan per account (filtered unique index),
-  guard triggers, API/Worker grants; harness 001–034 + 037 + `sa-037-guards.sql`. Runner on the existing Hangfire queue,
+- Migration 037 (SA-010; SA-008 and 035 are left to OR-2, 036 is SA-009; `DBA-037-TR.md`): job/account/server tables, one active scan per account (filtered unique index),
+  guard triggers, API/Worker grants; harness 001–034, 036, 037 + `sa-037-guards.sql`; errors 51430–51435. Runner on the existing Hangfire queue,
   lease-fenced; each document validated by the ADR-0027 parser; final evidence in the 030 tables (`tool = Jea`). API: six
   routes (OpenAPI snapshot: additions only). UI: live page + start panel. Off by default (`Collector=None`).
 - Verified here (Linux cloud, SDK 9.0.317): build 0/0, unit tests, format gate on a CRLF copy, the OpenAPI snapshot test.
   Not verified: SQL (037, guards, SQL tests), Windows/IIS, browser, real JEA. Report: `TARAMA-S-RAPOR.md`.
-- Open: release selector `Get-ReleaseSqlPlan.ps1` does not know 037 (Codex); 035/036 belong to parallel branches.
+- Open: release selector `Get-ReleaseSqlPlan.ps1` does not know 037 (Codex); 035 belongs to OR-2.
+## Event guidance UI OLAY-3 (branch `feature/service-accounts-event-guidance-ui-20261013`, from master `4a7ea77`, master `0556459` merged in, not merged)
+
+- Account page: "Bir gelişme mi oldu?" stepped flow (Ne oldu? → Ayrıntılar + optional mail paste → Önizleme "Şunlar kaydedilecek / Kaydedilmeyecek" →
+  separate Kaydet) against the OLAY-2a/2b/2c routes; hidden with a short honest text when `eventGuidanceAvailable` is false (036 missing). Close hints
+  from `close-readiness` on "Talebi kapat" (aria-disabled + the server's list + remedy buttons), closure sub-codes on actions, "Bildir" on the next-step
+  card, role line in the page guide. UI/tests/docs only; contract gaps [G-39](../26-ui-backend-contract-gaps.md). Decisions: EVENT-GUIDANCE-DESIGN §4 note.
+- Verified 2026-10-13 locally (Windows, SDK 9.0.317): build 0/0; full unit 2622 passed / 1 skipped (existing), new `ServiceAccountEventFlowUiTests` (24); repository-wide format gate clean; journey
+  `tests/browser/service-accounts-event-flow.cjs` 7/7 on the local Demo (API :5630, UI :5631, synthetic LocalDB `SecureOps_SaOlay3Ui1013` built by the
+  harness 001–036 without role scripts, `sa-demo-bootstrap.sql`; database dropped afterwards): keyboard + heading focus, mail hints cleared from the box,
+  one save per event, 409 stale and 422 refused close writing nothing, close hint aria-disabled, next-step Bildir, 390 px and dark without overflow.
+  The journey found one defect, fixed: the page did not re-render after a delegate call, so a refreshed preview reused the stale account version.
+- Not verified: unknown outcome and missing 036 in a browser (unit-tested only; the API call is server-side), participant in a browser (unit-tested),
+  real 200 % zoom by eye, screen reader, Windows/IIS, corporate TEST (036 not installed there).
+
+## Close readiness OLAY-2a (branch `feature/service-accounts-close-readiness-20261013`, from master `633eed9` + OLAY-1 design merged in, not merged)
+
+- `ServiceAccountRules.EvaluateClose` lists every missing close condition (`CloseGap`: code, remedy, sub-codes of the closest deletion
+  candidate, expected action type, related action); `ValidateClose` returns its first code (equivalence to the previous implementation
+  is a unit test). New read-only `GET requests/{id}/close-readiness?outcome=` (View, account-detail scope, 404 out of scope, strict
+  outcome names, no write/audit); OpenAPI snapshot additive only (one path, `CloseReadiness`, `CloseMissing`). No migration, no UI.
+- Not in this PR: `RequestView.closeReadiness` (detail lacks the verifier/evidence facts; see EVENT-GUIDANCE-DESIGN §6 note) and
+  `EvaluateVerification`.
+
+## Mail hints OLAY-2b (branch `feature/service-accounts-mail-hints-20261013`, from master `6ee5d26`, not merged)
+
+- `POST accounts/{id}/events/mail-hints` (Work + account in scope, else 403/404): pasted reply text in, **suggestions only** out
+  (event kinds, OR/OCO numbers, dates); deterministic rules in one table (`EventMailHintRules`), pure function `EventMailHints`, no
+  language model, no network, nothing written, text never stored, logged or echoed. Own controller file; OpenAPI snapshot additive only.
+  Details and limits: EVENT-GUIDANCE-DESIGN §7 "OLAY-2b uygulama notu". No migration, no UI.
+
+## Event guidance design OLAY-1 (branch `docs/service-accounts-event-guidance-design-20261013`, from master `633eed9`, not merged)
+
+- Design only, no code: [EVENT-GUIDANCE-DESIGN.md](EVENT-GUIDANCE-DESIGN.md) ("Ne oldu?" flow, event-to-record table, preview/commit contract,
+  close-readiness, deterministic mail hints, migration 036 reserved, threat table E1-E14, split OLAY-2a/2b/2c/3). Owner questions S1-S8 open.
+  Reported is not verified: the flow never writes Verified. OLAY-3 (UI) waits for F4.
+
+## First TEST acceptance — UI fixes (F4; branch `feature/service-accounts-first-acceptance-ui-20261013`, merged #42 → master `101c1f5`)
+
+- List shortcut buttons did nothing while the list was open (Blazor updates parameters, `OnParametersSet` only set `_status`). Now a changed
+  query string re-applies exactly that shortcut's filter (all other filters cleared), returns to page 1 and re-reads; no change, no re-read.
+- Counts: the list says what its total counts ("kapsamınızdaki tüm hesaplar" vs the applied filter) and, for `status=proposed` from the card,
+  whether it equals the card's number. Cards carry hints ("farklı hesap", "talep/bildirim sayısı, hesap değil"); the shortcut shows the count.
+  Both numbers count distinct in-scope accounts with a Proposed ownership; no API gap.
+- List search field is "Hesap adı" (the API never searched SID); filters apply on Listele/Enter, said on the page. Directory name search has
+  distinct states: waiting, could not search (unknown, may be not set up or unreachable), no match for the searched name, matches, truncated.
+- Usage-scan texts: the system does not scan; read-only JEA scanning is a separate capability without Information Security approval (ADR-0024 R2).
+- Short guide fix (list "Bul" step). Import rows: "Excel satırı N", a one-line reason for Conflict/Invalid/OutOfScope, error lines name sheet and row,
+  and a missing server detail is stated. The event-oriented guide ("Ne oldu?") is OLAY-1, not here.
+- Gaps recorded: `docs/26-ui-backend-contract-gaps.md` G-37. Tests: `ServiceAccountFirstAcceptanceUiTests` (renders the real list page with a
+  synthetic API; reverting the fix makes the shortcut tests fail). Not verified: the real browser journey and corporate TEST.
 
 ## Change plan d, PR 2 (branch `feature/service-accounts-change-plan-checklist-20261012`, from the PR 1 branch `db56856`, not merged)
 
