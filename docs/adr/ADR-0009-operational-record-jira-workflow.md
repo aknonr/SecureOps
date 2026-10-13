@@ -48,6 +48,10 @@ that intent when configuration changes. No automatic continuation or future
 close-intent transition is introduced. Legacy transfers default to no close intent.
 Migration 011 is additive and must precede the new SQL-backed binaries.
 
+Note 2026-10-13: `SourceCloseEnabled` governs only this OR source close. In Use
+completion writes use their own `InUseCompletion:SourceWritesEnabled` gate
+(ADR-0020 amendment 2026-10-13); neither flag enables the other.
+
 The owner confirms Sunucu Talebi and Uygulama Kurulumu as request types, represented
 by existing ServerRequest and SoftwareInstallation values. Operator declaration
 is not source attestation, infrastructure scope, identity validation, permission,
