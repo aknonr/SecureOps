@@ -21,7 +21,7 @@ public sealed class TuruncuHatItsmUserRegistrationMatchTests
     private const string _session = "synthetic-session";
 
     [Fact]
-    public async Task SingleExactRow_WithLeadingZeroDropped_IsMatched_WithIdsOnly()
+    public async Task SingleExactRow_SixDigitsWithLeadingZero_IsMatched_WithIdsOnly()
     {
         ScriptedHandler handler = new(Ok(Query(RegistrationRow)));
 
@@ -35,7 +35,7 @@ public sealed class TuruncuHatItsmUserRegistrationMatchTests
     }
 
     [Fact]
-    public async Task Request_IsOneExactEquality_WithoutLeadingZeros_SelectOnly_WithoutPersonFields()
+    public async Task Request_IsOneExactEqualityOnActiveUsers_KeepingTheSixDigitForm_SelectOnly_WithoutPersonFields()
     {
         ScriptedHandler handler = new(Ok(Query(RegistrationRow)));
 
@@ -46,18 +46,34 @@ public sealed class TuruncuHatItsmUserRegistrationMatchTests
         JsonElement req = JsonDocument.Parse(handler.Requests[0].Body).RootElement.GetProperty("req");
         req.GetProperty("BaseObject").GetString().Should().Be("cmn_user");
         req.GetProperty("Filters").EnumerateArray().Select(f => f.GetString()).Should()
-            .Equal("#%c_registration_number%#='770123'");
+            .Equal("#%m_active%#='True' AND #%c_registration_number%#='070123'");
         req.GetProperty("Selects").EnumerateArray().Select(s => s.GetString()).Should()
             .Equal("id", "c_registration_number", "p_obs_id", "m_rel_home_lbs_id");
         req.GetProperty("NoEncode").GetBoolean().Should().BeTrue();
         req.TryGetProperty("QueryPermissions", out _).Should().BeFalse();
-        handler.Requests[0].Body.Should().NotContainAny(RegistrationNumber, "m_username", "m_phone_number", "m_email", "m_name", "Password");
+        handler.Requests[0].Body.Should().NotContainAny("m_username", "m_phone_number", "m_email", "m_name", "Password");
     }
 
     [Theory]
-    [InlineData("770123")]
-    [InlineData("000770123")]
-    [InlineData(" 770123 ")]
+    [InlineData("123", "000123")]
+    [InlineData("12345", "012345")]
+    [InlineData("01234567", "1234567")]
+    [InlineData("00012341", "012341")]
+    [InlineData("ABC123", "ABC123")]
+    public async Task Filter_CarriesTheSourceFormOfTheNumber(string input, string searched)
+    {
+        ScriptedHandler handler = new(Ok(Query()));
+
+        await Mapping(handler).MatchByRegistrationNumberAsync(input, CancellationToken.None);
+
+        Filters(handler).Should().Equal("#%m_active%#='True' AND #%c_registration_number%#='" + searched + "'");
+    }
+
+    [Theory]
+    [InlineData("070123")]
+    [InlineData("70123")]
+    [InlineData("00070123")]
+    [InlineData(" 070123 ")]
     public async Task ReturnedNumber_IsNormalizedBeforeTheCheck(string returned)
     {
         ItsmUserMatchResult result = await Mapping(new ScriptedHandler(Ok(Query(RegistrationRow.With("SET.c_registration_number", returned)))))
@@ -67,10 +83,10 @@ public sealed class TuruncuHatItsmUserRegistrationMatchTests
     }
 
     [Fact]
-    public async Task ReturnedNumberAsJsonNumber_IsMatched()
+    public async Task ReturnedNumberAsJsonNumber_WithoutItsLeadingZero_IsMatched()
     {
         const string body = """
-            {"QueryResult":{"ErrorNo":0,"Items":[[{"Key":"SET.id","Value":880001},{"Key":"SET.c_registration_number","Value":770123},{"Key":"num","Value":"1"}]],"MaxPages":1,"PageNo":1,"RecordCount":1}}
+            {"QueryResult":{"ErrorNo":0,"Items":[[{"Key":"SET.id","Value":880001},{"Key":"SET.c_registration_number","Value":70123},{"Key":"num","Value":"1"}]],"MaxPages":1,"PageNo":1,"RecordCount":1}}
             """;
 
         ItsmUserMatchResult result = await Mapping(new ScriptedHandler(Ok(body)))
@@ -81,10 +97,11 @@ public sealed class TuruncuHatItsmUserRegistrationMatchTests
     }
 
     [Theory]
-    [InlineData("770124")]
-    [InlineData("1770123")]
-    [InlineData("7701230")]
-    [InlineData("77O123")]
+    [InlineData("070124")]
+    [InlineData("1070123")]
+    [InlineData("0701230")]
+    [InlineData("O70123")]
+    [InlineData("070123A")]
     [InlineData("0")]
     [InlineData("")]
     [InlineData(null)]
@@ -159,24 +176,30 @@ public sealed class TuruncuHatItsmUserRegistrationMatchTests
     [InlineData(null)]
     [InlineData("0")]
     [InlineData("000000")]
-    [InlineData("12a456")]
-    [InlineData("A12345")]
+    [InlineData("0000000")]
     [InlineData("123 456")]
+    [InlineData("ABC 123")]
     [InlineData("123\t456")]
     [InlineData("123\n456")]
     [InlineData("-123456")]
     [InlineData("+123456")]
+    [InlineData("ABC-123")]
+    [InlineData("ABC_123")]
     [InlineData("123.456")]
-    [InlineData("1e5")]
     [InlineData("123456789012345678901")]
     [InlineData("000000000000000000001")]
+    [InlineData("ABCDEFGHIJ1234567890K")]
     [InlineData("١٢٣٤٥٦")]
     [InlineData("１２３４５６")]
-    [InlineData("770123' OR '1'='1")]
-    [InlineData("770123'")]
+    [InlineData("ÄBC123")]
+    [InlineData("İ12345")]
+    [InlineData("070123' OR '1'='1")]
+    [InlineData("070123'")]
+    [InlineData("\"070123\"")]
     [InlineData("%")]
-    [InlineData("770%")]
-    [InlineData("770*")]
+    [InlineData("070%")]
+    [InlineData("070*")]
+    [InlineData("070123#")]
     [InlineData("#%c_registration_number%#")]
     public async Task InvalidRegistrationNumber_IsUnknownInvalidIdentifier_WithoutAnyRequest(string? registrationNumber)
     {
@@ -192,15 +215,44 @@ public sealed class TuruncuHatItsmUserRegistrationMatchTests
         await sessions.DidNotReceive().GetSessionAsync(Arg.Any<CancellationToken>());
     }
 
+    // The Turuncu Hat team's official rule (2026-10-14) and its examples, one case each.
     [Theory]
-    [InlineData("1", "1")]
-    [InlineData("000123", "123")]
-    [InlineData(" 0770123 ", "770123")]
-    [InlineData("100200", "100200")]
-    [InlineData("12345678901234567890", "12345678901234567890")]
-    [InlineData("00000000000000000001", "1")]
-    public void RegistrationNumber_ValidInput_DropsLeadingZeros(string input, string expected) =>
+    [InlineData("123", "000123")]
+    [InlineData("1234", "001234")]
+    [InlineData("12345", "012345")]
+    [InlineData("123456", "123456")]
+    [InlineData("1234567", "1234567")]
+    [InlineData("01234567", "1234567")]
+    [InlineData("00012341", "012341")]
+    [InlineData("ABC123", "ABC123")]
+    public void RegistrationNumber_SourceRuleExamples(string input, string expected) =>
         ItsmRegistrationNumber.Normalize(input).Should().Be(expected);
+
+    [Theory]
+    [InlineData("1", "000001")]
+    [InlineData("0123", "000123")]
+    [InlineData("012345", "012345")]
+    [InlineData("000123", "000123")]
+    [InlineData(" 012345 ", "012345")]
+    [InlineData("0001234567", "1234567")]
+    [InlineData("12345678901234567890", "12345678901234567890")]
+    [InlineData("00000000000000000001", "000001")]
+    [InlineData("abc123", "abc123")]
+    [InlineData("0ABC12", "0ABC12")]
+    [InlineData("A1", "A1")]
+    [InlineData("ABCDEFGHIJ1234567890", "ABCDEFGHIJ1234567890")]
+    public void RegistrationNumber_OtherValidInput_FollowsTheSameRule(string input, string expected) =>
+        ItsmRegistrationNumber.Normalize(input).Should().Be(expected);
+
+    [Fact]
+    public async Task ReturnedAlphanumericNumberInAnotherCase_IsUnknownInvalidResponse()
+    {
+        ItsmUserMatchResult result = await Mapping(new ScriptedHandler(Ok(Query(RegistrationRow.With("SET.c_registration_number", "abc123")))))
+            .MatchByRegistrationNumberAsync("ABC123", CancellationToken.None);
+
+        result.Status.Should().Be(ItsmUserMatchStatus.Unknown);
+        result.Reason.Should().Be(ItsmRecordLookupReason.InvalidResponse);
+    }
 
     [Fact]
     public async Task CallerCancellation_Propagates_BeforeAnyRequest()
@@ -228,7 +280,7 @@ public sealed class TuruncuHatItsmUserRegistrationMatchTests
 
         result.Status.Should().Be(ItsmUserMatchStatus.Matched);
         result.User.Should().Be(new ItsmUserReference("880001", "8601", "8701"));
-        Filters(handler).Should().Equal("#%c_registration_number%#='770123'", "#%m_username%#='synthetic.user'");
+        Filters(handler).Should().Equal("#%m_active%#='True' AND #%c_registration_number%#='070123'", "#%m_active%#='True' AND #%m_username%#='synthetic.user'");
     }
 
     [Fact]
@@ -272,9 +324,9 @@ public sealed class TuruncuHatItsmUserRegistrationMatchTests
     }
 
     [Theory]
-    [InlineData("12a456")]
+    [InlineData("12-456")]
     [InlineData("000000")]
-    [InlineData("770123' OR '1'='1")]
+    [InlineData("070123' OR '1'='1")]
     public async Task Combined_InvalidRegistration_IsUnknownInvalidIdentifier_WithoutFallbackOrRequest(string registrationNumber)
     {
         ScriptedHandler handler = new();
@@ -338,6 +390,18 @@ public sealed class TuruncuHatItsmUserRegistrationMatchTests
     }
 
     [Fact]
+    public async Task Combined_MatchedRegistration_WithUserNameRowInAnotherCase_IsUnknownInvalidResponse()
+    {
+        ItsmUserMatchResult result = await Mapping(new ScriptedHandler(
+                Ok(Query(RegistrationRow)), Ok(Query(UserRow.With("SET.m_username", "Synthetic.User")))))
+            .MatchAsync(RegistrationNumber, UserName, CancellationToken.None);
+
+        result.Status.Should().Be(ItsmUserMatchStatus.Unknown);
+        result.Reason.Should().Be(ItsmRecordLookupReason.InvalidResponse);
+        result.User.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Combined_MatchedRegistration_WithAmbiguousUserName_IsAmbiguous()
     {
         ItsmUserMatchResult result = await Mapping(new ScriptedHandler(
@@ -358,7 +422,7 @@ public sealed class TuruncuHatItsmUserRegistrationMatchTests
         ItsmUserMatchResult result = await Mapping(handler).MatchAsync(registrationNumber, UserName, CancellationToken.None);
 
         result.Status.Should().Be(ItsmUserMatchStatus.Matched);
-        Filters(handler).Should().Equal("#%m_username%#='synthetic.user'");
+        Filters(handler).Should().Equal("#%m_active%#='True' AND #%m_username%#='synthetic.user'");
     }
 
     [Theory]
@@ -372,7 +436,7 @@ public sealed class TuruncuHatItsmUserRegistrationMatchTests
         ItsmUserMatchResult result = await Mapping(handler).MatchAsync(RegistrationNumber, userName, CancellationToken.None);
 
         result.Status.Should().Be(ItsmUserMatchStatus.Matched);
-        Filters(handler).Should().Equal("#%c_registration_number%#='770123'");
+        Filters(handler).Should().Equal("#%m_active%#='True' AND #%c_registration_number%#='070123'");
     }
 
     [Theory]
@@ -402,7 +466,7 @@ public sealed class TuruncuHatItsmUserRegistrationMatchTests
             Ok(ApplicationError),
             Ok("not json"),
             Ok(Query(RegistrationRow.Without("SET.id"))),
-            Ok(Query(RegistrationRow.With("SET.c_registration_number", "770124"))),
+            Ok(Query(RegistrationRow.With("SET.c_registration_number", "070124"))),
             Ok(Query(RegistrationRow)), Ok(Query(UserRow.With("SET.id", "880009"))));
         TuruncuHatItsmUserMapping mapping = Mapping(handler, logger: logger);
 
@@ -416,7 +480,7 @@ public sealed class TuruncuHatItsmUserRegistrationMatchTests
         logger.Messages.Should().HaveCountGreaterThan(5);
         string all = string.Join('\n', logger.Messages);
         all.Should().Contain("registration number");
-        all.Should().NotContainAny(SearchedRegistrationNumber, "770124", _session, "synthetic-user", "synthetic-password",
+        all.Should().NotContainAny(SearchedRegistrationNumber, "070124", _session, "synthetic-user", "synthetic-password",
             "Basic c3ludGhldGlj", "itsm.invalid", UserName, "880001");
     }
 

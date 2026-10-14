@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Net;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SecureOps.Infrastructure.OperationalRecords;
@@ -9,7 +10,8 @@ namespace SecureOps.Infrastructure.ItsmRecords;
 
 /// <summary>
 /// Read-only Turuncu Hat adapter for <see cref="IItsmRecordTracking"/> (ADR-0032). One OR is read with up to three
-/// <c>/query</c> calls on the shared query path: the OR row (last update, configured status and stage fields), its
+/// <c>/query</c> calls on the shared query path: the OR row (last update, configured status and stage fields with
+/// their source display text when sent), its
 /// workflow activities, and its comments reduced to a count and the newest creation time. Every part is mapped
 /// independently, so one failed part is Unknown without hiding the others. It never selects person fields, comment
 /// text or the completing person, and never logs the session, credentials, base URL, record id or any value read.
@@ -32,6 +34,7 @@ public sealed class TuruncuHatItsmRecordTracking(
     private const string _activityObject = "BPM_Actvty";
     private const string _commentObject = "cmn_comment";
     private const int _maxTextLength = 128;
+    private const int _maxLabelLength = 256;
 
     // m_done_by is a person field and is deliberately absent from the activity selects.
     private static readonly string[] _activitySelects = ["id", "m_group", "m_status", "m_created_dt", "m_completion_date"];
@@ -124,15 +127,19 @@ public sealed class TuruncuHatItsmRecordTracking(
             return ItsmRecordTrackingResult.Ambiguous(id, ProviderName);
         }
 
+        // Only the KEY. display cells of the configured status and stage fields are read; never another KEY. cell,
+        // which could carry a person's name. An absent display cell is null, not a failure.
         IReadOnlyDictionary<string, string?> single = rows.Rows[0];
         if (!TryText(single, "SET." + _lastModifiedField, out string? modified)
             || !TryText(single, statusField is null ? null : "SET." + statusField, out string? status)
-            || !TryText(single, stageField is null ? null : "SET." + stageField, out string? stage))
+            || !TryText(single, stageField is null ? null : "SET." + stageField, out string? stage)
+            || !TryLabel(single, statusField, out string? statusLabel)
+            || !TryLabel(single, stageField, out string? stageLabel))
         {
             return ItsmRecordTrackingResult.Unknown(id, ItsmRecordLookupReason.InvalidResponse, ProviderName);
         }
 
-        return ItsmRecordTrackingResult.Found(id, new ItsmOrState(modified, status, stage),
+        return ItsmRecordTrackingResult.Found(id, new ItsmOrState(modified, status, stage, statusLabel, stageLabel),
             ItsmTrackingPart<IReadOnlyList<ItsmActivity>>.Unknown(ItsmRecordLookupReason.None),
             ItsmTrackingPart<ItsmCommentSummary>.Unknown(ItsmRecordLookupReason.None), ProviderName);
     }
@@ -255,6 +262,25 @@ public sealed class TuruncuHatItsmRecordTracking(
         }
 
         value = string.IsNullOrEmpty(text) ? null : text;
+        return true;
+    }
+
+    // The display cell of a configured field, HTML-decoded defensively like record titles; bounded like any text cell.
+    private static bool TryLabel(IReadOnlyDictionary<string, string?> row, string? field, out string? value)
+    {
+        value = null;
+        if (field is null || !row.TryGetValue("KEY." + field, out string? raw) || raw is null)
+        {
+            return true;
+        }
+
+        string text = WebUtility.HtmlDecode(raw).Trim();
+        if (text.Length > _maxLabelLength)
+        {
+            return false;
+        }
+
+        value = text.Length == 0 ? null : text;
         return true;
     }
 
