@@ -3,9 +3,9 @@ namespace SecureOps.Infrastructure.ItsmRecords;
 /// <summary>
 /// Deterministic synthetic provider for Development, Demo and Test (ADR-0004, ADR-0032). It makes no network call.
 /// Source id <c>900001</c> (the Fake OR of <see cref="FakeItsmRecordLookup"/>) is Found with two activities and
-/// two comments; <c>900002</c> Ambiguous; <c>900003</c> Unknown/Unavailable; <c>900004</c> Found with the activity
-/// part Unknown/IncompleteResponse and zero comments; any other valid id NotFound; an invalid id
-/// Unknown/InvalidIdentifier. Results report Provider "Fake" and are never real evidence.
+/// two comments and synthetic status and stage labels; <c>900002</c> Ambiguous; <c>900003</c> Unknown/Unavailable;
+/// <c>900004</c> Found with the activity part Unknown/IncompleteResponse and zero comments; any other valid id
+/// NotFound; an invalid id Unknown/InvalidIdentifier. Results report Provider "Fake" and are never real evidence.
 /// </summary>
 public sealed class FakeItsmRecordTracking : IItsmRecordTracking
 {
@@ -21,7 +21,7 @@ public sealed class FakeItsmRecordTracking : IItsmRecordTracking
         {
             null => ItsmRecordTrackingResult.Unknown(null, ItsmRecordLookupReason.InvalidIdentifier, ProviderName),
             "900001" => ItsmRecordTrackingResult.Found(id,
-                new ItsmOrState("2026-01-05T02:30:00", "9301", "9401"),
+                new ItsmOrState("2026-01-05T02:30:00", "9301", "9401", "Synthetic status", "Synthetic stage"),
                 ItsmTrackingPart<IReadOnlyList<ItsmActivity>>.Known(
                 [
                     new ItsmActivity("910001", "9001", "9501", "2026-01-05T01:00:00", "2026-01-05T01:45:00"),
@@ -44,8 +44,8 @@ public sealed class FakeItsmRecordTracking : IItsmRecordTracking
 
 /// <summary>
 /// Deterministic synthetic provider for Development, Demo and Test (ADR-0004, ADR-0032). User name
-/// <c>synthetic.user</c> is Matched, <c>synthetic.dup</c> Ambiguous, <c>synthetic.down</c> Unknown/Unavailable,
-/// any other valid name NotMatched, an invalid name Unknown/InvalidIdentifier. Registration number <c>990001</c>
+/// <c>synthetic.user</c> (exact case, like the source) is Matched, <c>synthetic.dup</c> Ambiguous,
+/// <c>synthetic.down</c> Unknown/Unavailable, any other valid name NotMatched, an invalid name Unknown/InvalidIdentifier. Registration number <c>990001</c>
 /// (also written <c>0990001</c>) is the same user as <c>synthetic.user</c>; <c>990004</c> is another user, so it
 /// conflicts with <c>synthetic.user</c> in the combined match; <c>990002</c> is Ambiguous, <c>990003</c>
 /// Unknown/Unavailable, any other valid number NotMatched. Results report Provider "Fake" and are never real evidence.
@@ -63,7 +63,7 @@ public sealed class FakeItsmUserMapping : IItsmUserMapping
     {
         cancellationToken.ThrowIfCancellationRequested();
         string? name = ItsmUserName.Normalize(userName);
-        ItsmUserMatchResult result = name?.ToLowerInvariant() switch
+        ItsmUserMatchResult result = name switch
         {
             null => ItsmUserMatchResult.Unknown(ItsmRecordLookupReason.InvalidIdentifier, ProviderName),
             "synthetic.user" => ItsmUserMatchResult.Matched(_syntheticUser, ProviderName),

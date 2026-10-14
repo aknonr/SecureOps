@@ -1,7 +1,7 @@
 # ADR-0032: Turuncu Hat OR Tracking and Exact User Match (read-only)
 
-**Status:** Accepted (owner, 2026-10-13; includes the 2026-10-13 amendment); implemented behind the Disabled default, no real Turuncu Hat call made
-**Date:** 2026-10-12 (amended 2026-10-13: registration-number match, see the amendment at the end)
+**Status:** Accepted (owner, 2026-10-13; includes the 2026-10-13 amendment; the 2026-10-14 amendment corrects it to the source team's official rules and stays within the accepted scope); implemented behind the Disabled default, no real Turuncu Hat call made
+**Date:** 2026-10-12 (amended 2026-10-13: registration-number match; amended 2026-10-14: registration rule, active users, user-name case, status/stage display text; see the amendments at the end)
 
 ## Context
 
@@ -127,6 +127,7 @@ leading zeros. Owner decision 2026-10-13: add the registration path now, ahead o
    `p_obs_id`, `m_rel_home_lbs_id`. The returned number is normalized the same way and must equal the searched one;
    otherwise the filter was not honoured and the result is `Unknown/InvalidResponse`. The outcome is again
    `Matched | NotMatched | Ambiguous | Unknown` with the same completeness and failure rules as the user name.
+   *(Search form and character set superseded by the 2026-10-14 amendment, decision 1.)*
 2. **Combined match and priority** (`IItsmUserMapping.MatchAsync(registrationNumber, userName)`); null or blank
    values count as not given:
 
@@ -164,4 +165,64 @@ operational-record, In Use or announcement files).
 
 **Activation gate addition.** One read-only run in corporate TEST that confirms the `c_registration_number`
 equality filter without leading zeros and the returned value's shape (text or number, with or without leading
-zeros), recorded without real numbers, names or ids in the repository.
+zeros), recorded without real numbers, names or ids in the repository. *(Search form superseded by the 2026-10-14
+amendment.)*
+
+## Amendment 2026-10-14 (TH-4c): source rules for the user match, OR status/stage display text
+
+**Context.** The Turuncu Hat team's third reply (2026-10-14, sanitized in `turuncu-hat-itsm-record-lookup.md`
+section "Vendor and team evidence") corrects what the 2026-10-13 amendment relied on: (a) the registration number is
+**not** searched without its leading zeros; the team gave its official normalization rule; (b) `cmn_user` keeps
+passive users, so a user query must add `m_active='True'`; (c) `m_username` holds whatever the identity system
+delivered and is compared **case-sensitively**; (d) the OR form has a separate "Aşama" (stage) field (code to be
+confirmed by Ctrl+double-click, probably `p_rel_stage`), and the `ROMA_Status` fields were not given, so the
+display text of a status or stage is read from the `KEY.<field>` cell the source returns next to `SET.<field>`.
+With the 2026-10-13 rule a six-digit product number with a leading zero (`security.Users.Uid`, OIDC `uid`) was sent
+without it and could not match. The `IItsmUserMapping` signatures do not change.
+
+**Decision.**
+
+1. **Registration rule** (`ItsmRegistrationNumber.Normalize`, replaces amendment 2026-10-13 decision 1 on the
+   search form). After trimming outer whitespace the value must be 1-20 ASCII letters or digits; inner whitespace,
+   signs, `_`, `-`, quotes, `%`, `*`, `#`, non-ASCII letters and non-ASCII digits are `Unknown/InvalidIdentifier`
+   without a remote call (filter safety; the team's rule itself does not restrict characters). Then, as the team
+   stated: a value that is not all digits is sent as it is (case preserved); an all-digit value with fewer than six
+   digits is left-padded with zeros to six; exactly six digits are kept as they are; more than six digits lose their
+   leading zeros and, if fewer than six remain, are padded to six again. A value of only zeros is invalid. Examples:
+   `123`→`000123`, `1234`→`001234`, `12345`→`012345`, `123456`→`123456`, `1234567`→`1234567`,
+   `01234567`→`1234567`, `00012341`→`012341`, `ABC123`→`ABC123`. The returned `c_registration_number` is normalized
+   with the same function and compared ordinally with the searched value, so a source that returns the number as a
+   JSON number (leading zero lost) still verifies, while another value or another letter case is
+   `Unknown/InvalidResponse`.
+2. **Active users only.** Both `cmn_user` queries filter `#%m_active%#='True' AND <key equality>`. A passive user is
+   therefore never Matched and never makes a result Ambiguous; `m_active` is not selected or returned.
+3. **User name is case-sensitive.** The name is sent exactly as given after the allow-list (outer whitespace
+   trimmed, case preserved; this was already so), and the returned `m_username` must equal it **ordinally**. A row
+   in another case is `Unknown/InvalidResponse`: the source answered for a key the adapter did not send, so nothing
+   in that response is trusted (same rule as a row for another key). This replaces the case-insensitive check of
+   decision 2, which assumed a case-insensitive source and could have accepted a row the source's own equality would
+   not produce. The product user name (`security.Users.LoginName`) therefore must have the same case as
+   `m_username`; a difference is visible (NotMatched, or Unknown/InvalidResponse) and is not repaired by guessing.
+4. **Status and stage display text.** `ItsmOrState` gains `StatusLabel` and `StageLabel` (optional, default null;
+   existing positional construction stays valid). When `OrStatusField`/`OrStageField` is configured, the adapter
+   reads the `KEY.<that field>` cell of the OR row if the source sent it (HTML-decoded defensively, trimmed, at most
+   256 characters; longer is `Unknown/InvalidResponse`; absent or empty is null, not a failure). No other `KEY.` cell
+   is read, so a person's display name (for example of a creator field) is never picked up. The label is the
+   source's text shown beside the raw code, not a product interpretation (ADR-0031 decision 4 still holds: the
+   product does not say "approved" or "closed" on its own). No extra select is sent; `OrStageField` stays
+   configuration (TEST value to be confirmed in the screen, expected `p_rel_stage`).
+5. **Fake and Disabled.** `FakeItsmRecordTracking` source id `900001` carries synthetic labels; `FakeItsmUserMapping`
+   compares the user name ordinally like the source (`Synthetic.User` is NotMatched) and applies the new registration
+   rule (`990001` and `0990001` still map to the same Fake user; an alphanumeric number such as `99a001` is valid and
+   NotMatched). Disabled is unchanged: every call is `Unknown/NotConfigured`.
+
+**Unchanged.** Personal-data boundary (no key value in results, logs, telemetry), the combined rule and its known
+risk, telemetry operation names, no write/API/OpenAPI/SQL/UI.
+
+**Activation gate addition (replaces the 2026-10-13 one).** One read-only run in corporate TEST that confirms, without
+recording real values in the repository: a six-digit registration number with a leading zero matches in the
+six-digit form; the returned value's shape; that `m_active='True'` is accepted on `cmn_user`; whether `KEY.` cells
+come back for `p_def_status` and the stage field, and the stage field code.
+
+**Ownership.** TH-4c (2026-10-14), assigned by the Turuncu Hat coordinator: Claude implements this amendment under the owner's TH-2/TH-4 exception, with the same
+exclusions as TH-4/TH-4b.

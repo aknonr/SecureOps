@@ -86,6 +86,63 @@ public sealed class TuruncuHatItsmRecordTrackingTests
     }
 
     [Fact]
+    public async Task KeyDisplayCells_OfConfiguredFields_AreReturnedBesideTheRawCodes()
+    {
+        ScriptedHandler handler = new(Ok(Query([.. OrHeaderRow,
+            ("SET.p_synthetic_status", "9301"), ("KEY.p_synthetic_status", " Sentetik &amp; durum "),
+            ("SET.p_synthetic_stage", "9401"), ("KEY.p_synthetic_stage", "Sentetik aşama")])), Ok(Query()), Ok(Query()));
+
+        ItsmRecordTrackingResult result = await Tracking(handler, statusField: "p_synthetic_status", stageField: "p_synthetic_stage")
+            .GetOrTrackingAsync(OrSourceId, CancellationToken.None);
+
+        result.State.Should().Be(new ItsmOrState("2026-01-05T02:30:00", "9301", "9401", "Sentetik & durum", "Sentetik aşama"));
+        Strings(Req(handler, 0), "Selects").Should().Equal("id", "m_last_mod_dt", "p_synthetic_status", "p_synthetic_stage");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task MissingOrEmptyKeyDisplayCell_IsNull_NotAFailure(string? label)
+    {
+        (string Key, string? Value)[] row = label is null
+            ? [.. OrHeaderRow, ("SET.p_synthetic_status", "9301")]
+            : [.. OrHeaderRow, ("SET.p_synthetic_status", "9301"), ("KEY.p_synthetic_status", label)];
+
+        ItsmRecordTrackingResult result = await Tracking(new ScriptedHandler(Ok(Query(row)), Ok(Query()), Ok(Query())), statusField: "p_synthetic_status")
+            .GetOrTrackingAsync(OrSourceId, CancellationToken.None);
+
+        result.Status.Should().Be(ItsmRecordLookupStatus.Found);
+        result.State.Should().Be(new ItsmOrState("2026-01-05T02:30:00", "9301", null));
+    }
+
+    [Fact]
+    public async Task KeyDisplayCells_OfUnconfiguredOrOtherFields_AreNeverRead()
+    {
+        ScriptedHandler handler = new(Ok(Query([.. OrHeaderRow,
+            ("KEY.p_synthetic_status", "Sentetik durum"), ("KEY.m_created_by", "Synthetic Person"), ("KEY.id", "Synthetic")])),
+            Ok(Query()), Ok(Query()));
+
+        ItsmRecordTrackingResult result = await Tracking(handler).GetOrTrackingAsync(OrSourceId, CancellationToken.None);
+
+        result.State.Should().Be(new ItsmOrState("2026-01-05T02:30:00", null, null));
+        result.ToString().Should().NotContainAny("Synthetic Person", "Sentetik durum");
+    }
+
+    [Fact]
+    public async Task OversizedKeyDisplayCell_IsUnknownInvalidResponse()
+    {
+        ScriptedHandler handler = new(Ok(Query([.. OrHeaderRow,
+            ("SET.p_synthetic_stage", "9401"), ("KEY.p_synthetic_stage", new string('x', 257))])));
+
+        ItsmRecordTrackingResult result = await Tracking(handler, stageField: "p_synthetic_stage")
+            .GetOrTrackingAsync(OrSourceId, CancellationToken.None);
+
+        result.Status.Should().Be(ItsmRecordLookupStatus.Unknown);
+        result.Reason.Should().Be(ItsmRecordLookupReason.InvalidResponse);
+    }
+
+    [Fact]
     public async Task EmptyOptionalHeaderValues_AreNull_NotMisread()
     {
         ScriptedHandler handler = new(Ok(Query([("SET.id", OrSourceId), ("SET.m_last_mod_dt", null)])), Ok(Query()), Ok(Query()));
