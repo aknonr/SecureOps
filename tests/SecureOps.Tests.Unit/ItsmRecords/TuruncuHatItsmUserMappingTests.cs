@@ -32,7 +32,7 @@ public sealed class TuruncuHatItsmUserMappingTests
     }
 
     [Fact]
-    public async Task Request_IsOneExactEquality_SelectOnly_WithoutPersonFields()
+    public async Task Request_IsOneExactEqualityOnActiveUsers_SelectOnly_WithoutPersonFields()
     {
         ScriptedHandler handler = new(Ok(Query(UserRow)));
 
@@ -42,7 +42,7 @@ public sealed class TuruncuHatItsmUserMappingTests
         handler.Requests[0].Path.Should().Be("/api/query");
         JsonElement req = JsonDocument.Parse(handler.Requests[0].Body).RootElement.GetProperty("req");
         req.GetProperty("BaseObject").GetString().Should().Be("cmn_user");
-        req.GetProperty("Filters").EnumerateArray().Select(f => f.GetString()).Should().Equal("#%m_username%#='synthetic.user'");
+        req.GetProperty("Filters").EnumerateArray().Select(f => f.GetString()).Should().Equal("#%m_active%#='True' AND #%m_username%#='synthetic.user'");
         req.GetProperty("Selects").EnumerateArray().Select(s => s.GetString()).Should()
             .Equal("id", "m_username", "p_obs_id", "m_rel_home_lbs_id");
         req.GetProperty("NoEncode").GetBoolean().Should().BeTrue();
@@ -60,13 +60,30 @@ public sealed class TuruncuHatItsmUserMappingTests
         result.User.Should().Be(new ItsmUserReference("880001", null, null));
     }
 
-    [Fact]
-    public async Task ReturnedNameCaseDifference_StillMatches()
+    // The source compares m_username case-sensitively (Turuncu Hat team, 2026-10-14): a row in another case did not
+    // honour the equality filter as this adapter understands it, so nothing in the response is trusted.
+    [Theory]
+    [InlineData("Synthetic.User")]
+    [InlineData("SYNTHETIC.USER")]
+    public async Task ReturnedNameCaseDifference_IsUnknownInvalidResponse(string returned)
     {
-        ItsmUserMatchResult result = await Mapping(new ScriptedHandler(Ok(Query(UserRow.With("SET.m_username", "Synthetic.User")))))
+        ItsmUserMatchResult result = await Mapping(new ScriptedHandler(Ok(Query(UserRow.With("SET.m_username", returned)))))
             .MatchByUserNameAsync(UserName, CancellationToken.None);
 
+        result.Status.Should().Be(ItsmUserMatchStatus.Unknown);
+        result.Reason.Should().Be(ItsmRecordLookupReason.InvalidResponse);
+    }
+
+    [Fact]
+    public async Task UserName_IsSentInItsOwnCase_AndMatchedOrdinally()
+    {
+        ScriptedHandler handler = new(Ok(Query(UserRow.With("SET.m_username", "Synthetic.User"))));
+
+        ItsmUserMatchResult result = await Mapping(handler).MatchByUserNameAsync("Synthetic.User", CancellationToken.None);
+
         result.Status.Should().Be(ItsmUserMatchStatus.Matched);
+        JsonDocument.Parse(handler.Requests[0].Body).RootElement.GetProperty("req").GetProperty("Filters")[0].GetString()
+            .Should().Be("#%m_active%#='True' AND #%m_username%#='Synthetic.User'");
     }
 
     [Fact]
@@ -242,10 +259,11 @@ public sealed class TuruncuHatItsmUserMappingTests
             Ok(ApplicationError),
             Ok("not json"),
             Ok(Query(UserRow.Without("SET.id"))),
-            Ok(Query(UserRow.With("SET.m_username", "someone.else"))));
+            Ok(Query(UserRow.With("SET.m_username", "someone.else"))),
+            Ok(Query(UserRow.With("SET.m_username", "Synthetic.User"))));
         TuruncuHatItsmUserMapping mapping = Mapping(handler, logger: logger);
 
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < 6; i++)
         {
             await mapping.MatchByUserNameAsync(UserName, CancellationToken.None);
         }
@@ -253,7 +271,7 @@ public sealed class TuruncuHatItsmUserMappingTests
         logger.Messages.Should().NotBeEmpty();
         string all = string.Join('\n', logger.Messages);
         all.Should().NotContainAny(_session, "synthetic-user", "synthetic-password", "Basic c3ludGhldGlj", "itsm.invalid",
-            UserName, "someone.else", "880001");
+            UserName, "Synthetic.User", "someone.else", "880001");
     }
 
     [Theory]
