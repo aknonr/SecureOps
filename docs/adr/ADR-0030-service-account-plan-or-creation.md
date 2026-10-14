@@ -1,7 +1,7 @@
-# ADR-0030: Open a Turuncu Hat OR from an approved gMSA change plan (PROPOSED)
+# ADR-0030: Open a Turuncu Hat OR from an approved gMSA change plan (ACCEPTED)
 
-**Status:** Proposed — decision draft only. Nothing implemented, no migration written, no Turuncu Hat write enabled.
-Implementation (OR-2, migration 035) starts only after this ADR is accepted.
+**Status:** Accepted 2026-10-14 by the project owner, with the condition below. OR-2 (migration 035) implements it with the Fake
+adapter only; the real Turuncu Hat creation adapter is a separate change and stays disabled until the conditions are met.
 **Date:** 2026-10-12
 **Decision makers:** project owner (scope, role bundle, activation); Turuncu Hat team (requester mapping, field codes,
 sample responses); Bilgi Güvenliği (integration identity writing on behalf of a person).
@@ -46,7 +46,7 @@ insert fields, so they are most likely catalog template properties; this makes t
 The collection contains **no user search**: the panel user → Turuncu Hat user mapping is unproven (TH answer 2026-10-12;
 planned as TH-4).
 
-## Decision (proposed)
+## Decision
 
 ### 1. Scope, visibility and capability
 
@@ -232,7 +232,24 @@ sides at once; the shared merge-order file records who is working.
 - Discovering template properties at run time: an extra remote read per submission and a moving contract; configuration is
   reviewed once.
 
-## Open questions
+## Acceptance (2026-10-14)
+
+Accepted by the project owner in the coordinator chat on 2026-10-14 ("ADR-0030'u kabul ediyorum, PROD TEST pilotuna bağlı";
+"evet hepsini kabul ediyorum"). Conditions and answers:
+
+- **PROD only after a TEST pilot.** OR creation is enabled in PROD only after ORs open completely (insert and template
+  properties) in the corporate TEST environment; a half-created OR is the main risk named by the Turuncu Hat team.
+- **Turuncu Hat team answer (2026-10-14)** confirms the design: `Success=true` with `InsertedId > 0` means created (error
+  text alongside is ignored); after a timeout, query by `m_created_by` and the same description/properties (reconciliation,
+  never an automatic second insert); no rate limit (requests are monitored); a session lasts about 60 minutes.
+- **Still required before the real adapter:** sanitized sample responses, environment/template property ids and allowed
+  values, and evidence (with Bilgi Güvenliği) that the integration identity may set another person as requester.
+- Open question answers (owner accepted the coordinator recommendations): (1) requester via TH-4/TH-4c `IItsmUserMapping`
+  (done); (2) `OcoNumber` unchanged for now; (5) one button per account; (6) "not created" with the same capability
+  (`Work`) as sending; the new `ServiceAccounts.CreateOperationalRecord` capability is not introduced now; tracking is read
+  live and not stored. (3), (4) and (7) wait for the Turuncu Hat answers above.
+
+## Open questions (original, answered above where possible)
 
 1. Requester: wait for TH-4, or build the interim administrator-maintained one-to-one mapping?
 2. Does the server-side change itself still need an OCO under the CAB process (keeps `OcoNumber` meaningful as optional)?
