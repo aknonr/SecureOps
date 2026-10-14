@@ -104,9 +104,9 @@ internal static class TuruncuHatItsmTrackingFixtures
         ("num", "1")
     ];
 
-    /// <summary>Synthetic registration number as the product stores it (leading zero) and as the source searches it.</summary>
-    public const string RegistrationNumber = "0770123";
-    public const string SearchedRegistrationNumber = "770123";
+    /// <summary>Synthetic six-digit registration number with a leading zero; the source searches it unchanged (TH rule).</summary>
+    public const string RegistrationNumber = "070123";
+    public const string SearchedRegistrationNumber = "070123";
 
     public static readonly (string Key, string? Value)[] RegistrationRow =
     [
