@@ -41,8 +41,7 @@ metin (koordinatör veya sahip uygular):
 
 ## Sözleşmeyle ilgili bulgular (sözleşme değiştirilmedi)
 
-1. **serverName:** uç nokta `$env:COMPUTERNAME` döndürür; toplayıcı onu istenen adla değiştirir (oturum o ada Kerberos karşılıklı
-   doğrulamayla açıldı; kişi çalıştırmalı JEA modu da aynısını yapıyor). FQDN↔kısa ad dönüşümü yapılmıyor. Onay istenir.
+1. **serverName:** çözüldü — bkz. "TARAMA-C raporu 2" (kısa ad kuralı, sahip onayı).
 2. **COM+ ve uç nokta sürümü (R2-2):** şema kapalı (`sources` üç anahtar, ek alan yok); eklemek şema + ADR-0027 ayrıştırıcı değişikliği.
    Bu işte yapılmadı.
 3. **WinRM hata kodu eşlemesi** (`JeaFailureClassifier`) belgelenmiş kodlarla yazıldı, gerçek sunucuda doğrulanmadı; bilinmeyen açılış
@@ -91,3 +90,21 @@ metin (koordinatör veya sahip uygular):
 
 TARAMA-S dalında 037 tetikleyici/guard/izin düzeltmesi → SQL süitini yeniden koş; koordinatör (0) kayıtlarını işler; sonra sahip TEST'te
 1 sunuculuk pilot (yukarıdaki adımlar).
+
+## TARAMA-C raporu 2 (2026-10-14, koordinatörün aktardığı sahip cevabından sonra)
+
+- **Merge:** güncel `origin/master` (a7d1cc9, Negotiate 8.0.32) dala merge edildi; normal restore çalışıyor, `NuGetAudit=false` gereksiz.
+- **(b) serverName kuralı:** uç noktanın bildirdiği ad istenen adla aynıysa ya da kısa adlar (ilk DNS etiketi, büyük/küçük harf
+  duyarsız) eşleşiyorsa belge kabul edilir ve istenen adla anahtarlanır; başka sunucu adı ya da adsız belge **Bozuk**, asla üzerine
+  yazılmaz (`JeaServiceAccountUsageCollector.SameHost`, testli). (c) port/SSL yalnız yapılandırma (`JeaRunner:UseSsl`/`Port`); TEST
+  değeri pilotta.
+- **037 düzeltmeleri** TARAMA-S dalında (`817c0fc`, push edildi) ve bu dala merge edildi: tetikleyicilerde boş UPDATE için erken dönüş;
+  `sa-037-guards.sql` beklentisi gerçek sıraya (547 önce, 51433 CHECK'ten geçen değişiklikle); rol testi 037 Worker izinlerini kabul
+  ediyor; gerekçe `DBA-037-TR.md`. **Bilgi:** Worker kodu History'ye yalnız INSERT yapıyor; SELECT'i kullanan bir Worker yolu bulunmadı
+  (izne dokunulmadı).
+- **(0) karar kayıtları yine yazılamadı:** README istisna satırı, ADR-0024 R2 sahip kararları ve AGENTS.md satırı düzenlendi ama commit
+  otomatik izin denetleyicisince engellendi; değişiklik geri alındı, yama dosyası koordinasyon notlarında
+  (`TARAMA-C-karar-kayitlari.patch`). Sahibin uygulaması ya da izin vermesi gerekiyor.
+- **Doğrulama (yerel Windows):** çözüm derlemesi 0 hata/0 uyarı; tam birim 2813 geçti, 0 başarısız, 1 atlanan; format kapısı temiz; SA SQL
+  (harness 001–034+036+037, `SecureOps_SaTaramaC1014c`, seri) harness + 037 guard geçti, SA SQL testleri 145 geçti, 0 başarısız, 2 atlanan,
+  1205 yok; DB silindi. Gerçek WinRM/JEA, Windows PowerShell 5.1, SCM ve olay günlüğü hâlâ doğrulanmadı.
