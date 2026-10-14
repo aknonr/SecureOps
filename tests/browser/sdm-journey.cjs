@@ -38,7 +38,8 @@ const checks = [];
     async function detail(record) {
         await navigate(page, ui, 'operational-records/' + record.id);
         await page.getByRole('heading', { name: record.orCode, exact: true }).waitFor();
-        await page.getByRole('heading', { name: 'Jira aktarımı', exact: true }).waitFor();
+        // The submission panel sits under "Önizleme ve işlem" since TH-9.
+        await page.getByRole('heading', { name: 'Önizleme ve işlem', exact: true }).waitFor();
     }
     async function preview(record) {
         await detail(record);
@@ -115,7 +116,9 @@ const checks = [];
         const blocked = records.find(record => !record.jiraEligible && record.evaluatedAt);
         assert.ok(blocked, 'Run the existing isolated SQL evaluation test first');
         await detail(blocked);
-        await page.getByText('SDM kategori politikası onaylanmadı.', { exact: false }).waitFor();
+        // The record page states the server's own reason; the wording is the API's, so compare with what it returned.
+        await page.getByText('Uygun değil', { exact: true }).first().waitFor();
+        if (blocked.eligibilityReason) await page.getByText(blocked.eligibilityReason, { exact: true }).first().waitFor();
         assert.equal(await page.getByRole('button', { name: 'Jira Kaydı Oluştur', exact: true }).isDisabled(), true);
         await capture(page, out, 'sdm-blocked');
 

@@ -86,6 +86,41 @@ Chromium 1194 headless): Demo API with Simulation source/Jira and InMemory persi
   - LocalDB note: the shared `SecureOpsResourcesV1` instance repeatedly stopped answering (orphaned `sqlservr` shown as Stopped) during the run;
     killing that instance's own process and restarting it restored it.
 
+## TH-13 MudSelect accessibility and stale journey, 2026-10-14
+
+Branch `claude/fix-th13-mudselect-a11y-da19d3` from master `5f22a69`. Local only: Windows 11, SDK 9.0.317, Chrome headless, Debug build, Demo API
+(Simulation source and Jira, InMemory persistence) on a free loopback port, UI on HTTPS. Not IIS, not corporate TEST, no SQL.
+
+- Root cause (read from the running Demo, not guessed): MudBlazor 6.16 `MudSelect` renders a hidden `<input>` that receives the page's
+  attributes, a `div.mud-input-slot[tabindex=0]` as the keyboard target, a `label[for]` pointing at an id nobody owns, and role-less
+  `div.mud-list-item` options in a popover outside the control. When no registered item matches the value it instead shows a visible
+  read-only `<input type=text>` and hides that div. No upgrade or JS interop was needed.
+- Fix, one place: `wwwroot/js/so-select-a11y.js` (loaded from `_Host.cshtml`, attribute-only, no key handling) gives every
+  `.mud-input-control.mud-select` `role=combobox`, a name (the input's `aria-label`, else `aria-labelledby` the visible label),
+  `aria-haspopup`, `aria-expanded`, `aria-controls`, `aria-activedescendant` (focus stays on the combobox; arrows move
+  `mud-selected-item`), `aria-disabled`, and the popover list `role=listbox` / items `role=option` + `aria-selected`. It replaces the two
+  page-specific `role=button` patches in `_Host` (Service Accounts pages and resource dialogs), so those selects are now `combobox` too.
+- Inventory: 76 `<MudSelect>` tags in 27 `.razor` files: 7 outside Service Accounts (`InUseReports`, `OperatorReport`, `Sessions`,
+  `InUseAssignmentDialog`, `ResourceLinkDialog`, `SoGroupAnalysisSection`, `SoGroupDirectMembers`) and 69 in 20 Service Accounts
+  pages/components; all are covered by the bridge and every one has a `Label` or `aria-label` (unit-tested). No Service Accounts file was edited.
+- Dialog defects found while doing this, fixed in `InUseAssignmentDialog` only: the select was drawn before the reviewer search returned,
+  so a current reviewer showed as a raw id in a text box (now the select appears after the options load); and the label overlapped the
+  "Atanmamış" value (empty-string value does not shrink the MudBlazor 6 label; `ShrinkLabel`).
+- `tests/browser/sdm-journey.cjs`: selectors only. The submission panel is under "Önizleme ve işlem" (TH-9); the stale text
+  "SDM kategori politikası onaylanmadı." is replaced by the "Uygun değil" badge plus the record's own `eligibilityReason` from the API.
+  `resource-ui.cjs` and `service-accounts.cjs` looked for `role=button` on selects and now look for `combobox`.
+- Tests: `SelectAccessibilityTests` (5 render/source tests: real MudSelect markup the bridge depends on, bridge contract, `_Host` wiring,
+  every select named, dialog load order) and the new journey `tests/browser/select-a11y.cjs`.
+- Ran, passed: `select-a11y.cjs` (in-use reports, admin sessions, Service Accounts work: 1440 and 390 px, light and dark, no horizontal scroll;
+  Enter opens, ArrowDown moves the selection and `aria-activedescendant`, Escape closes the list and keeps focus, Space reopens, option click
+  closes; reviewer assignment dialog by keyboard, value shows the label, Escape closes the list not the dialog).
+  `inuse-rc626-repair.cjs` with real `playwright` 1.56.1 (`playwright/test`, no shim): every step up to and including the reviewer
+  assignment dialog (answers, assignment to a reviewer and back to none, themes, 1366 and 390 px) passes.
+- Not run: `inuse-rc626-repair` after the report-archive step (the Demo API's report index answers 503 `PersistenceUnavailable` without SQL),
+  `sdm-journey` (needs the SQL evaluation rows; an isolated `th13` LocalDB database was created and dropped, but migrations 025–037, the
+  integration tests and a Worker were not set up), native 200 % zoom (`WASAS_NATIVE_ZOOM`), a real screen reader, IIS, corporate TEST.
+  The second reviewer came from the access API (`InUseReviewer` role on a demo actor), not a fixture.
+
 ## gMSA change plan UI (d, PR 3), 2026-10-12
 
 Branch `feature/service-accounts-change-plan-ui-20261012`, cut from the API branch `feature/service-accounts-change-plan-api-20261007`
