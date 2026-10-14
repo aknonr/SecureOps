@@ -1,11 +1,13 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SecureOps.Infrastructure.Access;
 using SecureOps.Infrastructure.ItsmRecords;
 using SecureOps.Infrastructure.ItsmRequests;
 using SecureOps.Infrastructure.ServiceAccounts.Reminders;
+using SecureOps.Infrastructure.ServiceAccounts.UsageScans.Jobs;
 
 namespace SecureOps.Infrastructure.ServiceAccounts;
 
@@ -16,11 +18,14 @@ public static class ServiceAccountsModule
     public static IServiceCollection AddServiceAccounts(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<ServiceAccountOptions>(configuration.GetSection(ServiceAccountOptions.SectionName));
-        bool enabled = configuration.GetSection(ServiceAccountOptions.SectionName).Get<ServiceAccountOptions>()?.Enabled == true;
+        ServiceAccountOptions settings = configuration.GetSection(ServiceAccountOptions.SectionName).Get<ServiceAccountOptions>() ?? new();
+        bool enabled = settings.Enabled;
         if (enabled)
         {
-            services.AddSingleton<SqlServiceAccountRepository>();
+            services.TryAddSingleton<SqlServiceAccountRepository>();
         }
+
+        services.AddServiceAccountUsageScanJobs(settings, UsageScanJobAvailability.EnvironmentName(configuration));
 
         services.AddScoped(provider => new ServiceAccountService(
             enabled ? provider.GetRequiredService<SqlServiceAccountRepository>() : null,
@@ -29,7 +34,9 @@ public static class ServiceAccountsModule
             provider.GetRequiredService<TimeProvider>(),
             provider.GetRequiredService<ILogger<ServiceAccountService>>(),
             provider.GetService<SecureOps.Infrastructure.Identity.IDirectoryNameSearchProvider>(),
-            OperationalRecordPorts(provider)));
+            OperationalRecordPorts(provider),
+            new UsageScanJobServices(enabled ? provider.GetRequiredService<SqlServiceAccountRepository>() : null,
+                provider.GetRequiredService<UsageScanJobAvailability>(), provider.GetRequiredService<IUsageScanJobDispatcher>())));
         services.AddScoped(provider => new ServiceAccountReminderJob(
             enabled ? provider.GetRequiredService<SqlServiceAccountRepository>() : null,
             provider.GetRequiredService<IOptions<ServiceAccountOptions>>(),

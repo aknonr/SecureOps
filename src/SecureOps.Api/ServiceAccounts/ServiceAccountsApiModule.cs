@@ -70,6 +70,10 @@ public static class ServiceAccountReplies
             SaErrors.EventsNotInstalled => (503, "account-event-schema", false, "Olay kaydı tabloları (036) bu ortamda kurulu değil; hiçbir kayıt yapılmadı."),
             SaErrors.OperationalRecordsNotInstalled => (503, "operational-record-schema", false, "OR gönderim tabloları (035) bu ortamda kurulu değil; hiçbir şey gönderilmedi."),
             SaErrors.OperationalRecordCreationDisabled => (503, "operational-record", false, "OR açma bu ortamda kapalı; hiçbir şey gönderilmedi."),
+            SaErrors.UsageScanJobsUnavailable => (503, "usage-scan-job", false, "Web taraması bu ortamda kapalı; hiçbir sunucuya bağlanılmadı."),
+            SaErrors.UsageScanJobsNotInstalled => (503, "usage-scan-job-schema", false, "Web taraması tabloları (037) bu ortamda kurulu değil."),
+            SaErrors.UsageScanAlreadyRunning => (409, "usage-scan-job", false, "Bu hesap için çalışan bir web taraması var; bitmesini bekleyin veya iptal edin."),
+            SaErrors.UsageScanJobState => (409, "usage-scan-job", true, "Tarama bu adım için uygun durumda değil; güncel durumu inceleyin."),
             SaErrors.NotConfigured => (503, "configuration", false, "Servis hesapları modülü bu ortamda etkin değil."),
             SaErrors.DirectoryUnavailable => (503, "directory", true, "Dizin sağlayıcısına şu an ulaşılamıyor."),
             _ => (503, "persistence", true, "Kayıt deposuna şu an ulaşılamıyor.")

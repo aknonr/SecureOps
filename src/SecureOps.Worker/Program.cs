@@ -6,6 +6,7 @@ using SecureOps.Infrastructure;
 using SecureOps.Infrastructure.Announcements;
 using SecureOps.Infrastructure.Announcements.Sources;
 using SecureOps.Worker;
+using SecureOps.Worker.Jea;
 using SecureOps.Worker.ServiceAccounts;
 
 // The Worker hosts the Hangfire job server per ADR-0003. It serves no HTTP traffic and never calls
@@ -50,14 +51,25 @@ try
         else if (service)
         { throw new InvalidOperationException("WorkerHosting.JobServerConfigurationRequired"); }
         builder.Services.AddServiceAccountsWorker(builder.Configuration, jobsConfigured);
+        // JEA runner and the Jea usage collector: registered only when configured and usable here (fail closed).
+        string? jeaTransport = builder.Services.AddWorkerJea(builder.Configuration);
+        var events = WorkerEventLog.Create(service);
 
         using IHost host = builder.Build();
         IHostApplicationLifetime lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
-        using CancellationTokenRegistration started = lifetime.ApplicationStarted.Register(() => lifecycle?.Information("Worker started."));
+        using CancellationTokenRegistration started = lifetime.ApplicationStarted.Register(() =>
+        {
+            lifecycle?.Information("Worker started.");
+            events.Information(1000, "SecureOps Worker started.");
+        });
         using CancellationTokenRegistration stopping = lifetime.ApplicationStopping.Register(() => lifecycle?.Information("Worker stopping."));
-        using CancellationTokenRegistration stopped = lifetime.ApplicationStopped.Register(() => lifecycle?.Information("Worker stopped."));
-        lifecycle?.Information("Worker starting. Service={Service} JobsConfigured={JobsConfigured} ProcessId={ProcessId}",
-            service, jobsConfigured, Environment.ProcessId);
+        using CancellationTokenRegistration stopped = lifetime.ApplicationStopped.Register(() =>
+        {
+            lifecycle?.Information("Worker stopped.");
+            events.Information(1002, "SecureOps Worker stopped.");
+        });
+        lifecycle?.Information("Worker starting. Service={Service} JobsConfigured={JobsConfigured} JeaTransport={JeaTransport} ProcessId={ProcessId}",
+            service, jobsConfigured, jeaTransport ?? "None", Environment.ProcessId);
         host.Services.GetRequiredService<ILoggerFactory>().CreateLogger("OperationsComposition")
             .LogInformation("SecureOps effective operations composition: {Composition}",
                 System.Text.Json.JsonSerializer.Serialize(host.Services.GetRequiredService<OperationsDiagnostics>().Composition()));
@@ -67,6 +79,7 @@ try
     {
         // Do not persist remote bodies, configuration values or exception messages in lifecycle logs.
         lifecycle?.Error("Worker failed. Review protected diagnostics and workflow evidence before restart.");
+        WorkerEventLog.Create(service).Error(1001, "SecureOps Worker failed. Review the protected lifecycle log before restart.");
         throw;
     }
 }

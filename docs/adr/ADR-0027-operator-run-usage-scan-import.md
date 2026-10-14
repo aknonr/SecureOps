@@ -138,6 +138,11 @@ No scheduled or product-initiated scan, no default-endpoint remoting, no automat
 creation, no change to reports or metric definitions (scan items do not count as findings or work), no write/conversion
 code, no change to the JEA allow-list.
 
+**Update 2026-10-13 (owner decision; ADR-0024 Revision 2, R2-4).** A product-initiated, person-started web scan now exists
+next to this upload path: the Worker reads through the JEA endpoint only, every server document passes the §2 parser, and the
+result is stored in the §3 tables as an ordinary scan (`tool = Jea`) linked under the §4 rules. Nothing else in this ADR
+changes; the person-run upload stays. Contract: `docs/service-accounts/USAGE-SCAN-JOB-CONTRACT.md`; job state: migration 037.
+
 ## Alternatives considered
 
 - **Product fans out over default WinRM with the uploader's credentials:** fastest for many servers, but it is platform
