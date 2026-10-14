@@ -3,8 +3,8 @@
 **Status:** **Revision 2 — Accepted (sahip kararı, 2026-10-06).** Read-only scan through a constrained JEA endpoint is the
 chosen direction; the sections above stay valid unless Revision 2 changes them. Nothing is implemented or deployed.
 **Not obtained, and required before any pilot:** (1) Bilgi Güvenliği (and Siber Güvenlik) approval of the JEA endpoint
-registration and of the read gMSA; (2) approval of the target server owners for the pilot list. **Open question:** the
-Worker access path — direct WinRM + Kerberos or through BeyondTrust (PAM team; `docs/15-system-landscape.md`). The
+registration and of the read gMSA; (2) approval of the target server owners for the pilot list. **Worker access path decided (owner, 2026-10-14):** direct
+WinRM + Kerberos + JEA; see "Owner decisions 2026-10-13/14" below. The
 diagnostic allow-list finding must also be closed by its own ADR before deployment. The owner decision is read-only: no
 write to servers, `AGENTS.md` rules 1 and 3 are unchanged and no exception is added; ADR-0028 stays Proposed.
 Earlier status: shelved by the project owner on 2026-10-04. The person-run scan and its import are decided separately in
@@ -210,6 +210,17 @@ names live in the scan record, not in the audit text. JEA transcripts stay on ea
 opt-in sources and the gMSA identity; PAM / BeyondTrust team and team lead: the Worker access path (open decision in
 `docs/15-system-landscape.md`; this revision assumes direct WinRM + Kerberos + JEA and does not decide it); server owners:
 the 10–15 server pilot. **Before deployment** the diagnostic allow-list finding above must be closed by its own ADR.
+
+**Owner decisions 2026-10-13/14 (recorded 2026-10-14).** Source: the owner's answer in the coordination chat on 2026-10-14
+("a ve b onaylıyorum"), and confirmed directly to the coordinator on 2026-10-14 ("karar kayıtlarını sen uygula"); the formal reference is in the owner's private record.
+(1) The Worker reaches servers by **direct WinRM + Kerberos + JEA** as the read gMSA (R2-1); the BeyondTrust-brokered path is not
+rejected, it is out of scope here. (2) **No separate scan approval is sought:** the team's read-only script already runs approved in
+the organisation (owner statement); registering the JEA endpoint and creating the read gMSA still follow the corporate process per
+server. (3) The product runs the same read-only scan from the web (`docs/service-accounts/USAGE-SCAN-JOB-CONTRACT.md`).
+(4) A returned `serverName` that differs from the requested name is accepted only when the short names match (case-insensitive;
+the first label of an FQDN is the short name), otherwise the server result is Malformed; it is never overwritten blindly.
+(5) HTTPS 5986 or HTTP 5985 (Kerberos still encrypts) is chosen by Worker configuration; the TEST value is set in the pilot.
+AGENTS.md rules 1 and 3 are unchanged; R2-6 approvals for the endpoint registration on each server remain.
 
 **R2-7 Estimate.** About 10–15 developer days after approval (Worker JEA runner with fake, job, storage reuse, UI progress,
 tests) plus the pilot. Split in `docs/service-accounts/ops-research/05-yol-haritasi.md` (aşama B).
