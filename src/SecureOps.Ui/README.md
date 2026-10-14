@@ -39,6 +39,26 @@ Open UI ↔ API contract gaps: [`docs/26-ui-backend-contract-gaps.md`](../../doc
 Below this point: reference sections (Layout to Testing) and dated handoff logs, kept with their source SHAs and
 evidence paths. Search for the feature or date you need rather than reading top to bottom.
 
+## TH-12 OR → Jira and In Use UI acceptance, 2026-10-13
+
+Branch `feature/th12-ui-acceptance-20261013` from master `e79ac0b`. Local run only (Linux container, SDK 9.0.317 from `global.json`,
+Chromium 1194 headless): Demo API with Simulation source/Jira and InMemory persistence, UI on HTTPS. Not Windows/IIS, not corporate TEST.
+
+- Journeys: `sdm-jira-submission.cjs` and `inuse-v2-presentation.cjs` (native 100/200 %, light/dark, contrast ≥ 4.5, focus in view) passed
+  unchanged; new `th12-ui-acceptance.cjs` covers what those hosts cannot reach on their own through a test-only loopback proxy that rewrites
+  response fields with synthetic values: Jira link only with `jiraIssueUrl`, replay note (attempt-only, gone after F5), retry preview
+  matching vs. changed (changed hides the draft and keeps "Yeniden Dene" closed), F5 "gönderildi, yanıt yok" (claim active / lapsed),
+  date sort closed with its note on unknown source dates, In Use completion closed for `Disabled` / `WriteFence` / `SourceContractsMissing`;
+  1440 and 390 px, light and dark, native 200 % zoom, keyboard only. Not run here: the SQL/LocalDB journeys (`sdm-journey`, `sdm-jira-only`,
+  `sdm-jira-negative`, `inuse-v2-review`, `inuse-v2-outcomes`, `inuse-rc626-repair`). `sdm-milestone` is stale: it waits for the old
+  "Bağlantı Gruplarım" heading (now "Kişisel bağlantı gruplarım") and expects a Disabled OR source.
+- Fixed: MudBlazor 6 buttons and button-links showed keyboard focus only as a faint tint on the OR list/detail, In Use and both Jira
+  dialogs; scoped `.razor.css` now draws a 2 px `--so-accent` ring. `JiraRetryDialog` had no accessible name (its title had no id for the
+  `_Host` bridge). In Use step 4 shows a closed completion as "Onay düğmesi kapalı." plus the server's explanation and links it to the
+  button with `aria-describedby`. Tests: `Th12UiAcceptanceTests`; `OperationalRecordListRenderTests` ignores the new scope attribute.
+- Still open (shell, not changed here): the brand link and the account-menu trigger have no focus ring.
+- Evidence: `artifacts/th12-ui-acceptance-20261013/` (synthetic data only).
+
 ## gMSA change plan UI (d, PR 3), 2026-10-12
 
 Branch `feature/service-accounts-change-plan-ui-20261012`, cut from the API branch `feature/service-accounts-change-plan-api-20261007`
