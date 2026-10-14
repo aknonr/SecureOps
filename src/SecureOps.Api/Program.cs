@@ -171,7 +171,7 @@ builder.Services.AddSwaggerGen(options =>
     }
 });
 builder.Services.AddSecureOpsInfrastructure(builder.Configuration, builder.Environment.EnvironmentName);
-builder.Services.AddServiceAccountsApi(builder.Configuration); // Isolated Service Accounts module; disabled unless ServiceAccounts:Provider=SqlServer.
+builder.Services.AddServiceAccountsApi(builder.Configuration, builder.Environment.EnvironmentName); // Isolated Service Accounts module; disabled unless ServiceAccounts:Provider=SqlServer.
 builder.Services.AddSingleton<SecureOps.Infrastructure.Announcements.Mail.IAnnouncementMailPreviewCodec, AnnouncementMailPreviewCodec>();
 builder.Services.AddScoped<SecureOps.Infrastructure.Announcements.Mail.AnnouncementMailService>();
 // The API only enqueues announcement source work; the Worker hosts the Hangfire job server.

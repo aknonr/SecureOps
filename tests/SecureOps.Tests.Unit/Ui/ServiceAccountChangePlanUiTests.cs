@@ -508,6 +508,15 @@ public sealed class ServiceAccountChangePlanUiTests
                 });
             }
 
+            if (path.Contains("/operational-record", StringComparison.Ordinal))
+            {
+                // The OR panel (ADR-0030) is covered by ServiceAccountOperationalRecordUiTests; here migration 035 is "not installed".
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
+                {
+                    Content = JsonContent.Create(new { title = "x", status = 503, code = "ServiceAccountOperationalRecordsNotInstalled" }, options: ApiResponseReader.JsonOptions)
+                });
+            }
+
             object body = path.EndsWith("/items", StringComparison.Ordinal)
                 ? new ChangePlanItemPage(2, [Item("ManualOnly", "SYN-WEB01", "IisSiteConnectAs", "SynSite", "SYN\\svc", "SYN\\gmsa$", "Elle: IIS connect as")], 1, 1, 50)
                 : plan;

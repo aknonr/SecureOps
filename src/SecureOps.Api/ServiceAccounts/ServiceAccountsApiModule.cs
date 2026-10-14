@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using SecureOps.Api.Middleware;
 using SecureOps.Api.Security;
 using SecureOps.Infrastructure.Access;
+using SecureOps.Infrastructure.ItsmRequests;
 using SecureOps.Infrastructure.ServiceAccounts;
 using SecureOps.Shared.Contracts.ServiceAccounts;
 
@@ -14,9 +15,13 @@ public static class ServiceAccountsApiModule
     /// <summary>Module-owned rate limit for list exports (registered here; existing platform policies are unchanged).</summary>
     public const string ExportRateLimit = "ServiceAccountExport";
 
-    /// <summary>Registers module services and capability policies (reusing the platform capability handler).</summary>
-    public static IServiceCollection AddServiceAccountsApi(this IServiceCollection services, IConfiguration configuration)
+    /// <summary>
+    /// Registers module services and capability policies (reusing the platform capability handler) and the OR creation provider
+    /// (Disabled by default; Fake only in Development, Demo and Test; validated at startup, ADR-0030).
+    /// </summary>
+    public static IServiceCollection AddServiceAccountsApi(this IServiceCollection services, IConfiguration configuration, string? environmentName = null)
     {
+        services.AddItsmRequestCreation(configuration, environmentName);
         services.AddServiceAccounts(configuration);
         services.Configure<Microsoft.AspNetCore.RateLimiting.RateLimiterOptions>(options => options.AddPolicy(ExportRateLimit,
             context => ApiRateLimits.Partition(context, ExportRateLimit, new SecureOps.Shared.Configuration.OperationRateLimitOptions { PermitLimit = 3, WindowSeconds = 60 })));
@@ -63,6 +68,8 @@ public static class ServiceAccountReplies
             SaErrors.IdempotencyKeyReused => (409, "account-event", false, "Bu işlem anahtarı başka bir içerikle kullanılmış; hiçbir kayıt yapılmadı."),
             SaErrors.CloseNotAllowed => (422, "account-event", false, "Talep bu kayıtlarla kapatılamıyor; hiçbir kayıt yapılmadı. Kapatmayı seçmeden yeniden kaydedebilirsiniz."),
             SaErrors.EventsNotInstalled => (503, "account-event-schema", false, "Olay kaydı tabloları (036) bu ortamda kurulu değil; hiçbir kayıt yapılmadı."),
+            SaErrors.OperationalRecordsNotInstalled => (503, "operational-record-schema", false, "OR gönderim tabloları (035) bu ortamda kurulu değil; hiçbir şey gönderilmedi."),
+            SaErrors.OperationalRecordCreationDisabled => (503, "operational-record", false, "OR açma bu ortamda kapalı; hiçbir şey gönderilmedi."),
             SaErrors.UsageScanJobsUnavailable => (503, "usage-scan-job", false, "Web taraması bu ortamda kapalı; hiçbir sunucuya bağlanılmadı."),
             SaErrors.UsageScanJobsNotInstalled => (503, "usage-scan-job-schema", false, "Web taraması tabloları (037) bu ortamda kurulu değil."),
             SaErrors.UsageScanAlreadyRunning => (409, "usage-scan-job", false, "Bu hesap için çalışan bir web taraması var; bitmesini bekleyin veya iptal edin."),

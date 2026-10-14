@@ -10,9 +10,9 @@ param(
 
 # Windows counterpart of sa-sql-harness.sh (NOT executed in the Linux container that produced it).
 # Creates a NEW database SecureOps_Sa<suffix> on the isolated per-user LocalDB instance, applies the reviewed
-# numbered migrations in order (now 001-034, 036 and 037; 029 numbers SA-003, 030 numbers SA-004, 031 numbers SA-005, 032 is
-# Access, 033 numbers SA-006, 034 numbers SA-007, 035 is reserved for OR-2, 036 numbers SA-009, 037 numbers SA-010), verifies module
-# replay refusal, the 033, 034, 036 and 037 database guards (sa-033/034/036/037-guards.sql) and
+# numbered migrations in order (now 001-037; 029 numbers SA-003, 030 numbers SA-004, 031 numbers SA-005, 032 is Access,
+# 033 numbers SA-006, 034 numbers SA-007, 035 numbers SA-008 (OR-2), 036 numbers SA-009, 037 numbers SA-010), verifies module
+# replay refusal, the 033, 034, 035, 036 and 037 database guards (sa-033/034/035/036/037-guards.sql) and
 # (unless -SkipRoleScripts) the module role scripts. No role member is assigned. Never targets a
 # shared or corporate server and never reuses an existing database.
 $ErrorActionPreference = 'Stop'
@@ -128,7 +128,28 @@ try {
         & $sqlcmd -S $server -d $database -E -I -b -i (Join-Path $PSScriptRoot 'sa-034-guards.sql')
         if ($LASTEXITCODE -ne 0) { throw "Service Accounts 034 guard check failed; database $database retained for inspection." }
     }
-    # -ThroughMigration 34 or 35 leaves the database like an installed 034 system (no account event tables).
+    # -ThroughMigration 34 leaves the database like an installed 034 system (no OR submission tables).
+    $hasRecords = if ($ThroughMigration -ge 35) { (& $sqlcmd -S $server -d $database -E -I -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CASE WHEN OBJECT_ID(N'svcacct.ChangePlanRecordSubmissions', N'U') IS NULL THEN 0 ELSE 1 END" | Select-Object -First 1).Trim() } else { 'skip' }
+    if ($hasRecords -eq 'skip') { Write-Host 'Plan OR submissions (035) left out: -ThroughMigration below 35' }
+    elseif ($hasRecords -eq '0') {
+        Invoke-SaSql -Database $database -File 'SA-008-plan-operational-records.sql'
+        Write-Host 'applied SA-008-plan-operational-records.sql (candidate 8)'
+    } else { Write-Host 'Plan OR submissions installed through numbered 035' }
+    if ($hasRecords -ne 'skip') {
+        & $sqlcmd -S $server -d $database -E -I -b -i 'SA-008-plan-operational-records.sql' | Out-Null
+        if ($LASTEXITCODE -eq 0) { throw 'Candidate 8 replay was not refused.' }
+        Write-Host 'candidate 8 replay refused as expected'
+        if (-not $SkipRoleScripts) {
+            Invoke-SaSql -Database $database -File 'SA-008-API-permissions.sql'
+            Write-Host 'applied SA-008-API-permissions.sql (no role member assigned)'
+        }
+        # Append-only, fixed content, transitions, live-uniqueness, shape and runtime-role guards; the role part needs the role
+        # scripts and removes its temporary member again.
+        $withRole = if ($SkipRoleScripts) { '0' } else { '1' }
+        & $sqlcmd -S $server -d $database -E -I -b -v WithRole=$withRole -i (Join-Path $PSScriptRoot 'sa-035-guards.sql')
+        if ($LASTEXITCODE -ne 0) { throw "Service Accounts 035 guard check failed; database $database retained for inspection." }
+    }
+    # -ThroughMigration 34 or 35 leaves the database like an installed 034/035 system (no account event tables).
     $hasEvents = if ($ThroughMigration -ge 36) { (& $sqlcmd -S $server -d $database -E -I -b -h -1 -W -Q "SET NOCOUNT ON; SELECT CASE WHEN OBJECT_ID(N'svcacct.AccountEvents', N'U') IS NULL THEN 0 ELSE 1 END" | Select-Object -First 1).Trim() } else { 'skip' }
     if ($hasEvents -eq 'skip') { Write-Host 'Account events (036) left out: -ThroughMigration below 36' }
     elseif ($hasEvents -eq '0') {

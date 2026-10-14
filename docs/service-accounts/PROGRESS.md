@@ -17,6 +17,25 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
 - Push on the owner's workstation: Git Credential Manager holds two GitHub accounts, so name the owner's:
   `git -c credential.https://github.com.username=aknonr push origin <branch>`.
 
+## OR creation OR-2, Fake only (branch `feature/service-accounts-or-creation-20261013`, from master `e79ac0b` + ADR-0030 branch merged in, not merged)
+
+- ADR-0030 stays **Proposed**; owner asked for OR-2 with a Fake adapter only (AGENTS rule 8). Migration **035** (SA-008): per plan account OR
+  submissions (Sending written before any call, fixed content, allowed transitions only, one live submission per plan account and per OR number,
+  idempotency key unique per account) + append-only events; `DBA-035-TR.md`, harness step and `sa-035-guards.sql`.
+- `Infrastructure/ItsmRequests/`: `IItsmRequestCreator` (module-independent), shared insert rule (vendor `Success=true` + `InsertedId` decides; error
+  text next to them is ignored), Fake and Disabled providers; `ItsmRequestCreation:Provider` defaults to Disabled, Fake only in Development/Demo/Test,
+  `TuruncuHat` refused at startup (no real adapter). `ItsmRecords/` and `TuruncuHat*` files untouched.
+- API (Work for commands, View for reads, whole-plan scope): preview, submit (fingerprint + idempotency key; OutcomeUnknown on any doubt, never resent),
+  candidate lookup, link (verified only when the ADR-0031 lookup finds it), not-created, live tracking (ADR-0032; null = unknown). Requester = the signed-in
+  user via `IItsmUserMapping.MatchAsync(Uid, LoginName)`; anything but Matched with a home location stops. OpenAPI: 7 paths + 15 schemas added only.
+- UI: `SaPlanOperationalRecords` on the plan page after approval (preview → separate confirm, Belirsiz and reconciliation, tracking "bilinmiyor").
+- Verified 2026-10-13 in the **Linux cloud session** (SDK 8.0.131 in a build copy; the repo pins 9.0.317, unavailable there): build 0/0; unit 2713 passed,
+  3 failed (environment: SDK pin, Linux PowerShell, publish path; also failing on master there); API composition 15/15 and the OpenAPI snapshot test pass;
+  integration 380 passed / 208 skipped / 7 failed (the same 7 `AnnouncementTests` codec tests fail on master there); format gate: 346 findings on both
+  master and this branch under SDK 8 + CRLF, none in changed lines. 2026-10-14 on Windows LocalDB (SDK 9.0.317), master `6f6b472` merged in:
+  harness 001–037 with all guards passed (two 035 guard expectations fixed, no guard relaxed), SA SQL suite serial 159 passed / 2 skipped, DBA-035
+  rehearsed on a 034 copy, unit 2944, format clean. **Not run:** browser journey, Windows/IIS, corporate TEST. Report: [OR-2-RAPOR.md](OR-2-RAPOR.md).
+
 ## Web usage scan, TARAMA-S (branch `feature/service-accounts-web-usage-scan-20261013`, from master `b64068a`, master `e79ac0b` merged in, not merged)
 
 - Owner decision 2026-10-13: the product runs the same read-only scan from the web; Worker is a Windows service; access is

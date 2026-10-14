@@ -117,6 +117,11 @@ Candidate 4 (`SA-004`, numbered 030, ADR-0027): UsageScans (uploaded file ≤ 4 
 expected gMSA, times, run statement), UsageScanServers (one row per planned server, result and per-source status),
 UsageScanItems (matched components, role Former/Expected), UsageScanLinks (scan → account, optional participant request)
 and UsageScanDecisions (usage recorded / dismissed with reason). All append-only by trigger; runtime SELECT/INSERT only.
+Candidate 8 (`SA-008`, numbered 035, ADR-0030 *Proposed*, OR-2 with a Fake adapter only): ChangePlanRecordSubmissions (one row per "open OR"
+attempt for a plan account, written as Sending before any remote call with the exact sent content, idempotency key and fingerprint; only outcome
+columns change, along allowed transitions; one live submission per plan account and per OR number) and ChangePlanRecordSubmissionEvents
+(append-only). Runtime SELECT/INSERT plus column-level UPDATE on the outcome columns.
+
 Candidate 10 (`SA-010`, numbered 037, web usage scan 2026-10-13): UsageScanJobs (job state, lease, plan hash, collector kind),
 UsageScanJobAccounts (filtered unique index: one queued/running scan per account; link outcome) and UsageScanJobServers (live
 per-server state, collector status, validated document, matched items). Operational state, never deleted; the evidence stays the
