@@ -12,6 +12,10 @@ including this note's former status preamble: [PROGRESS-HISTORY.md](PROGRESS-HIS
   a copy of the installed database first. No corporate SQL/AD/Jira/SMTP writes; repository data stays synthetic.
   Writing automation on managed servers (gMSA conversion) still needs its own ADR and approval (AGENTS.md rules 1, 9).
   Repository-wide defaults in `AGENTS.md`/`CLAUDE.md` are unchanged outside this module.
+- **Owner-approved exception (2026-10-14):** TARAMA-C (Worker JEA çalıştırıcı, Windows hizmet kurulumu,
+  SecureOps.ServiceAccountUsage JEA uç noktası, Jea toplayıcı) sahip kararıyla Claude'da; varsayılan sahiplik değişmez.
+  Covers only `src/SecureOps.Worker/Jea/`, `scripts/jea/`, `scripts/worker/`, their tests and docs. Source: owner's answer in the
+  coordination chat 2026-10-14 ("a ve b onaylıyorum"; "karar kayıtlarını sen uygula"), given directly in the coordinator chat.
 
 ## Reuse decisions (verified paths)
 
