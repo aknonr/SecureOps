@@ -1,8 +1,7 @@
 # Servis Hesapları — 035 (plandan OR gönderimi) için DBA eki
 
 Tarih: 2026-10-13. Kime: kurulu TEST veritabanından sorumlu DBA. Durum: **hazırlık belgesi; kurulu sisteme bu belgedeki hiçbir
-şey uygulanmadı ve bu betikler bu belgeyi yazan Linux ortamında hiç çalıştırılmadı** (SQL Server yok). İlk çalıştırma Windows'ta
-harness ile yapılır (`tests/sql/service-accounts/sa-sql-harness.ps1`). Uygulama için proje sahibinin ayrı onayı gerekir.
+şey uygulanmadı**; betikler Windows yerel LocalDB harness'ında prova edildi (aşağıda "Doğrulama durumu"). Uygulama için proje sahibinin ayrı onayı gerekir.
 Tasarım: `docs/adr/ADR-0030-service-account-plan-or-creation.md` (**Proposed**, kabul edilmedi) ve OR-2 (yalnız sahte adaptör;
 yapılandırma varsayılanı kapalı). Yedeği DBA kendi sürecinde alır; bu belge yedek komutu içermez.
 
@@ -70,9 +69,10 @@ Beklenen: `OrTablosu = 2`, `Tetikleyici = 2`, `FiltreliTekilIndeks = 2`, `Guveni
 
 ## Doğrulama durumu (dürüst)
 
-- **Hiçbir şey çalıştırılmadı.** Bu ek ve betikler Linux bulut oturumunda yazıldı; SQL Server/LocalDB yok. Windows koordinatörü
-  koşacak: `sa-sql-harness.ps1 -DatabaseSuffix <ek>` (tam: 001–036, `sa-035-guards.sql` dahil) ve `-ThroughMigration 34` ile 034'te
-  bırakılmış kopyada ön kontrol → 035 → izin → son kontrol → tekrar reddi; geri dönüş komutu `COMMIT` yerine `ROLLBACK` ile.
+- **2026-10-14, Windows yerel LocalDB'de koşuldu** (kurulu TEST'e hiçbir şey uygulanmadı): `sa-sql-harness.ps1` 001–036
+  (`sa-035-guards.sql` dahil) geçti. `-ThroughMigration 34` kopyasında: ön kontrol `var/var/yok/var`; 035 ve SA-008 izinleri çıkış 0;
+  son kontrol `2/2/2/0/4/7/0/0`; 035 tekrarı 51400; geri dönüş komutu `COMMIT` yerine `ROLLBACK` ile çalıştı (tablolar geri geldi);
+  gönderim satırı olan veritabanında geri dönüş 51405 ile durdu.
 - `sa-035-guards.sql` şunları dener: olay tablosunda UPDATE/DELETE 51402; gönderim silme ve içerik değişimi (harf büyüklüğü, sondaki
   boşluk dahil) 51403; izinsiz geçiş ve saklı numaranın değişimi 51404; aynı plan+hesapta ikinci canlı gönderim ve aynı OR numarası
   iki canlı satırda 2601; aynı hesapta aynı işlem anahtarı 2627; kod sütunlarında yanlış yazım ve durum biçimi 547; API rolü DELETE

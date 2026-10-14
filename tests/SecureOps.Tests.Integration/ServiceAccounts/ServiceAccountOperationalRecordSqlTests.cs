@@ -1,3 +1,4 @@
+using System.Globalization;
 using Dapper;
 using FluentAssertions;
 using Microsoft.Data.SqlClient;
@@ -132,15 +133,15 @@ public sealed class ServiceAccountOperationalRecordSqlTests
         OperationalRecordCandidate missing = Ok(await s.Service.OperationalRecordCandidateAsync(s.Planner.Principal, s.Fx.Context, plan.Id, account.Summary.Id,
             new OperationalRecordCandidateRequest("OR-000009"), _token));
         OperationalRecordCandidate found = Ok(await s.Service.OperationalRecordCandidateAsync(s.Planner.Principal, s.Fx.Context, plan.Id, account.Summary.Id,
-            new OperationalRecordCandidateRequest("or-000001"), _token));
+            new OperationalRecordCandidateRequest(s.Found.ToLowerInvariant()), _token));
         (missing.LookupStatus, missing.Tracking, missing.CanLink).Should().Be(("NotFound", (OperationalRecordTrackingView?)null, true));
-        (found.Number, found.LookupStatus, found.TitleMatchesSubmission, found.Tracking!.Status).Should().Be(("OR-000001", "Found", (bool?)false, "Found"));
+        (found.Number, found.LookupStatus, found.TitleMatchesSubmission, found.Tracking!.Status).Should().Be((s.Found, "Found", (bool?)false, "Found"));
         (await CountAsync(s, plan.Id)).Should().Be(new Counts(1, 2, 2, 2), "a candidate lookup writes nothing");
 
         PlanOperationalRecordsView linked = Ok(await s.Service.LinkOperationalRecordAsync(s.Second.Principal, s.Fx.Context, plan.Id, account.Summary.Id,
-            new OperationalRecordLinkRequest(unknown.Submission.Id, "OR-000001", "Sentetik: Turuncu Hat'ta plan referansıyla bulundu"), _token));
+            new OperationalRecordLinkRequest(unknown.Submission.Id, s.Found, "Sentetik: Turuncu Hat'ta plan referansıyla bulundu"), _token));
 
-        linked.Accounts.Single().Current.Should().Match<OperationalRecordSubmissionView>(v => v.State == "Linked" && v.RecordNumber == "OR-000001"
+        linked.Accounts.Single().Current.Should().Match<OperationalRecordSubmissionView>(v => v.State == "Linked" && v.RecordNumber == s.Found
             && v.LinkVerification == "Found" && v.ExternalId == "900001" && v.Events.Count == 3 && v.Events.Last().Reason!.Contains("plan referansıyla"));
         (await CountAsync(s, plan.Id)).Should().Be(new Counts(1, 3, 3, 3));
         (await s.Service.ConfirmOperationalRecordNotCreatedAsync(s.Planner.Principal, s.Fx.Context, plan.Id, account.Summary.Id,
@@ -156,7 +157,7 @@ public sealed class ServiceAccountOperationalRecordSqlTests
             Guid.NewGuid()));
 
         PlanOperationalRecordsView linked = Ok(await s.Service.LinkOperationalRecordAsync(s.Planner.Principal, s.Fx.Context, plan.Id, account.Summary.Id,
-            new OperationalRecordLinkRequest(unknown.Submission.Id, "OR-000003", "Sentetik: numara elle bulundu, arama cevap vermedi"), _token));
+            new OperationalRecordLinkRequest(unknown.Submission.Id, s.Unavailable, "Sentetik: numara elle bulundu, arama cevap vermedi"), _token));
 
         linked.Accounts.Single().Current.Should().Match<OperationalRecordSubmissionView>(v => v.State == "Linked" && v.LinkVerification == "NotVerified"
             && v.ExternalId == null);
@@ -206,10 +207,10 @@ public sealed class ServiceAccountOperationalRecordSqlTests
         (await s.Service.ConfirmOperationalRecordNotCreatedAsync(s.Planner.Principal, s.Fx.Context, plan.Id, other,
             new OperationalRecordNotCreatedRequest(partial.Submission.Id, "Sentetik"), _token)).Field.Should().Be("submissionResolved", "the record exists");
 
-        await s.Fx.CountAsync("UPDATE svcacct.ChangePlanRecordSubmissions SET State = 'Linked', ExternalNumber = N'OR-000001', LinkVerification = 'NotVerified' WHERE Id = @sending; SELECT 0;",
-            new { sending });
+        await s.Fx.CountAsync("UPDATE svcacct.ChangePlanRecordSubmissions SET State = 'Linked', ExternalNumber = @number, LinkVerification = 'NotVerified' WHERE Id = @sending; SELECT 0;",
+            new { sending, number = s.Found });
         (await s.Service.LinkOperationalRecordAsync(s.Planner.Principal, s.Fx.Context, plan.Id, other,
-            new OperationalRecordLinkRequest(partial.Submission.Id, "OR-000001", "Sentetik"), _token)).Field.Should().Be("recordNumberInUse");
+            new OperationalRecordLinkRequest(partial.Submission.Id, s.Found, "Sentetik"), _token)).Field.Should().Be("recordNumberInUse");
     }
 
     [ServiceAccountSqlFact]
@@ -242,7 +243,13 @@ public sealed class ServiceAccountOperationalRecordSqlTests
         (await CountAsync(s, plan.Id)).Should().Be(new Counts(0, 0, 0, 0));
     }
 
-    private sealed record Setup(ServiceAccountSqlFixture Fx, ServiceAccountService Service, SynUser Planner, SynUser Verifier, SynUser Second, Guid Org);
+    /// <summary>
+    /// <see cref="Found"/> and <see cref="Unavailable"/> are this test's own OR numbers: a number linked to a live submission is held
+    /// for good (035 never clears it, UX_SaRecordSubmissions_Number), so fixed placeholders would make the tests depend on their order
+    /// and fail on a rerun against the same harness database.
+    /// </summary>
+    private sealed record Setup(ServiceAccountSqlFixture Fx, ServiceAccountService Service, SynUser Planner, SynUser Verifier, SynUser Second, Guid Org,
+        string Found, string Unavailable);
 
     private sealed record Counts(int Submissions, int Events, int History, int Audit);
 
@@ -259,11 +266,32 @@ public sealed class ServiceAccountOperationalRecordSqlTests
             await fx.GrantAsync(user, ScopeKind.Organization, org);
         }
 
-        return new Setup(fx, fx.WithOperationalRecords(Ports(new FakeItsmRequestCreator())), planner, verifier, second, org);
+        // OR-900000..OR-999999: outside the Fake creator's OR-100000..OR-899999 and the Fake lookup's 000001-000003.
+        int pair = 900_000 + (2 * Random.Shared.Next(50_000));
+        var lookup = new NumberedFakeLookup("OR-" + pair.ToString(CultureInfo.InvariantCulture), "OR-" + (pair + 1).ToString(CultureInfo.InvariantCulture));
+        return new Setup(fx, fx.WithOperationalRecords(Ports(new FakeItsmRequestCreator(), lookup)), planner, verifier, second, org, lookup.Found,
+            lookup.Unavailable);
     }
 
-    private static ServiceAccountOperationalRecordPorts Ports(IItsmRequestCreator creator) =>
-        new(creator, new FakeItsmUserMapping(), new FakeItsmRecordLookup(), new FakeItsmRecordTracking(), TimeSpan.FromSeconds(30));
+    private static ServiceAccountOperationalRecordPorts Ports(IItsmRequestCreator creator, IItsmRecordLookup? lookup = null) =>
+        new(creator, new FakeItsmUserMapping(), lookup ?? new FakeItsmRecordLookup(), new FakeItsmRecordTracking(), TimeSpan.FromSeconds(30));
+
+    /// <summary>The Fake lookup, plus <paramref name="Found"/> answering like its OR-000001 (source 900001, the Fake tracking record) and
+    /// <paramref name="Unavailable"/> like its OR-000003.</summary>
+    private sealed record NumberedFakeLookup(string Found, string Unavailable) : IItsmRecordLookup
+    {
+        private readonly FakeItsmRecordLookup _fake = new();
+
+        public Task<ItsmRecordLookupResult> LookupAsync(ItsmRecordKind kind, string? number, CancellationToken cancellationToken)
+        {
+            string? normalized = ItsmRecordNumber.Normalize(kind, number);
+            return normalized == Found ? Task.FromResult(ItsmRecordLookupResult.Found(kind, Found,
+                    new ItsmRecord(FakeItsmRequestCreator.SourceId, Found, "Synthetic OR record", null, null, "9001", null, null), FakeItsmRecordLookup.ProviderName))
+                : normalized == Unavailable ? Task.FromResult(ItsmRecordLookupResult.Unknown(kind, Unavailable, ItsmRecordLookupReason.Unavailable,
+                    FakeItsmRecordLookup.ProviderName))
+                : _fake.LookupAsync(kind, number, cancellationToken);
+        }
+    }
 
     private static async Task<AccountDetail> AccountAsync(Setup s, string label) =>
         Ok(await s.Fx.Service.CreateAccountAsync(s.Planner.Principal, s.Fx.Context,

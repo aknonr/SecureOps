@@ -55,6 +55,21 @@ gevşetildi ve SDK 8 derleyicisinin belirsiz bulduğu tek bir mevcut satır yaln
 Format karşılaştırması: aynı SDK 8 + CRLF koşulunda master kopyası **346** bulgu, bu dal **346** bulgu verdi (aynı dosya/satırlar); bu işin eklediği
 bulgu yok.
 
+### Windows SQL doğrulaması (2026-10-14, yerel LocalDB; Windows/IIS ve kurumsal TEST değil)
+
+Master `70ce3b1` birleştirildikten sonra, SDK 9.0.317:
+- Harness 001–036 (`sa-035-guards.sql` dahil) baştan sona geçti. İki **test beklentisi** hatası düzeltildi, koruma gevşetilmedi: (1) geçiş
+  döngüsünde NotSent→Sending, aynı plan+hesapta canlı satır varken tetikleyiciden önce `UX_SaRecordSubmissions_Active`'e takılıyordu (2601);
+  şimdi başka canlı satırı olmayan üçüncü sentetik hesabın NotSent satırıyla denenip **51404** alınıyor, eski durum ayrıca 2601 olarak ve
+  "satır değişmedi" kontrolüyle tutuluyor; (2) 547 döngüsündeki numarasız `Created` satırı da aynı nedenle o hesaba taşındı.
+- `ServiceAccountOperationalRecordSqlTests`: sabit `OR-000001`/`OR-000003` numaraları bir kez canlı satıra bağlanınca kalıcı tutuluyor (035
+  numarayı silmez), testler sıraya ve tekrar koşmaya bağımlıydı. Her test kendi `OR-9xxxxx` numaralarını alıyor (Fake lookup'a test içi sarmalayıcı);
+  ürün kodu değişmedi. SA entegrasyon (seri): **154 geçti, 0 düştü, 2 atlandı** (Before031/Before036; başka migration seviyesi ister), aynı
+  veritabanında ikinci koşuda da aynı sonuç.
+- DBA-035 provası `-ThroughMigration 34` kopyasında: ön kontrol `var/var/yok/var`, 035 + SA-008 izinleri çıkış 0, son kontrol `2/2/2/0/4/7/0/0`,
+  tekrar 51400, geri dönüş `ROLLBACK` ile (tablolar geri geldi); satır varken geri dönüş 51405 ile durdu.
+- Tam birim 2771 geçti / 1 atlandı, OpenAPI testi geçti, `dotnet format --verify-no-changes` temiz.
+
 ## Gerçek adaptör için Turuncu Hat ekibinden beklenenler
 
 1. Arındırılmış örnek cevaplar: `SMSS_oRFF` insert (başarı, hata, `Success=true` + `InsertedId` + dolu hata metni), `DCM_DynamicCase` sorgusu,
@@ -79,6 +94,5 @@ bulgu yok.
 
 ## Sonraki adım
 
-Koordinatör Windows'ta harness (001–036) + `sa-035-guards.sql` + `ServiceAccountOperationalRecordSqlTests` + tam birim/format (SDK 9.0.317) koşar;
-yerel Demo'da `ItsmRequestCreation:Provider=Fake` ve `ItsmRecordLookup:Provider=Fake` ile tarayıcı yolculuğu (390 px, klavye, koyu tema). Sonra sahip
+SQL tarafı Windows'ta koşuldu (yukarıda). Kalan: yerel Demo'da `ItsmRequestCreation:Provider=Fake` ve `ItsmRecordLookup:Provider=Fake` ile tarayıcı yolculuğu (390 px, klavye, koyu tema). Sonra sahip
 ADR-0030 kararını ve yukarıdaki soruları verir; TH cevapları gelince gerçek adaptör ayrı PR'da, `ReadOnlyIntegrationMode` çitinin altında yazılır.

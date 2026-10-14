@@ -15,18 +15,22 @@ SET NOCOUNT ON;
 DECLARE @now datetimeoffset(7) = SYSUTCDATETIME(), @actor uniqueidentifier = NEWID(), @account uniqueidentifier = NEWID(), @other uniqueidentifier = NEWID(),
     @plan uniqueidentifier = NEWID(), @preview uniqueidentifier = NEWID(), @live uniqueidentifier = NEWID(), @done uniqueidentifier = NEWID(),
     @closed uniqueidentifier = NEWID(), @unknown uniqueidentifier = NEWID(), @key uniqueidentifier = NEWID(), @fp char(64) = REPLICATE('a', 64),
+    @third uniqueidentifier = NEWID(), @lone uniqueidentifier = NEWID(),
     @name nvarchar(64) = N'SYN-OR-' + LEFT(CONVERT(nvarchar(36), NEWID()), 8), @otherName nvarchar(64) = N'SYN-OR2-' + LEFT(CONVERT(nvarchar(36), NEWID()), 8),
+    @thirdName nvarchar(64) = N'SYN-OR3-' + LEFT(CONVERT(nvarchar(36), NEWID()), 8),
     @number nvarchar(64) = N'OR-SYN-' + LEFT(CONVERT(nvarchar(36), NEWID()), 8);
 
 INSERT INTO svcacct.Accounts(Id, AccountName, NormalizedName, IdentityKey, IdentityState, LifecycleState, CreatedAt, CreatedBy, UpdatedAt, UpdatedBy) VALUES
     (@account, @name, UPPER(@name), N'P:UNKNOWN|' + UPPER(@name), 'Provisional', 'Active', @now, @actor, @now, @actor),
-    (@other, @otherName, UPPER(@otherName), N'P:UNKNOWN|' + UPPER(@otherName), 'Provisional', 'Active', @now, @actor, @now, @actor);
+    (@other, @otherName, UPPER(@otherName), N'P:UNKNOWN|' + UPPER(@otherName), 'Provisional', 'Active', @now, @actor, @now, @actor),
+    (@third, @thirdName, UPPER(@thirdName), N'P:UNKNOWN|' + UPPER(@thirdName), 'Provisional', 'Active', @now, @actor, @now, @actor);
 INSERT INTO svcacct.ChangePlans(Id, Kind, Title, Status, CurrentPreviewVersion, CreatedBy, CreatedAt, UpdatedBy, UpdatedAt)
 VALUES(@plan, 'GmsaConversion', N'Sentetik OR planı', 'Approved', 1, @actor, @now, @actor, @now);
 INSERT INTO svcacct.ChangePlanPreviews(Id, PlanId, Version, Sha256, ScanFreshDays, ItemCount, CreatedBy, CreatedAt)
-VALUES(@preview, @plan, 1, REPLICATE('b', 64), 7, 2, @actor, @now);
+VALUES(@preview, @plan, 1, REPLICATE('b', 64), 7, 3, @actor, @now);
 
--- @done: Created for @account; @closed: NotSent for @account (so a second live one is possible only after it); @unknown: OutcomeUnknown for @other.
+-- @done: Created for @account; @closed: NotSent for @account (so a second live one is possible only after it); @unknown: OutcomeUnknown for @other;
+-- @lone: NotSent for @third and the only row of that plan account, so reopening it passes UX_SaRecordSubmissions_Active and reaches the trigger.
 INSERT INTO svcacct.ChangePlanRecordSubmissions(Id, PlanId, AccountId, PreviewId, IdempotencyKey, Fingerprint, Provider, RecordKind, Environment,
     RequesterExternalId, ShortDescription, Description, State, ExternalId, ExternalNumber, LinkVerification, OutcomeReason, CreatedBy, CreatedAt, UpdatedBy, UpdatedAt)
 VALUES
@@ -35,10 +39,12 @@ VALUES
     (@done, @plan, @account, @preview, @key, @fp, 'Fake', 'OR', N'Test', N'920001', N'gmsa service account talebi(gmsaSyn)', N'Sentetik açıklama',
         'Created', N'900001', @number, NULL, NULL, @actor, @now, @actor, @now),
     (@unknown, @plan, @other, @preview, NEWID(), @fp, 'Fake', 'OR', N'Test', N'920001', N'gmsa service account talebi(gmsaSyn2)', N'Sentetik açıklama',
-        'OutcomeUnknown', NULL, NULL, NULL, 'Timeout', @actor, @now, @actor, @now);
+        'OutcomeUnknown', NULL, NULL, NULL, 'Timeout', @actor, @now, @actor, @now),
+    (@lone, @plan, @third, @preview, NEWID(), @fp, 'Fake', 'OR', N'Test', N'920001', N'gmsa service account talebi(gmsaSyn3)', N'Sentetik açıklama',
+        'NotSent', NULL, NULL, NULL, 'NotConfigured', @actor, @now, @actor, @now);
 INSERT INTO svcacct.ChangePlanRecordSubmissionEvents(SubmissionId, Event, FromState, ToState, Actor, At)
 VALUES (@done, 'Started', NULL, 'Sending', @actor, @now), (@done, 'Created', 'Sending', 'Created', @actor, @now);
-PRINT 'seeded synthetic OR submissions (Created, NotSent, OutcomeUnknown) and two events';
+PRINT 'seeded synthetic OR submissions (Created, two NotSent, OutcomeUnknown) and two events';
 
 -- Append-only events (51402).
 BEGIN TRY UPDATE svcacct.ChangePlanRecordSubmissionEvents SET Reason = N'x' WHERE SubmissionId = @done; THROW 51000, 'Submission event UPDATE was not refused.', 1; END TRY
@@ -72,13 +78,14 @@ IF NOT EXISTS (SELECT 1 FROM svcacct.ChangePlanRecordSubmissions WHERE Id = @clo
     THROW 51000, 'A submission row changed.', 1;
 PRINT 'submissions refuse DELETE and content changes, also case-only and trailing-space ones (51403)';
 
--- Transitions (51404): final states stay final; a stored number never changes.
+-- Transitions (51404): final states stay final; a stored number never changes. CHECK constraints and unique indexes are
+-- enforced before the AFTER trigger, so every case here satisfies both and must be refused by the trigger itself.
 SET @case = 0;
 WHILE @case < 4
 BEGIN
     BEGIN TRY
         IF @case = 0 UPDATE svcacct.ChangePlanRecordSubmissions SET State = 'OutcomeUnknown', ExternalNumber = NULL, ExternalId = NULL WHERE Id = @done;
-        IF @case = 1 UPDATE svcacct.ChangePlanRecordSubmissions SET State = 'Sending', OutcomeReason = NULL WHERE Id = @closed;
+        IF @case = 1 UPDATE svcacct.ChangePlanRecordSubmissions SET State = 'Sending', OutcomeReason = NULL WHERE Id = @lone;
         IF @case = 2 UPDATE svcacct.ChangePlanRecordSubmissions SET State = 'Created', ExternalId = N'900001', ExternalNumber = N'OR-SYN-X' WHERE Id = @unknown;
         IF @case = 3 UPDATE svcacct.ChangePlanRecordSubmissions SET ExternalNumber = @number + N'9' WHERE Id = @done;
         THROW 51000, 'A refused submission transition was accepted.', 1;
@@ -86,7 +93,21 @@ BEGIN
     BEGIN CATCH IF ERROR_NUMBER() <> 51404 THROW; END CATCH;
     SET @case += 1;
 END;
+-- Reopening a NotSent row while its plan account already has a live one is refused earlier, by the unique index (2601).
+BEGIN TRY
+    UPDATE svcacct.ChangePlanRecordSubmissions SET State = 'Sending', OutcomeReason = NULL WHERE Id = @closed;
+    THROW 51000, 'A NotSent submission was reopened next to a live one.', 1;
+END TRY
+BEGIN CATCH IF ERROR_NUMBER() <> 2601 THROW; END CATCH;
+IF NOT EXISTS (SELECT 1 FROM svcacct.ChangePlanRecordSubmissions WHERE Id = @done AND State = 'Created' AND ExternalId = N'900001'
+                   AND ExternalNumber COLLATE Latin1_General_BIN2 = @number AND DATALENGTH(ExternalNumber) = DATALENGTH(@number))
+    OR NOT EXISTS (SELECT 1 FROM svcacct.ChangePlanRecordSubmissions WHERE Id = @closed AND State = 'NotSent' AND OutcomeReason = 'NotConfigured')
+    OR NOT EXISTS (SELECT 1 FROM svcacct.ChangePlanRecordSubmissions WHERE Id = @lone AND State = 'NotSent' AND OutcomeReason = 'NotConfigured')
+    OR NOT EXISTS (SELECT 1 FROM svcacct.ChangePlanRecordSubmissions WHERE Id = @unknown AND State = 'OutcomeUnknown' AND ExternalId IS NULL
+                   AND ExternalNumber IS NULL)
+    THROW 51000, 'A refused transition changed a submission row.', 1;
 PRINT 'only allowed transitions pass; Created, NotSent stay final; OutcomeUnknown cannot become Created; a stored number never changes (51404)';
+PRINT 'a NotSent submission next to a live one cannot be reopened (2601); refused transitions left every row unchanged';
 
 -- One live submission per (plan, account) and one live holder per number (2601); one key per account (2627).
 BEGIN TRY
@@ -110,7 +131,8 @@ END TRY
 BEGIN CATCH IF ERROR_NUMBER() <> 2627 THROW; END CATCH;
 PRINT 'one live submission per plan account and per OR number (2601); one idempotency key per account (2627)';
 
--- Exact spelling and state shape (547).
+-- Exact spelling and state shape (547). Rows go to @third, which has no live submission, so a would-be live state
+-- (case 3) is judged by the CHECK constraints and not first refused by UX_SaRecordSubmissions_Active (2601).
 DECLARE @refused int = 0;
 SET @case = 0;
 WHILE @case < 6
@@ -118,7 +140,7 @@ BEGIN
     BEGIN TRY
         INSERT INTO svcacct.ChangePlanRecordSubmissions(Id, PlanId, AccountId, PreviewId, IdempotencyKey, Fingerprint, Provider, RecordKind, Environment,
             RequesterExternalId, ShortDescription, Description, State, ExternalId, ExternalNumber, CreatedBy, CreatedAt, UpdatedBy, UpdatedAt)
-        VALUES (NEWID(), @plan, @other, @preview, NEWID(), CASE @case WHEN 4 THEN REPLICATE('A', 64) ELSE @fp END,
+        VALUES (NEWID(), @plan, @third, @preview, NEWID(), CASE @case WHEN 4 THEN REPLICATE('A', 64) ELSE @fp END,
             CASE @case WHEN 0 THEN 'fake' WHEN 1 THEN 'Fake ' ELSE 'Fake' END, 'OR', N'Test', N'920001', N'x', N'x',
             CASE @case WHEN 2 THEN 'notsent' WHEN 3 THEN 'Created' WHEN 5 THEN 'Belirsiz' ELSE 'NotSent' END,
             NULL, NULL, @actor, @now, @actor, @now);
