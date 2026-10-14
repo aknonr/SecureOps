@@ -175,6 +175,40 @@ public sealed class JeaServiceAccountUsageCollectorTests
         JeaServiceAccountUsageCollector.Document("syn-app-01", output, Encoding.UTF8.GetByteCount(output) - 1).Should().BeNull();
     }
 
+    [Theory]
+    [InlineData("syn-app-01", "SYN-APP-01", true)]
+    [InlineData("syn-app-01.syn.example", "SYN-APP-01", true)]
+    [InlineData("SYN-APP-01", "syn-app-01.syn.example", true)]
+    [InlineData("syn-app-01.syn.example", "syn-app-01.other.example", true)]
+    [InlineData("syn-app-01", "SYN-APP-02", false)]
+    [InlineData("syn-app-01.syn.example", "SYN-APP-010", false)]
+    [InlineData("syn-app-01", "", false)]
+    [InlineData("syn-app-01", null, false)]
+    public void SameHost_AcceptsOnlyTheSameShortName(string requested, string? reported, bool expected) =>
+        JeaServiceAccountUsageCollector.SameHost(requested, reported).Should().Be(expected);
+
+    [Theory]
+    [InlineData("\"SYN-APP-02\"")]
+    [InlineData("null")]
+    [InlineData("42")]
+    public void Document_FromAnotherHostOrWithoutAName_IsNeverRelabelled(string reported)
+    {
+        string output = "{\"schema\":\"service-account-usage-v1\",\"serverName\":" + reported + ",\"accounts\":[\"svc_a\"]}";
+
+        JeaServiceAccountUsageCollector.Document("syn-app-01", output, 4096).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task AnAnswerFromAnotherHost_IsMalformed()
+    {
+        FakeJeaRunner wrongHost = new((server, command) => FakeJeaRunner.UsageDocument("syn-elsewhere-09", command));
+        Recorder recorder = new();
+
+        await Collector(wrongHost).CollectAsync(Request(["syn-app-01", "syn-app-02"], null), recorder, CancellationToken.None);
+
+        recorder.Completed.Should().HaveCount(2).And.OnlyContain(r => r.Status == UsageCollectionStatus.Malformed && r.Document == null);
+    }
+
     [Fact]
     public async Task EndToEnd_TheModuleJobRunnerWithTheJeaCollector_WritesJeaEvidence()
     {

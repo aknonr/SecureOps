@@ -99,7 +99,12 @@ public sealed class JeaEndpointPackageTests
         JsonNode document = JsonNode.Parse(text)!;
         schema.Evaluate(document).IsValid.Should().BeTrue(text);
         document["verification"]!["StillFormerAccount"]!.AsArray().Should().HaveCount(2, "nested objects survive as JSON, unlike remoting's shallow serialization");
-        JeaServiceAccountUsageCollector.Document("syn-app-01", text, 512 * 1024).Should().NotBeNull();
+        if (document["serverName"] is JsonValue reported && reported.GetValue<string?>() is { Length: > 0 } computer)
+        {
+            JeaServiceAccountUsageCollector.Document(computer.ToLowerInvariant() + ".syn.example", text, 512 * 1024).Should().NotBeNull(
+                "the endpoint reports its short name; the requested FQDN has the same first label");
+            JeaServiceAccountUsageCollector.Document("syn-other-host", text, 512 * 1024).Should().BeNull("another host is never relabelled");
+        }
     }
 
     [Fact]

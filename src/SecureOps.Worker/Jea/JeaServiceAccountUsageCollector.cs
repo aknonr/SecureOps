@@ -94,10 +94,11 @@ public sealed class JeaServiceAccountUsageCollector(IJeaRunner runner, ILogger<J
     };
 
     /// <summary>
-    /// The endpoint's JSON text as the module's document: exactly one JSON object with <c>schema = service-account-usage-v1</c>, and
-    /// <c>serverName</c> set to the requested name. The endpoint reports <c>$env:COMPUTERNAME</c>; the session was opened to the requested
-    /// name with Kerberos mutual authentication, so the requested name is the one the evidence is about (the person-run JEA mode does the
-    /// same). Nothing else is changed; the module's parser validates the rest (secret guard first). Null when not one valid object or too large.
+    /// The endpoint's JSON text as the module's document: exactly one JSON object with <c>schema = service-account-usage-v1</c> whose
+    /// reported <c>serverName</c> (the endpoint's <c>$env:COMPUTERNAME</c>) is the requested host — equal, or the same short name
+    /// (case-insensitive; the first label of an FQDN is the short name; owner decision 2026-10-14, ADR-0024 R2). Only then is it set to
+    /// the requested name, so the evidence is keyed by the planned server; a different host is never overwritten (null → Malformed).
+    /// Nothing else is changed; the module's parser validates the rest (secret guard first). Null when not one valid object or too large.
     /// </summary>
     public static byte[]? Document(string server, string? output, int maxBytes)
     {
@@ -115,6 +116,12 @@ public sealed class JeaServiceAccountUsageCollector(IJeaRunner runner, ILogger<J
                 return null;
             }
 
+            if (document["serverName"] is not JsonValue reported || reported.GetValueKind() != JsonValueKind.String
+                || !SameHost(server, reported.GetValue<string>()))
+            {
+                return null;
+            }
+
             document["serverName"] = server;
             byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(document);
             return bytes.Length <= maxBytes ? bytes : null;
@@ -124,5 +131,17 @@ public sealed class JeaServiceAccountUsageCollector(IJeaRunner runner, ILogger<J
             // Duplicate keys, invalid JSON or depth: not one valid document.
             return null;
         }
+    }
+
+    /// <summary>Same host: equal names, or equal short names (first DNS label), case-insensitive. Empty never matches.</summary>
+    public static bool SameHost(string requested, string? reported)
+    {
+        if (string.IsNullOrWhiteSpace(requested) || string.IsNullOrWhiteSpace(reported))
+        {
+            return false;
+        }
+
+        return string.Equals(requested, reported, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(requested.Split('.')[0], reported.Split('.')[0], StringComparison.OrdinalIgnoreCase);
     }
 }
