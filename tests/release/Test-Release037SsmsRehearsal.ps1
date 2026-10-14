@@ -1,12 +1,15 @@
 [CmdletBinding()]
 param([Parameter(Mandatory)][string]$PackageDirectory,
     [Parameter(Mandatory)][ValidatePattern('(?-i)^[A-Za-z0-9_]{1,30}$')][string]$DatabaseSuffix,
-    [Parameter(Mandatory)][string]$EvidenceDirectory)
+    [Parameter(Mandatory)][string]$EvidenceDirectory,
+    [ValidatePattern('(?-i)^[A-Za-z0-9]{1,40}$')][string]$LocalDbInstance = 'SecureOpsResourcesV1')
 # Local proof that a 033-037 review candidate really upgrades an installed-032 database: the module harness builds a NEW
 # LocalDB copy at 032 (roles included, no members), then the package's DBA/ssms single files run in operator order through
 # sqlcmd WITHOUT -I/-b (the files must carry those themselves), with the DBA notes' expected check values, replay refusal
 # and the harness 033-037 guards. A normal-mode (non-SQLCMD) run is simulated first and must change nothing. Never targets
 # a shared or corporate server. The database is dropped on success and kept for inspection on failure.
+# -LocalDbInstance names another per-user LocalDB instance when the harness instance is unusable; the 032 copy is then built
+# with the harness's own 032 steps (numbered 001-032 from sql/migrations, then SA-API, SA-Worker, SA-002 and SA-004 grants).
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -14,7 +17,7 @@ $package = (Resolve-Path -LiteralPath $PackageDirectory).Path
 $evidence = [IO.Path]::GetFullPath($EvidenceDirectory)
 if (Test-Path -LiteralPath $evidence) { throw 'Use a fresh evidence directory.' }
 New-Item -ItemType Directory -Path $evidence | Out-Null
-$server = '(localdb)\SecureOpsResourcesV1'
+$server = "(localdb)\$LocalDbInstance"
 $database = 'SecureOps_Sa' + $DatabaseSuffix
 $sqlcmd = (Get-Command sqlcmd -ErrorAction Stop).Source
 $checks = [Collections.Generic.List[string]]::new()
@@ -67,8 +70,21 @@ $ssms = @{}; foreach ($script in $manifest.scripts) { $ssms[$script.file] = Join
 foreach ($script in $manifest.scripts) { Check "SSMS hash $($script.file)" ((Get-FileHash -LiteralPath $ssms[$script.file]).Hash -ceq $script.sha256) }
 
 $harness = Join-Path $root 'tests/sql/service-accounts/sa-sql-harness.ps1'
-& (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File $harness -DatabaseSuffix $DatabaseSuffix -ThroughMigration 32 *> (Join-Path $evidence 'harness-032.log')
-Check 'harness built a 032 copy with roles' ($LASTEXITCODE -eq 0)
+if ($LocalDbInstance -ceq 'SecureOpsResourcesV1') {
+    & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File $harness -DatabaseSuffix $DatabaseSuffix -ThroughMigration 32 *> (Join-Path $evidence 'harness-032.log')
+    Check 'harness built a 032 copy with roles' ($LASTEXITCODE -eq 0)
+} else {
+    & $sqlcmd -S $server -d master -E -I -b -Q "IF DB_ID(N'$database') IS NOT NULL THROW 51000, 'Refuse existing database.', 1; CREATE DATABASE [$database];" | Out-Null
+    Check 'new disposable database created' ($LASTEXITCODE -eq 0)
+    $base = @(Get-ChildItem (Join-Path $root 'sql/migrations') -File -Filter '*.sql' | Where-Object { [int]$_.Name.Substring(0,3) -le 32 } | Sort-Object Name |
+        ForEach-Object { @{ Dir='sql/migrations'; File=$_.Name } }) +
+        @('SA-API-permissions.sql','SA-Worker-permissions.sql','SA-002-API-permissions.sql','SA-004-API-permissions.sql' | ForEach-Object { @{ Dir='sql/pending/service-accounts'; File=$_ } })
+    foreach ($step in $base) {
+        Push-Location (Join-Path $root $step.Dir)
+        try { & $sqlcmd -S $server -d $database -E -I -b -i $step.File *>> (Join-Path $evidence 'base-032.log') } finally { Pop-Location }
+        Check "032 copy: $($step.File)" ($LASTEXITCODE -eq 0)
+    }
+}
 
 # Inventories on the 032 copy.
 $run = Invoke-File $ssms['00-envanter-025-032.sql']
@@ -120,7 +136,7 @@ $expected = @{
              post=@{ Tablo='3'; Tetikleyici='3'; TekCalisanDizin='1'; GuvenilmeyenKisit='0'; Is='0' } } }
 foreach ($number in 33..37) {
     $m = "0$number"; $k = $number - 32
-    $files = @($manifest.scripts | Where-Object { $_.file -like "$k?-$m-*" } | ForEach-Object file | Sort-Object)
+    $files = @($manifest.scripts | Where-Object { $_.file -like "$($k)?-$m-*" } | ForEach-Object file | Sort-Object)
     Check "$m has pre, apply, grants and post files in order" ($files[0] -ceq "$($k)1-$m-on-kontrol.sql" -and $files[1] -ceq "$($k)2-$m-uygula.sql" -and
         $files[-1] -ceq "$($k)9-$m-son-kontrol.sql")
     foreach ($file in $files) {

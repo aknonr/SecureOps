@@ -118,7 +118,8 @@ Offline tests: `tests/release/Test-ServiceAccount033To037ReviewSelection.ps1 -Ev
 `tests/release/Test-SsmsSingleFile.ps1 -EvidenceDirectory <fresh> [-PackageDirectory <candidate>]` (re-derives every
 line independently). Local SQL proof: `tests/release/Test-Release037SsmsRehearsal.ps1 -PackageDirectory <candidate>
 -DatabaseSuffix <new>` builds a LocalDB copy at 032 with the module harness, applies the package's SSMS files in
-order with expected check values, runs the harness 033–037 guards, and drops the database. Windows PowerShell 5.1
+order with expected check values, runs the harness 033–037 guards, and drops the database. `-LocalDbInstance <name>`
+uses another disposable per-user LocalDB instance and the harness's own 032 steps when the shared one is unusable. Windows PowerShell 5.1
 needs a short evidence path (MAX_PATH).
 
 ## Admin / Lookup 027 API/UI Review
