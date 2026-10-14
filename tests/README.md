@@ -2,7 +2,7 @@
 
 ## Toolchain And Rules
 
-SDK 10.0.401 (`global.json`, roll-forward disabled), .NET 10, C# 14, analyzer level 10.0.
+SDK 10.0.402 (`global.json`, roll-forward disabled), .NET 10, C# 14, analyzer level 10.0.
 Use the pinned SDK without language-version overrides. Warnings are errors.
 xUnit v3 (`xunit.v3.mtp-off`) runs through VSTest with runner 4, Test SDK 18, FluentAssertions 7.2,
 NSubstitute 6 and coverlet 10. Custom Fact/Theory attributes forward caller file/line;
