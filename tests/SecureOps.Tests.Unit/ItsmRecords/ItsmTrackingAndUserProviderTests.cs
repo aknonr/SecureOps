@@ -64,6 +64,8 @@ public sealed class ItsmTrackingAndUserProviderTests
         full.Activities!.State.Should().Be(ItsmTrackingPartState.Known);
         full.Activities.Value.Should().HaveCount(2);
         full.Comments!.Value!.Count.Should().Be(2);
+        full.State.Should().Be(new ItsmOrState("2026-01-05T02:30:00", "9301", "9401", "Synthetic status", "Synthetic stage"));
+        partial.State.Should().Be(new ItsmOrState(null, null, null));
         partial.Activities!.State.Should().Be(ItsmTrackingPartState.Unknown);
         partial.Activities.Reason.Should().Be(ItsmRecordLookupReason.IncompleteResponse);
         partial.Comments!.State.Should().Be(ItsmTrackingPartState.Known);
@@ -86,7 +88,7 @@ public sealed class ItsmTrackingAndUserProviderTests
 
     [Theory]
     [InlineData("synthetic.user", ItsmUserMatchStatus.Matched, ItsmRecordLookupReason.None)]
-    [InlineData("Synthetic.User", ItsmUserMatchStatus.Matched, ItsmRecordLookupReason.None)]
+    [InlineData("Synthetic.User", ItsmUserMatchStatus.NotMatched, ItsmRecordLookupReason.None)]
     [InlineData("synthetic.dup", ItsmUserMatchStatus.Ambiguous, ItsmRecordLookupReason.None)]
     [InlineData("synthetic.down", ItsmUserMatchStatus.Unknown, ItsmRecordLookupReason.Unavailable)]
     [InlineData("nobody", ItsmUserMatchStatus.NotMatched, ItsmRecordLookupReason.None)]
@@ -114,7 +116,8 @@ public sealed class ItsmTrackingAndUserProviderTests
     [InlineData("990003", ItsmUserMatchStatus.Unknown, ItsmRecordLookupReason.Unavailable)]
     [InlineData("990004", ItsmUserMatchStatus.Matched, ItsmRecordLookupReason.None)]
     [InlineData("990404", ItsmUserMatchStatus.NotMatched, ItsmRecordLookupReason.None)]
-    [InlineData("99a001", ItsmUserMatchStatus.Unknown, ItsmRecordLookupReason.InvalidIdentifier)]
+    [InlineData("99-001", ItsmUserMatchStatus.Unknown, ItsmRecordLookupReason.InvalidIdentifier)]
+    [InlineData("99a001", ItsmUserMatchStatus.NotMatched, ItsmRecordLookupReason.None)]
     [InlineData("0000", ItsmUserMatchStatus.Unknown, ItsmRecordLookupReason.InvalidIdentifier)]
     [InlineData(null, ItsmUserMatchStatus.Unknown, ItsmRecordLookupReason.InvalidIdentifier)]
     public async Task FakeRegistrationMapping_IsDeterministic_AndCoversEveryState(
@@ -143,7 +146,7 @@ public sealed class ItsmTrackingAndUserProviderTests
     [InlineData("990001", "nobody", ItsmUserMatchStatus.Matched, ItsmRecordLookupReason.None)]
     [InlineData("990001", "synthetic.down", ItsmUserMatchStatus.Unknown, ItsmRecordLookupReason.Unavailable)]
     [InlineData("990001", "synthetic.dup", ItsmUserMatchStatus.Ambiguous, ItsmRecordLookupReason.None)]
-    [InlineData("99a001", "synthetic.user", ItsmUserMatchStatus.Unknown, ItsmRecordLookupReason.InvalidIdentifier)]
+    [InlineData("99-001", "synthetic.user", ItsmUserMatchStatus.Unknown, ItsmRecordLookupReason.InvalidIdentifier)]
     [InlineData(null, "synthetic.user", ItsmUserMatchStatus.Matched, ItsmRecordLookupReason.None)]
     [InlineData("990001", null, ItsmUserMatchStatus.Matched, ItsmRecordLookupReason.None)]
     [InlineData(null, null, ItsmUserMatchStatus.Unknown, ItsmRecordLookupReason.InvalidIdentifier)]

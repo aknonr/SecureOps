@@ -1,0 +1,266 @@
+@* Starts a read-only web usage scan (ADR-0024 R2-4, USAGE-SCAN-JOB-CONTRACT.md) for one account (account page) or the accounts
+   selected in the list, and lists the account's recent web scans. The server decides availability, scope and responsibility; this
+   panel only says honestly what the server said: when no collector is configured the feature is off and the script upload stays the
+   way to scan. Nothing here contacts a server; the Worker does, through the JEA endpoint. *@
+@using SecureOps.Domain.ServiceAccounts
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+@inject ServiceAccountApiClient Api
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<section class="so-panel sa-wscan-start" aria-labelledby="@($"{IdPrefix}-title")">
+    <div class="so-panel-head">
+        <h2 id="@($"{IdPrefix}-title")" class="so-panel-title">Webden tara (salt okunur)</h2>
+        @if (_availability is { } badge)
+        {
+            <SoStatusBadge Label="@(badge.Available ? (badge.IsFake ? "Açık · sahte toplayıcı" : "Açık") : "Kapalı")"
+                           Tone="@(badge.Available ? (badge.IsFake ? SoStatusBadge.BadgeTone.Caution : SoStatusBadge.BadgeTone.Positive) : SoStatusBadge.BadgeTone.Neutral)"
+                           Icon="@(badge.Available ? Icons.Material.Filled.PlayCircleOutline : Icons.Material.Filled.PowerOff)" />
+        }
+    </div>
+    <p class="so-panel-text--sm">
+        Worker, JEA uç noktası üzerinden yalnız okur: Windows servisleri, zamanlanmış görevler ve IIS. Sunucuda hiçbir şey değiştirilmez,
+        parola okunmaz. Her sunucu bittikçe sonuç görünür; bitince sonuç hesabın Kullanım taraması bölümüne kanıt olarak bağlanır.
+        "Bulunamadı" kullanılmıyor demek değildir; ulaşılamayan sunucu "bilgi yok" olarak kalır.
+    </p>
+
+    @if (_availability is null && _availabilityProblem is null)
+    {
+        <SoLoading Message="Web taramasının durumu okunuyor" />
+    }
+    else if (_availabilityProblem is not null)
+    {
+        <SaProblem Problem="_availabilityProblem" OnRetry="LoadAsync" />
+    }
+    else if (_availability is { Available: false } closed)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" role="note" Class="mb-2">@closed.ReasonText</MudAlert>
+        <p class="so-panel-text--sm sa-wscan-next" role="note">Sıradaki adım: taramayı onaylı script ile yapıp birleşik çıktıyı "Tarama sonucu yükle" ile ekleyin.</p>
+    }
+    else if (_availability is { } open)
+    {
+        @if (open.IsFake)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" role="note" Class="mb-2">
+                Bu ortamda SAHTE toplayıcı çalışıyor (geliştirme/demo/test): hiçbir sunucuya bağlanılmaz, sonuçlar gerçek değildir ve kanıt kaydı bunu açıkça yazar.
+            </MudAlert>
+        }
+
+        @if (!CanWork || !open.CanStart)
+        {
+            <p class="so-panel-text--sm" role="note">Tarama başlatmak için Çalışma yetkisi ve seçilen her hesapta sorumlu dayanak (kurum kapsamı veya sahip ekip) gerekir. Sunucu her istekte yeniden karar verir.</p>
+        }
+        else
+        {
+            @if (AccountLabels.Count > 0)
+            {
+                <p class="so-panel-text sa-wscan-wrap">Taranacak hesaplar (@AccountIds.Count): @string.Join(", ", AccountLabels)</p>
+            }
+
+            @if (AccountIds.Count > open.MaxAccounts)
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" role="alert">Bir taramada en çok @open.MaxAccounts hesap olabilir; @AccountIds.Count hesap seçili.</MudAlert>
+            }
+
+            <MudGrid Spacing="2" Class="mt-1">
+                <MudItem xs="12" md="8">
+                    <MudTextField @bind-Value="_servers" Label="Planlanan sunucular (her satıra bir ad)" Lines="6" Variant="Variant.Outlined" Immediate="true"
+                                  HelperText="@ServersHelp(open)" Class="sa-wscan-servers" />
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="_expected" Label="Beklenen gMSA (isteğe bağlı)" MaxLength="100" Variant="Variant.Outlined" Immediate="true"
+                                  HelperText="Doluysa gMSA kontrol taraması olur (ör. DOMAIN\gmsa-adı$); boşsa keşif taraması." />
+                </MudItem>
+            </MudGrid>
+            @if (Parsed.Error == "serverName")
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2" role="alert">@Parsed.Line. satırdaki sunucu adı geçersiz: yalnız harf, rakam, nokta ve tire; harf veya rakamla başlamalı.</MudAlert>
+            }
+
+            @* aria-disabled, never disabled: the button stays reachable by Tab and says why it cannot start yet. *@
+            <MudButton OnClick="StartAsync" Variant="@(CanStart ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" Class="mt-2"
+                       StartIcon="@Icons.Material.Filled.TravelExplore" aria-disabled="@(CanStart ? "false" : "true")"
+                       aria-describedby="@(CanStart ? null : $"{IdPrefix}-why")">Taramayı başlat</MudButton>
+            @if (!CanStart) { <p id="@($"{IdPrefix}-why")" class="so-panel-text--sm sa-wscan-why">@WhyNot</p> }
+            <p class="so-panel-text--sm sa-wscan-next" role="note">Sıradaki adım: başlattığınızda canlı tarama sayfası açılır; sunucu kutucukları dolarken sayfadan ayrılabilirsiniz, tarama Worker'da sürer.</p>
+            <SaProblem Problem="_startProblem" ShowFieldMessage="false" />
+            @if (StartFieldText is { } why)
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-1" role="alert">@why</MudAlert>
+            }
+            @if (_runningJobId is { } running)
+            {
+                <MudButton Href="@($"service-accounts/usage-scan-jobs/{running}")" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.OpenInNew">Çalışan taramayı aç</MudButton>
+            }
+        }
+    }
+
+    @if (ShowHistory && AccountIds.Count == 1)
+    {
+        <h3 class="sa-wscan-subtitle">Bu hesabın web taramaları</h3>
+        @if (_jobs is null && _jobsProblem is null && _availability is not null)
+        {
+            <SoLoading Message="Taramalar okunuyor" />
+        }
+        else if (_jobsProblem is not null)
+        {
+            <p class="so-panel-text--sm" role="note">@(_jobsProblem.Code == "ServiceAccountUsageScanJobsNotInstalled" ? "Web taraması kayıtları bu ortamda kurulu değil (037)." : "Web taramaları okunamadı: " + _jobsProblem.Title)</p>
+        }
+        else if (_jobs is { Count: 0 })
+        {
+            <p class="so-panel-text--sm">Bu hesap için henüz web taraması yok.</p>
+        }
+        else if (_jobs is not null)
+        {
+            <ul class="sa-wscan-history">
+                @foreach (UsageScanJobSummaryView job in _jobs)
+                {
+                    <li>
+                        <SoStatusBadge Label="@job.StateLabel" Tone="@UsageScanJobPresentation.StateTone(job.State)" Icon="@UsageScanJobPresentation.StateIcon(job.State)" />
+                        <MudLink Href="@($"service-accounts/usage-scan-jobs/{job.Id}")">
+                            @job.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture) taraması
+                        </MudLink>
+                        <span class="so-panel-text--sm">
+                            @job.Done / @job.Planned sunucu · @job.Matches kullanım bulundu@(job.NotCovered > 0 ? $" · {job.NotCovered} sunucuda bilgi yok" : string.Empty)@(job.IsFake ? " · sahte" : string.Empty)@(job.StartedByYou ? " · sizin başlattığınız" : string.Empty)
+                        </span>
+                    </li>
+                }
+            </ul>
+        }
+    }
+</section>
+
+@code {
+    private readonly CancellationTokenSource _lifetime = new();
+    private UsageScanJobAvailabilityView? _availability;
+    private UiProblem? _availabilityProblem;
+    private IReadOnlyList<UsageScanJobSummaryView>? _jobs;
+    private UiProblem? _jobsProblem;
+    private UiProblem? _startProblem;
+    private Guid? _runningJobId;
+    private string _servers = string.Empty;
+    private string? _expected;
+    private bool _starting;
+
+    /// <summary>Accounts to scan (one on the account page, the selection on the list).</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<Guid> AccountIds { get; set; } = [];
+
+    /// <summary>Names of the selected accounts (list page only).</summary>
+    [Parameter] public IReadOnlyList<string> AccountLabels { get; set; } = [];
+
+    /// <summary>The caller's snapshot shows ServiceAccounts.Work and, on the account page, the responsible basis (a courtesy; the server decides).</summary>
+    [Parameter] public bool CanWork { get; set; }
+
+    /// <summary>Show the account's recent web scans (account page).</summary>
+    [Parameter] public bool ShowHistory { get; set; }
+
+    /// <summary>Unique id prefix when the panel appears more than once.</summary>
+    [Parameter] public string IdPrefix { get; set; } = "sa-wscan";
+
+    /// <summary>The pasted list as the server will read it (a courtesy check; the server validates again).</summary>
+    private (IReadOnlyList<string> Servers, string? Error, int? Line) Parsed => UsageScanJobRules.ParseServers(_servers.Split('\n'));
+
+    private bool CanStart => !_starting && Parsed.Error is null && AccountIds.Count is > 0 and <= UsageScanJobRules.MaxAccounts && ExpectedValid;
+
+    private bool ExpectedValid => string.IsNullOrWhiteSpace(_expected) || UsageScanJobRules.IsAccountName(_expected.Trim()) && _expected.Trim().EndsWith('$');
+
+    private string WhyNot => _starting ? "Tarama başlatılıyor…"
+        : AccountIds.Count == 0 ? "Önce listeden hesap seçin."
+        : AccountIds.Count > UsageScanJobRules.MaxAccounts ? $"En çok {UsageScanJobRules.MaxAccounts} hesap seçin."
+        : Parsed.Error == "serversEmpty" ? "En az bir sunucu adı yazın."
+        : Parsed.Error == "serversTooMany" ? $"En çok {UsageScanJobRules.MaxServers} sunucu yazılabilir; listeyi bölün."
+        : Parsed.Error == "serverName" ? $"{Parsed.Line}. satırdaki adı düzeltin."
+        : !ExpectedValid ? "Beklenen gMSA adı $ ile bitmeli (ör. DOMAIN\\gmsa-adı$) ya da boş bırakılmalı."
+        : string.Empty;
+
+    private string? StartFieldText => _startProblem is null ? null : (_startProblem.Code, _startProblem.Fields.FirstOrDefault()) switch
+    {
+        ("ServiceAccountUsageScanAlreadyRunning", _) => "Seçilen hesaplardan biri için çalışan bir web taraması var. Hesap başına aynı anda tek tarama çalışır; bitmesini bekleyin veya iptal edin.",
+        ("ServiceAccountNotFound", _) => "Seçilen hesaplardan biri bulunamadı veya kapsamınızda değil; hiçbir tarama başlatılmadı.",
+        ("ServiceAccountAccessDenied", _) => "Seçilen hesaplardan birinde sorumlu dayanağınız yok (kurum kapsamı veya sahip ekip gerekir); hiçbir tarama başlatılmadı.",
+        (_, "serverName") => "Sunucu listesindeki bir ad kabul edilmedi; düzeltip yeniden başlatın.",
+        (_, "serversTooMany") => $"En çok {UsageScanJobRules.MaxServers} sunucu olabilir.",
+        (_, "serversEmpty") => "En az bir sunucu yazın.",
+        (_, "expectedAccount") => "Beklenen gMSA adı kabul edilmedi ($ ile bitmeli ve aranan hesaplardan farklı olmalı).",
+        (_, "accountName") => "Hesaplardan birinin adı taramada aranabilecek biçimde değil; hesabın adını ve domainini kontrol edin.",
+        (_, "accountIds") => "Hesap seçimi kabul edilmedi (1–20 farklı hesap; aynı ad iki kez aranamaz).",
+        _ => null
+    };
+
+    private static string ServersHelp(UsageScanJobAvailabilityView view) =>
+        $"En çok {view.MaxServers} sunucu; boş satırlar ve tekrarlar atılır. Yalnız harf, rakam, nokta ve tire.";
+
+    /// <inheritdoc />
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        (_availability, _availabilityProblem, _jobs, _jobsProblem) = (null, null, null, null);
+        try
+        {
+            _availability = await Api.GetAsync<UsageScanJobAvailabilityView>("/usage-scan-jobs/availability", _lifetime.Token);
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _availabilityProblem = ex.Problem;
+            return;
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+            return;
+        }
+
+        if (ShowHistory && AccountIds.Count == 1)
+        {
+            try
+            {
+                _jobs = await Api.GetAsync<IReadOnlyList<UsageScanJobSummaryView>>($"/accounts/{AccountIds[0]}/usage-scan-jobs", _lifetime.Token);
+                _runningJobId = _jobs.FirstOrDefault(j => j.Active)?.Id;
+            }
+            catch (SecureOpsApiException ex)
+            {
+                _jobsProblem = ex.Problem;
+            }
+            catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+            {
+            }
+        }
+    }
+
+    private async Task StartAsync()
+    {
+        if (!CanStart)
+        {
+            return;
+        }
+
+        _starting = true;
+        _startProblem = null;
+        try
+        {
+            UsageScanJobView job = await Api.SendAsync<UsageScanJobView>(HttpMethod.Post, "/usage-scan-jobs",
+                new StartUsageScanJobRequest([.. AccountIds], [.. Parsed.Servers], string.IsNullOrWhiteSpace(_expected) ? null : _expected.Trim()), _lifetime.Token);
+            Navigation.NavigateTo($"service-accounts/usage-scan-jobs/{job.Id}");
+        }
+        catch (SecureOpsApiException ex)
+        {
+            _startProblem = ex.Problem;
+            _runningJobId = null;
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            _starting = false;
+        }
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+    }
+}

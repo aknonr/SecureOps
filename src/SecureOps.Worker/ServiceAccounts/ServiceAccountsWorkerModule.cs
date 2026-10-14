@@ -1,10 +1,12 @@
 using Hangfire;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SecureOps.Infrastructure.ServiceAccounts;
 using SecureOps.Infrastructure.ServiceAccounts.Reminders;
+using SecureOps.Infrastructure.ServiceAccounts.UsageScans.Jobs;
 using SecureOps.Shared.Configuration;
 
 namespace SecureOps.Worker.ServiceAccounts;
@@ -20,6 +22,16 @@ public static class ServiceAccountsWorkerModule
     {
         ServiceAccountOptions settings = new();
         configuration.GetSection(ServiceAccountOptions.SectionName).Bind(settings);
+        // Web usage scan jobs (USAGE-SCAN-JOB-CONTRACT.md) run on this host's existing Hangfire server. The runner is always
+        // resolvable so a queued job is closed honestly (module disabled, collector missing) instead of failing activation; the
+        // real JEA collector is registered by the Worker's JEA runner (TARAMA-C), never by the module.
+        services.Configure<ServiceAccountOptions>(configuration.GetSection(ServiceAccountOptions.SectionName));
+        if (settings.Enabled)
+        {
+            services.TryAddSingleton<SqlServiceAccountRepository>();
+        }
+
+        services.AddServiceAccountUsageScanJobs(settings, UsageScanJobAvailability.EnvironmentName(configuration));
         if (!jobServerConfigured || !settings.Enabled || !settings.Reminders.Enabled)
         {
             // Recurring jobs are never removed here (shared Hangfire state). A job registered while reminders were enabled

@@ -1,10 +1,12 @@
 # ITSM Record Lookup Contract (OR / OCO, read-only)
 
-Decision: ADR-0031 (Proposed) for the record lookup; ADR-0032 (Proposed) for OR tracking and exact user match
-(sections "OR tracking" and "User match" below). Code: `src/SecureOps.Infrastructure/ItsmRecords/`. Tests:
-`tests/SecureOps.Tests.Unit/ItsmRecords/`. No API endpoint, no OpenAPI entry, no SQL, no UI: modules call the
-interfaces from their service layer. Status 2026-10-12 (registration-number match added 2026-10-13): implemented and
-unit-tested with synthetic responses only; no real Turuncu Hat call has been made.
+Decision: ADR-0031 (Accepted) for the record lookup; ADR-0032 (Accepted, amendments 2026-10-13 and 2026-10-14) for
+OR tracking and exact user match (sections "OR tracking" and "User match" below). Code:
+`src/SecureOps.Infrastructure/ItsmRecords/`. Tests: `tests/SecureOps.Tests.Unit/ItsmRecords/`. No API endpoint, no
+OpenAPI entry, no SQL, no UI: modules call the interfaces from their service layer. Status 2026-10-12
+(registration-number match added 2026-10-13; source registration rule, active-user filter, case-sensitive user name
+and status/stage display text 2026-10-14): implemented and unit-tested with synthetic responses only; no real
+Turuncu Hat call has been made.
 
 ## Contract
 
@@ -103,8 +105,12 @@ Authorization header, base URL, number or title. Metric `secureops.integration.o
 - `Status`/`Reason` describe the OR row: Found, NotFound, Ambiguous, Unknown (same rules as the lookup; an
   invalid id is `Unknown/InvalidIdentifier` with no remote call). `State`, `Activities` and `Comments` are null
   unless Found.
-- `State = ItsmOrState(LastModifiedText, RawStatusCode, RawStage)`: raw text. `m_last_mod_dt` time-zone semantics
-  are not proven. Status and stage are null unless their field names are configured.
+- `State = ItsmOrState(LastModifiedText, RawStatusCode, RawStage, StatusLabel, StageLabel)`: raw text.
+  `m_last_mod_dt` time-zone semantics are not proven. Status and stage are null unless their field names are
+  configured. `StatusLabel`/`StageLabel` (added 2026-10-14, optional, default null) are the source's display text
+  from the `KEY.<configured field>` cell when the source sends it (HTML-decoded, trimmed, max 256 characters, longer
+  is `Unknown/InvalidResponse`, absent or empty is null). Show them beside the raw code as the source's words, not as
+  a product meaning. No other `KEY.` cell is read (no person display names).
 - `Activities` and `Comments` are `ItsmTrackingPart<T>` (`Known` or `Unknown` + `Reason`). A failed or incomplete
   part never hides the others and is never shown as "empty".
 - `ItsmActivity(ActivityId, RawGroup, RawStatus, CreatedText, CompletedText)`, ascending by id, at most 50 rows.
@@ -113,7 +119,7 @@ Authorization header, base URL, number or title. Metric `secureops.integration.o
 
 | Part | BaseObject | Filter | Selects |
 |---|---|---|---|
-| OR header | `ItsmRecordLookup:OrBaseObject` | `#%m_active%#='True' AND #%id%#=<id>` | `id, m_last_mod_dt` + configured status/stage field |
+| OR header | `ItsmRecordLookup:OrBaseObject` | `#%m_active%#='True' AND #%id%#=<id>` | `id, m_last_mod_dt` + configured status/stage field (their `KEY.` cells are read if returned) |
 | Activities | `BPM_Actvty` | `#%m_bpe_actvty_task_model.m_action_type.m_code%#!='WorkflowSystemAction' AND #%m_process.m_main_object_id%#=<id>` (+ ` AND #%m_process.m_main_object%#=<ActivityMainObject>` when set) | `id, m_group, m_status, m_created_dt, m_completion_date` |
 | Comments | `cmn_comment` | `#%m_active%#='True' AND #%m_mob%#=<CommentMainObject> AND #%m_mid%#=<id>` | `id` + `CommentTimeField` |
 
@@ -141,15 +147,33 @@ the requested user name nor the registration number is echoed.
   search for anyone else.
 - User name allow-list: `ItsmUserName.Normalize` (1-64 ASCII letters, digits, `.`, `_`, `-`, starting with a letter or
   digit; domain prefix, UPN suffix, spaces, quotes and wildcards are rejected as `Unknown/InvalidIdentifier` without a
-  remote call).
-- Registration allow-list: `ItsmRegistrationNumber.Normalize` (outer whitespace trimmed, then 1-20 ASCII digits;
-  leading zeros dropped; only zeros, letters, signs, inner whitespace, quotes, `%`, `*`, `#` and non-ASCII digits are
-  rejected as `Unknown/InvalidIdentifier` without a remote call). `0770123` is searched as `770123`.
-- Wire, user name: `cmn_user`, filter `#%m_username%#='<name>'`, selects `id, m_username, p_obs_id, m_rel_home_lbs_id`
-  (`m_username` only proves the filter was honoured, case-insensitively).
-- Wire, registration number: `cmn_user`, filter `#%c_registration_number%#='<digits without leading zeros>'`, selects
-  `id, c_registration_number, p_obs_id, m_rel_home_lbs_id` (`c_registration_number` only proves the filter was
-  honoured: the returned text or number is normalized the same way and must be equal).
+  remote call). Case is preserved: the source compares `m_username` case-sensitively.
+- Registration rule: `ItsmRegistrationNumber.Normalize`, the Turuncu Hat team's official rule (2026-10-14). Outer
+  whitespace trimmed; then 1-20 ASCII letters or digits, anything else (inner whitespace, signs, `_`, `-`, quotes,
+  `%`, `*`, `#`, non-ASCII letters or digits) is `Unknown/InvalidIdentifier` without a remote call; only zeros is
+  invalid. Not all digits → sent as it is. All digits → leading zeros dropped, then left-padded with zeros to six
+  digits (fewer than six are padded, six stay as they are, more than six lose their leading zeros):
+
+  | Input | Searched |
+  |---|---|
+  | `123` | `000123` |
+  | `1234` | `001234` |
+  | `12345` | `012345` |
+  | `123456` | `123456` |
+  | `1234567` | `1234567` |
+  | `01234567` | `1234567` |
+  | `00012341` | `012341` |
+  | `ABC123` | `ABC123` |
+
+- Wire, user name: `cmn_user`, filter `#%m_active%#='True' AND #%m_username%#='<name>'`, selects
+  `id, m_username, p_obs_id, m_rel_home_lbs_id` (`m_username` only proves the filter was honoured and must be
+  **ordinally** equal: a row in another case is `Unknown/InvalidResponse`).
+- Wire, registration number: `cmn_user`, filter `#%m_active%#='True' AND #%c_registration_number%#='<source form>'`,
+  selects `id, c_registration_number, p_obs_id, m_rel_home_lbs_id` (`c_registration_number` only proves the filter
+  was honoured: the returned text or number is normalized with the same rule and must be ordinally equal, so a JSON
+  number that lost its leading zero still verifies).
+- Passive users (`m_active` not `'True'`) are excluded by the filter on both paths; they never match and never make a
+  result Ambiguous.
 - Both paths: a row for another key value is `Unknown/InvalidResponse`; `p_obs_id` and `m_rel_home_lbs_id` may be empty
   and read as null; completeness and failure rules are the same as for the record lookup.
 - Combined rule (`MatchAsync`; null or blank counts as not given):
@@ -173,13 +197,14 @@ the requested user name nor the registration number is echoed.
 
 ## Fake providers
 
-`FakeItsmRecordTracking`: source id `900001` Found (two activities, two comments), `900002` Ambiguous, `900003`
-Unknown/Unavailable, `900004` Found with the activity part `Unknown/IncompleteResponse` and zero comments, any other
-valid id NotFound. `FakeItsmUserMapping`: `synthetic.user` Matched, `synthetic.dup` Ambiguous, `synthetic.down`
-Unknown/Unavailable, any other valid name NotMatched; registration number `990001` (also `0990001`) is the same Fake
-user as `synthetic.user`, `990004` another Fake user (conflicts with `synthetic.user` in `MatchAsync`), `990002`
-Ambiguous, `990003` Unknown/Unavailable, any other valid number NotMatched. Source id `900001` matches the Fake OR
-record of the lookup.
+`FakeItsmRecordTracking`: source id `900001` Found (two activities, two comments, synthetic status and stage labels),
+`900002` Ambiguous, `900003` Unknown/Unavailable, `900004` Found with the activity part `Unknown/IncompleteResponse`
+and zero comments, any other valid id NotFound. `FakeItsmUserMapping`: `synthetic.user` (exact case, like the source;
+`Synthetic.User` is NotMatched) Matched, `synthetic.dup` Ambiguous, `synthetic.down` Unknown/Unavailable, any other
+valid name NotMatched; registration numbers follow the source rule: `990001` (also `0990001`) is the same Fake user as
+`synthetic.user`, `990004` another Fake user (conflicts with `synthetic.user` in `MatchAsync`), `990002` Ambiguous,
+`990003` Unknown/Unavailable, any other valid number (also alphanumeric) NotMatched. Source id `900001` matches the
+Fake OR record of the lookup.
 
 ## Vendor and team evidence (2026-10-12, sanitized)
 
@@ -200,16 +225,26 @@ registration value is recorded here).
   proven; raw text is shown).
 - Insert example: `Success=true` and `InsertedId` filled while `ErrorDescription`/`ErrorDetails` are also filled
   ("ignore them"): see `turuncu-hat-jira-contract-gaps.md` and ADR-0032 decision 6.
+- Third reply (2026-10-14): official registration-number rule (table above; the earlier "leading zeros are dropped"
+  was wrong for six-digit numbers); `cmn_user` keeps passive users, add `m_active='True'`; `m_username` is whatever
+  the identity system delivered and is case-sensitive; the OR form has a separate "Aşama" (stage) field, code to be
+  confirmed by Ctrl+double-click (probably `p_rel_stage`); `ROMA_Status` fields were not given, so display text is
+  read from `KEY.` cells; `!=` is supported; page numbers start at 0; read times look like
+  `2026-10-14 17:26:45.0000000` without a zone, and time values in filters must be UTC; no rate limit (monitored);
+  session about 60 minutes, logout not needed.
 
 ## Open items (ask the Turuncu Hat team)
 
 1. Sanitized OR, OCO, activity, comment and user query responses for zero and one row (take them in TEST).
-2. Meanings of `p_def_status` and `p_rel_stage` codes; status and stage field names on OR records; `ROMA_Status` fields.
+2. Meanings of `p_def_status` and `p_rel_stage` codes (`ROMA_Status` fields not given; `KEY.` display text is read
+   instead, 2026-10-14). OR status field is `p_def_status`; the OR "Aşama" field code is to be confirmed in the TEST
+   screen (probably `p_rel_stage`), and whether `KEY.` cells come back for both.
 3. Time zone of `m_last_mod_dt` and of `p_proposed_start_date_time` / `p_proposed_finish_date_time`.
 4. Whether `RecordCount` is the total of the filtered query (the team described it as the object total) and what
    `PageCount`/`PageCounter` mean (page size?), so the activity and comment reads can request a bounded page.
 5. Exact OR/OCO number formats; the `m_mob` value for OR in `cmn_comment`, whether `cmn_comment` has a creation-time
    column (default `m_created_dt` is unproven), and the `m_process.m_main_object` value for OR.
-6. Whether the `!=` filter operator with the system-action exclusion works as described.
-7. Whether `c_registration_number` matches with the equality filter and no leading zeros, and whether the value comes
+6. The team confirms `!=` is supported (2026-10-14); the system-action exclusion has still not been executed.
+7. One TEST query: a six-digit registration number with a leading zero matches in the six-digit form with
+   `m_active='True'`, and whether the value comes
    back as text or number, with or without leading zeros (one TEST query, recorded without the real value).

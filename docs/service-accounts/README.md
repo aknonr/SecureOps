@@ -12,6 +12,10 @@ including this note's former status preamble: [PROGRESS-HISTORY.md](PROGRESS-HIS
   a copy of the installed database first. No corporate SQL/AD/Jira/SMTP writes; repository data stays synthetic.
   Writing automation on managed servers (gMSA conversion) still needs its own ADR and approval (AGENTS.md rules 1, 9).
   Repository-wide defaults in `AGENTS.md`/`CLAUDE.md` are unchanged outside this module.
+- **Owner-approved exception (2026-10-14):** TARAMA-C (Worker JEA çalıştırıcı, Windows hizmet kurulumu,
+  SecureOps.ServiceAccountUsage JEA uç noktası, Jea toplayıcı) sahip kararıyla Claude'da; varsayılan sahiplik değişmez.
+  Covers only `src/SecureOps.Worker/Jea/`, `scripts/jea/`, `scripts/worker/`, their tests and docs. Source: owner's answer in the
+  coordination chat 2026-10-14 ("a ve b onaylıyorum"; "karar kayıtlarını sen uygula"), given directly in the coordinator chat.
 
 ## Reuse decisions (verified paths)
 
@@ -50,6 +54,7 @@ Not reused, with reason:
 | UI | `src/SecureOps.Ui/Pages/ServiceAccounts/`, `src/SecureOps.Ui/Services/ServiceAccounts/`, `src/SecureOps.Ui/Shared/Components/ServiceAccounts/` |
 | SQL payloads | `sql/pending/service-accounts/` retained includes; numbered discovery through `sql/schema/025-*.sql`, `026-*.sql`, `029-*.sql` and matching migrations; separate grants |
 | Usage scan tooling | `scripts/powershell/Get-ServiceAccountUsage.ps1` (collector), `scripts/powershell/Invoke-ServiceAccountUsageScan.ps1` (combine), contracts `service-account-usage(-scan).schema.json`, parser `Infrastructure/ServiceAccounts/UsageScans/` |
+| Web usage scan | collector seam + fake `UsageScans/Collection/`, job runner/store/views `UsageScans/Jobs/`, rules `Domain/ServiceAccounts/UsageScanJobRules.cs`, API `ServiceAccountUsageScanJobsController`, UI `ServiceAccountUsageScanJob.razor` + `SaWebScanPanel` |
 | Tests | `tests/SecureOps.Tests.Unit/ServiceAccounts/`, `tests/SecureOps.Tests.Unit/Ui/ServiceAccountUiTests.cs`, `tests/SecureOps.Tests.Integration/ServiceAccounts/`, `tests/sql/service-accounts/`, `tests/browser/service-accounts.cjs` |
 
 All routes are under `/api/v1/service-accounts/…`.
@@ -112,6 +117,16 @@ Candidate 4 (`SA-004`, numbered 030, ADR-0027): UsageScans (uploaded file ≤ 4 
 expected gMSA, times, run statement), UsageScanServers (one row per planned server, result and per-source status),
 UsageScanItems (matched components, role Former/Expected), UsageScanLinks (scan → account, optional participant request)
 and UsageScanDecisions (usage recorded / dismissed with reason). All append-only by trigger; runtime SELECT/INSERT only.
+Candidate 8 (`SA-008`, numbered 035, ADR-0030 *Proposed*, OR-2 with a Fake adapter only): ChangePlanRecordSubmissions (one row per "open OR"
+attempt for a plan account, written as Sending before any remote call with the exact sent content, idempotency key and fingerprint; only outcome
+columns change, along allowed transitions; one live submission per plan account and per OR number) and ChangePlanRecordSubmissionEvents
+(append-only). Runtime SELECT/INSERT plus column-level UPDATE on the outcome columns.
+
+Candidate 10 (`SA-010`, numbered 037, web usage scan 2026-10-13): UsageScanJobs (job state, lease, plan hash, collector kind),
+UsageScanJobAccounts (filtered unique index: one queued/running scan per account; link outcome) and UsageScanJobServers (live
+per-server state, collector status, validated document, matched items). Operational state, never deleted; the evidence stays the
+030 record (`tool = Jea`). Contract with the Worker JEA runner: [USAGE-SCAN-JOB-CONTRACT.md](USAGE-SCAN-JOB-CONTRACT.md); DBA:
+[DBA-037-TR.md](DBA-037-TR.md).
 
 Dates: plan/business dates are `date`; events carry `datetimeoffset` only when a real instant is
 known; `TimePrecision` records DateOnly/Instant/Unknown. Source timestamps without a timezone
@@ -195,3 +210,5 @@ requested gMSA name of a conversion has no field in the API yet (open owner ques
   pending; see PROGRESS.md).
 - How the team reaches many servers with the collector is their own approved practice; a product-side fan-out over the
   default WinRM endpoint would be an exception to AGENTS.md rule 3 and needs an owner decision and its own ADR.
+- Web scan (2026-10-13): the module side and its contract exist; the Worker JEA runner, the Windows service setup and the
+  JEA endpoint package are TARAMA-C (Codex). Until a `Jea` collector is configured the feature is off (fail closed).
