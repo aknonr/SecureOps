@@ -35,6 +35,21 @@ public sealed class JiraIssueLinkTests
     public void InvalidKey_GivesNoLink(string? key) =>
         JiraIssueLink.Create(Options("Corporate", "https://jira.contoso.example/browse/"), key).Should().BeNull();
 
+    [Theory]
+    [InlineData("SYN-٤٢")]
+    [InlineData("SYN-４２")]
+    [InlineData("SYN-4٢")]
+    [InlineData("SY١-42")]
+    [InlineData("S১N-42")]
+    public void IsValidKey_NonAsciiDigits_IsRejected(string key) =>
+        JiraIssueLink.IsValidKey(key).Should().BeFalse();
+
+    [Theory]
+    [InlineData("SYN-42")]
+    [InlineData("SY2-7")]
+    public void IsValidKey_AsciiKey_IsAccepted(string key) =>
+        JiraIssueLink.IsValidKey(key).Should().BeTrue();
+
     private static JiraIntegrationOptions Options(string provider, string baseUrl) =>
         new() { Provider = provider, IssueBrowseBaseUrl = baseUrl };
 }
