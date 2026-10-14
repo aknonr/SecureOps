@@ -249,7 +249,7 @@ public sealed class ServiceAccountUsageModuleTests
         return string.Concat(shell.Invoke().Select(o => o.ToString()));
     }
 
-    private static string ModuleFolder() => Path.Combine(Root(), "scripts", "jea", "proposed", "SecureOps.ServiceAccountUsage");
+    private static string ModuleFolder() => Path.Combine(Root(), "scripts", "jea", "SecureOps.ServiceAccountUsage");
 
     private static string Root()
     {
