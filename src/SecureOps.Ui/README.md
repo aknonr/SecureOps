@@ -60,15 +60,31 @@ Chromium 1194 headless): Demo API with Simulation source/Jira and InMemory persi
   response fields with synthetic values: Jira link only with `jiraIssueUrl`, replay note (attempt-only, gone after F5), retry preview
   matching vs. changed (changed hides the draft and keeps "Yeniden Dene" closed), F5 "gönderildi, yanıt yok" (claim active / lapsed),
   date sort closed with its note on unknown source dates, In Use completion closed for `Disabled` / `WriteFence` / `SourceContractsMissing`;
-  1440 and 390 px, light and dark, native 200 % zoom, keyboard only. Not run here: the SQL/LocalDB journeys (`sdm-journey`, `sdm-jira-only`,
-  `sdm-jira-negative`, `inuse-v2-review`, `inuse-v2-outcomes`, `inuse-rc626-repair`). `sdm-milestone` is stale: it waits for the old
-  "Bağlantı Gruplarım" heading (now "Kişisel bağlantı gruplarım") and expects a Disabled OR source.
+  1440 and 390 px, light and dark, native 200 % zoom, keyboard only. The SQL/LocalDB journeys were not run on Linux; see "Windows LocalDB
+  journeys" below. `sdm-milestone` is stale: it waits for the old "Bağlantı Gruplarım" heading (now "Kişisel bağlantı gruplarım") and expects
+  a Disabled OR source; not run.
 - Fixed: MudBlazor 6 buttons and button-links showed keyboard focus only as a faint tint on the OR list/detail, In Use and both Jira
   dialogs; scoped `.razor.css` now draws a 2 px `--so-accent` ring. `JiraRetryDialog` had no accessible name (its title had no id for the
   `_Host` bridge). In Use step 4 shows a closed completion as "Onay düğmesi kapalı." plus the server's explanation and links it to the
   button with `aria-describedby`. Tests: `Th12UiAcceptanceTests`; `OperationalRecordListRenderTests` ignores the new scope attribute.
-- Still open (shell, not changed here): the brand link and the account-menu trigger have no focus ring.
+- Shell: the brand link and the account-menu trigger had no focus ring; resolved in #58.
 - Evidence: `artifacts/th12-ui-acceptance-20261013/` (synthetic data only).
+- Windows LocalDB journeys, 2026-10-14 (master `f3788fa`, Windows 11, SDK 9.0.317, Chrome headless, Release publish of Api/Ui/Worker, loopback,
+  synthetic data; test-owned databases with `th12` in the name, all dropped afterwards; local only, not IIS, not corporate TEST):
+  - Passed: `sdm-jira-only`, `sdm-jira-negative` (with `sdm-fault-proxy`), `inuse-v2-review` (needs `-InUseExecutionFixture`, the Worker and the Hangfire
+    schema installed by hand because the host script keeps `PrepareSchema=false`), `inuse-v2-outcomes` (after the `InUseExecution` SQL tests).
+    `sdm-jira-only` needs the SDM evaluation rows that `ResourceSqlTests` create (`Test-ResourceCatalogueSql.ps1 -RunTests`).
+  - Failed, stale test: `sdm-journey` waits for the heading "Jira aktarımı" (the panel is now "Önizleme ve işlem" since TH-9) and for the text
+    "SDM kategori politikası onaylanmadı." (no longer in the UI). The script was last touched 2026-09-07. Needs a rewrite; not changed here.
+  - Failed, probable product gap: `inuse-rc626-repair` stops in the reviewer-assignment dialog. The MudBlazor 6 `MudSelect` "İnceleyici" renders a
+    `div tabindex=0` with a hidden input: no `combobox` role, `getByLabel` finds nothing (the label's `for` points at no element), and the options
+    have no `option` role. Screen readers and role-based tests cannot name or drive it. Everything before that step (answers, themes, reflow) ran.
+    Not fixed here; other `MudSelect`s probably share the pattern. The script also needs `playwright/test` (`expect`), but only `playwright-core`
+    is installed; a scratch shim stood in for the nine `expect` calls, so this was not a stock run. Native-zoom mode (`WASAS_NATIVE_ZOOM`) was not run.
+  - Not run: `sdm-milestone` (stale), native 200 % zoom of the In Use journeys, IIS, corporate TEST. One `ResourceSqlTests` case
+    (`AccessBundles_PreserveRights_PageDecisions_ImpactAndConcurrentGuards`) failed during seeding; its cause was not investigated.
+  - LocalDB note: the shared `SecureOpsResourcesV1` instance repeatedly stopped answering (orphaned `sqlservr` shown as Stopped) during the run;
+    killing that instance's own process and restarting it restored it.
 
 ## gMSA change plan UI (d, PR 3), 2026-10-12
 
