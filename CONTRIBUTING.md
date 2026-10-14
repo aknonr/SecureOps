@@ -40,18 +40,18 @@ SQL Server in Docker (arm64 runs it under emulation) can help you read and try S
 - **Shared files:** the OpenAPI snapshot `docs/contracts/secureops-api-v1.openapi.json` — only *append* your new entries (never commit a regenerated, reordered file). **Migration and ADR numbers:** request one in `WORK-LOG.md` and wait for the owner to write it back before using it.
 - **Keep your branch current with a MERGE** of `master` (`git fetch && git merge origin/master`). No rebase, no force-push. Re-run verification after each merge; an old green is not evidence.
 - **Commits:** subject with area prefix (`[UI] …`, `[Docs] …`, `[Phase 1] …`), never a broken build. If an AI agent helped, end the message with its attribution trailer, e.g. `Co-Authored-By: Claude <noreply@anthropic.com>` (use the exact line your tool produces).
-- **PR:** push your branch, open a PR against `master` using the template below. At least one owner approval is required; only the owner merges. Do not merge your own PR.
+- **PR:** push your branch, open a PR against `master`; the template [`.github/pull_request_template.md`](.github/pull_request_template.md) fills in automatically. At least one owner approval is required; only the owner merges. Do not merge your own PR.
+- **Agents work through GitHub:** tasks arrive as issues (label `gorev`), questions go back as issue comments (label `soru`), Windows-only checks are requested with the label `windows-dogrulama`. Full loop: [`docs/team/AGENT-PROTOCOL.md`](docs/team/AGENT-PROTOCOL.md).
 
-### PR description template
+### New to Claude Code? Start here
 
-```
-## What changed
-## Why (issue / ADR / roadmap item)
-## Verification (exact commands, where run, result)
-## Not verified (Windows/IIS, SQL, corporate TEST, screen readers, ...)
-## Docs touched (and ADR if a decision changed)
-## Shared files touched (OpenAPI, migration/ADR number)
-```
+- Start `claude` **inside the repository folder**; that is how it loads `CLAUDE.md` → `AGENTS.md`.
+- One issue per session. Begin with: *"Read AGENTS.md, CLAUDE.md, CONTRIBUTING.md and docs/team/AGENT-PROTOCOL.md, then do issue #N."* Start a new session (or `/clear`) for the next issue.
+- For anything bigger than a small fix, use **plan mode** first; read and approve the plan before code is written.
+- Model: Sonnet by default; Opus (high effort) for security, authorization, SQL or concurrency work.
+- Permission mode: keep the default or accept-edits. **Never** bypass permissions, and never let the agent merge, push to `master` or change repository settings.
+- Read the diff before you push. Ask the agent to end every task with the report format in §7, and to say plainly what it did not verify.
+- Keep a short private note of where you left off (on your Mac, not in the repo) so the next session can resume.
 
 ## 5. Verification gates (all required before asking for review)
 
@@ -80,3 +80,5 @@ End each task with: what changed · how verified (and what not) · docs touched 
 - Mac'te: .NET SDK **9.0.317** (`global.json`), build + birim test + `dotnet format --verify-no-changes`, UI Demo modu. LocalDB SQL testleri, IIS, JEA/WinRM, Windows PowerShell 5.1 ve paketleme sahipte kalır.
 - Bir iş = bir dal = bir PR; `master` dala **merge** ile alınır (rebase/force-push yok); önce Issue + `docs/team/WORK-LOG.md` satırı; migration/ADR numarasını sahip onaylamadan kullanma; OpenAPI anlık görüntüsüne yalnız ekleme.
 - PR'a en az 1 sahip onayı gerekir; merge'ü yalnız sahip yapar.
+- Görevler GitHub issue olarak gelir (`gorev`); takılınca issue'ya `soru` etiketiyle yaz ve bekle; Windows testi gerekiyorsa PR'a `windows-dogrulama` koy. Ayrıntı: `docs/team/AGENT-PROTOCOL.md`.
+- Claude'a yeni başlıyorsan: repo klasöründe başlat, bir issue = bir oturum, büyük işte önce plan modu, varsayılan Sonnet, bypass izni ve merge asla.
