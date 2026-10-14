@@ -16,8 +16,9 @@ Order: `AGENTS.md` → `CLAUDE.md` (Claude Code) → [`docs/agent-guides/000-pro
 ## 3. First-day setup (macOS)
 
 1. Install Git, GitHub CLI (`gh auth login`; **2FA enabled** on your GitHub account) and the **.NET SDK exactly as pinned in [`global.json`](global.json)** (currently 9.0.317, roll-forward disabled; the runtime target stays `net8.0`). Get it from <https://dotnet.microsoft.com/download/dotnet/9.0> (arm64 build on Apple silicon). Any other SDK gives diagnostic evidence only and must be labelled so.
+   **Also install the .NET 8 runtime** (ASP.NET Core Runtime 8.0, same page for 8.0: <https://dotnet.microsoft.com/download/dotnet/8.0>): the projects target `net8.0`, so the SDK 9 builds them but the tests need the 8.0 runtime to run. Do not use roll-forward to run them on 9.0; results from that are not valid.
 2. `git clone https://github.com/aknonr/SecureOps.git && cd SecureOps`
-3. Verify: `dotnet build SecureOps.sln` (0 warnings, 0 errors), then `dotnet test tests/SecureOps.Tests.Unit/SecureOps.Tests.Unit.csproj`. Windows-only tests (`WindowsFact`) skip on Mac; report that, do not hide it.
+3. Verify: `dotnet build SecureOps.sln` (0 warnings, 0 errors), then `dotnet test tests/SecureOps.Tests.Unit/SecureOps.Tests.Unit.csproj`. Windows-only tests (`WindowsFact`) skip on Mac; report that, do not hide it. A few tests are known to fail outside Windows (PowerShell execution policy, Windows paths, image codecs in `AnnouncementTests`); if the unit suite is not green on Mac, list each failing test name in your report instead of changing it, and the owner checks it on Windows.
 4. Run the UI on synthetic data: [`src/SecureOps.Ui/README.md` → *Running locally*](src/SecureOps.Ui/README.md) (Demo profiles). The `dotnet run` commands there work the same in a Mac shell.
 5. Browser journeys (`tests/browser/*.cjs`, Playwright) are optional, loopback and synthetic only; each script has a usage line at the top.
 
