@@ -63,25 +63,41 @@ public sealed class ServiceAccountRoleSqlTests
     {
         await ProbeAsync("svcacct_worker_runtime", async (connection, transaction) =>
         {
+            // SA-010-Worker-permissions.sql (037) adds the web usage scan job rights: job rows SELECT/UPDATE, the 030 evidence tables
+            // SELECT/INSERT, History SELECT/INSERT (owner decision 2026-10-14: the SELECT stays) and audit INSERT. Without it the
+            // reminder-only rights below hold unchanged.
+            bool scanJobs = await connection.QuerySingleAsync<int?>(
+                "SELECT HAS_PERMS_BY_NAME(N'svcacct.UsageScanJobs', 'OBJECT', 'SELECT');", transaction: transaction) == 1;
             await RightsAsync(connection, transaction, "svcacct.Accounts", true, "SELECT");
             await RightsAsync(connection, transaction, "svcacct.WorkRequests", true, "SELECT");
             await RightsAsync(connection, transaction, "svcacct.ReminderOutbox", true, "SELECT", "INSERT", "UPDATE");
             await RightsAsync(connection, transaction, "svcacct.Accounts", false, "INSERT", "UPDATE", "DELETE", "ALTER");
             await RightsAsync(connection, transaction, "svcacct.WorkRequests", false, "INSERT", "UPDATE", "DELETE");
-            await RightsAsync(connection, transaction, "svcacct.History", false, "SELECT", "INSERT", "UPDATE", "DELETE");
+            await RightsAsync(connection, transaction, "svcacct.History", scanJobs, "SELECT", "INSERT");
+            await RightsAsync(connection, transaction, "svcacct.History", false, "UPDATE", "DELETE");
             await RightsAsync(connection, transaction, "svcacct.Evidence", false, "SELECT", "INSERT");
-            await RightsAsync(connection, transaction, "audit.AuditLog", false, "INSERT");
+            await RightsAsync(connection, transaction, "audit.AuditLog", scanJobs, "INSERT");
+            await RightsAsync(connection, transaction, "audit.AuditLog", false, "UPDATE", "DELETE");
             await RightsAsync(connection, transaction, "svcacct.AccountUsages", false, "SELECT", "INSERT", "UPDATE", "DELETE", "ALTER", "CONTROL");
             await RightsAsync(connection, transaction, "svcacct.TeamRoles", false, "SELECT", "INSERT", "UPDATE", "DELETE", "ALTER", "CONTROL");
             foreach (string table in _usageScanTables)
             {
-                await RightsAsync(connection, transaction, "svcacct." + table, false, "SELECT", "INSERT", "UPDATE", "DELETE");
+                bool linked = scanJobs && table != "UsageScanDecisions";
+                await RightsAsync(connection, transaction, "svcacct." + table, linked, "SELECT", "INSERT");
+                await RightsAsync(connection, transaction, "svcacct." + table, false, "UPDATE", "DELETE");
             }
 
             await connection.ExecuteAsync("SELECT TOP (0) Id FROM svcacct.Accounts; SELECT TOP (0) Id FROM svcacct.WorkRequests; "
                 + "UPDATE svcacct.ReminderOutbox SET LeaseOwner = LeaseOwner WHERE 1 = 0;", transaction: transaction);
             Func<Task> readHistory = async () => await connection.ExecuteAsync("SELECT TOP (0) Id FROM svcacct.History;", transaction: transaction);
-            (await readHistory.Should().ThrowAsync<SqlException>()).Which.Number.Should().Be(229);
+            if (scanJobs)
+            {
+                await readHistory.Should().NotThrowAsync();
+            }
+            else
+            {
+                (await readHistory.Should().ThrowAsync<SqlException>()).Which.Number.Should().Be(229);
+            }
         });
     }
 

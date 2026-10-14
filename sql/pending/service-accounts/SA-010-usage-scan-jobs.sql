@@ -95,6 +95,8 @@ GO
 CREATE TRIGGER svcacct.TR_SaScanJobs_Guard ON svcacct.UsageScanJobs AFTER UPDATE, DELETE AS
 BEGIN
     SET NOCOUNT ON;
+    -- An UPDATE or DELETE that touched no row fires the trigger with both tables empty: nothing to guard.
+    IF NOT EXISTS (SELECT 1 FROM deleted) RETURN;
     IF NOT EXISTS (SELECT 1 FROM inserted) THROW 51431, 'Usage scan jobs are never deleted.', 1;
     -- A finished job is a closed record; its fixed columns never change after creation.
     IF EXISTS (SELECT 1 FROM deleted d JOIN inserted i ON i.Id = d.Id
@@ -109,6 +111,8 @@ GO
 CREATE TRIGGER svcacct.TR_SaScanJobAccounts_Guard ON svcacct.UsageScanJobAccounts AFTER UPDATE, DELETE AS
 BEGIN
     SET NOCOUNT ON;
+    -- An UPDATE or DELETE that touched no row fires the trigger with both tables empty: nothing to guard.
+    IF NOT EXISTS (SELECT 1 FROM deleted) RETURN;
     IF NOT EXISTS (SELECT 1 FROM inserted) THROW 51432, 'Usage scan job accounts are never deleted.', 1;
     IF EXISTS (SELECT 1 FROM deleted d JOIN inserted i ON i.JobId = d.JobId AND i.AccountId = d.AccountId
                WHERE (d.IsActive = 0 AND i.IsActive = 1) OR i.SearchedName <> d.SearchedName
@@ -119,6 +123,8 @@ GO
 CREATE TRIGGER svcacct.TR_SaScanJobServers_Guard ON svcacct.UsageScanJobServers AFTER UPDATE, DELETE AS
 BEGIN
     SET NOCOUNT ON;
+    -- An UPDATE or DELETE that touched no row fires the trigger with both tables empty: nothing to guard.
+    IF NOT EXISTS (SELECT 1 FROM deleted) RETURN;
     IF NOT EXISTS (SELECT 1 FROM inserted) THROW 51433, 'Usage scan job servers are never deleted.', 1;
     IF EXISTS (SELECT 1 FROM deleted d JOIN inserted i ON i.JobId = d.JobId AND i.ServerName = d.ServerName
                WHERE d.State = 'Done' OR i.Ordinal <> d.Ordinal)
