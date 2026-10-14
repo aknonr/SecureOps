@@ -141,6 +141,17 @@ internal sealed class ServiceAccountSqlFixture
         return id;
     }
 
+    public async Task<Guid> PersonAsync(string name)
+    {
+        var id = Guid.NewGuid();
+        await using SqlConnection connection = Connection();
+        await connection.ExecuteAsync("""
+            INSERT INTO svcacct.People(Id, DisplayName, NormalizedName, VerificationState, CreatedAt, CreatedBy, UpdatedAt, UpdatedBy)
+            VALUES(@id, @name, @key, 'Provisional', SYSUTCDATETIME(), @grantor, SYSUTCDATETIME(), @grantor);
+            """, new { id, name, key = ServiceAccountText.LabelKey(name), grantor = _grantor });
+        return id;
+    }
+
     public async Task GrantAsync(SynUser user, ScopeKind kind, Guid? organization = null, Guid? team = null)
     {
         await using SqlConnection connection = Connection();

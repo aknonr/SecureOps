@@ -444,10 +444,38 @@ public sealed partial class ServiceAccountService
         });
 
         string digest = PreviewDigest(detail.Summary.Id, draft, detail.Summary.Version, request?.Version);
+        Dictionary<Guid, string> visiblePeople = VisiblePeople(detail);
+        items = [.. items.Select(i => i with
+        {
+            Fields = [.. i.Fields.Select(f => _personFields.Contains(f.Name) && Guid.TryParse(f.Value, out Guid person)
+                ? f with { Label = visiblePeople.GetValueOrDefault(person) } : f)]
+        })];
         EventPreview preview = new(digest, items, notRecorded, warnings, readiness, followUps, items.All(i => i.Allowed));
         AccountEventWrite write = new(detail.Summary.Id, kind, on, channel, Guid.Empty, string.Empty, detail.Summary.Version, request?.Id, request?.Version,
             communication, action, references, moveLastReply, create, ownership, draft.CloseRequest is not null);
         return new AccountEventPlan(preview, write);
+    }
+
+    private static readonly HashSet<string> _personFields = ["contactPersonId", "performerPersonId", "personId"];
+
+    /// <summary>
+    /// People the caller already sees in this account detail (owner, request follow-ups and contacts, performers, verifiers, ownership rows,
+    /// mail contacts), by id. The preview labels a person id only from here (G-39): no directory lookup, so nothing new is disclosed.
+    /// </summary>
+    private static Dictionary<Guid, string> VisiblePeople(AccountDetail detail)
+    {
+        IEnumerable<SaRef?> refs = new[] { detail.Summary.OwnerPerson }
+            .Concat(detail.Requests.SelectMany(r => new[] { r.FollowupPerson, r.ContactPerson }))
+            .Concat(detail.Actions.SelectMany(a => new[] { a.PerformerPerson, a.VerifiedByPerson }))
+            .Concat(detail.Ownership.Select(o => o.Person))
+            .Concat(detail.Communications.Select(c => c.ContactPerson));
+        Dictionary<Guid, string> people = [];
+        foreach (SaRef person in refs.OfType<SaRef>())
+        {
+            people.TryAdd(person.Id, person.Label);
+        }
+
+        return people;
     }
 
     private static EventPreviewItem Item(string kind, string operation, Guid? target, string label, string? denied, params (string Name, string? Value)[] fields) =>

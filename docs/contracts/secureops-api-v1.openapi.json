@@ -27484,6 +27484,9 @@
           "version": {
             "type": "string",
             "nullable": true
+          },
+          "verificationReadiness": {
+            "$ref": "#/components/schemas/VerificationReadiness"
           }
         },
         "additionalProperties": false
@@ -33437,6 +33440,9 @@
           "requestedGmsaName": {
             "type": "string",
             "nullable": true
+          },
+          "closeReadiness": {
+            "$ref": "#/components/schemas/CloseReadiness"
           }
         },
         "additionalProperties": false
@@ -35899,6 +35905,22 @@
         },
         "additionalProperties": false
       },
+      "VerificationReadiness": {
+        "type": "object",
+        "properties": {
+          "ready": {
+            "type": "boolean"
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "VerifyActionRequest": {
         "type": "object",
         "properties": {
@@ -37123,6 +37145,10 @@
             "nullable": true
           },
           "value": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
             "type": "string",
             "nullable": true
           }

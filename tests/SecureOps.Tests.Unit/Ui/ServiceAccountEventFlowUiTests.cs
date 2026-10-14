@@ -156,6 +156,21 @@ public sealed class ServiceAccountEventFlowUiTests
     }
 
     [Fact]
+    public void G39_PreviewPersonUsesTheServerLabel_AndVerifyGapsFollowTheForm()
+    {
+        string id = Guid.NewGuid().ToString("D");
+        ServiceAccountEventText.FieldValue(new EventField("performerPersonId", id, "Sentetik Kişi"), Detail(_responsible), []).Should().Be("Sentetik Kişi");
+        ServiceAccountEventText.FieldValue(new EventField("contactPersonId", id), Detail(_responsible), []).Should().Be("Seçilen kişi",
+            "a person the server did not label is never named by the UI");
+
+        VerificationReadiness readiness = new(false, ["EvidenceRequired", "OrRequiredForDeletion"]);
+        ServiceAccountEventText.VerificationGaps(readiness, false).Should().Equal("EvidenceRequired", "OrRequiredForDeletion");
+        ServiceAccountEventText.VerificationGaps(readiness, true).Should().Equal("OrRequiredForDeletion");
+        ServiceAccountEventText.VerificationGaps(null, false).Should().BeEmpty();
+        ServiceAccountEventText.SubCode("ActionVoided").Should().NotBe("ActionVoided");
+    }
+
+    [Fact]
     public void EventProblems_MapToHonestTurkishStates()
     {
         UiProblem stale = UiProblemFactory.FromResponse(409, new ProblemDetailsPayload { Code = "ServiceAccountEventStale" });
