@@ -5,7 +5,8 @@ Tarih: 2026-10-13. Kime: kurulu TEST veritabanından sorumlu DBA. Durum: **hazı
 içermez. Sözleşme: `USAGE-SCAN-JOB-CONTRACT.md`; karar: ADR-0024 R2-4 ve sahip kararı 2026-10-13.
 
 **Sıra:** 030 (kullanım taramaları) uygulanmış olmalı. 036 (SA-009, olay kaydı) master'dadır; 035 ve SA-008 adı OR-2'ye ayrılmıştır. 037 ikisine de bağlı değildir ve
-yalnız 025 ile 030'u ister. Sürüm aracı (`scripts/release/Get-ReleaseSqlPlan.ps1`) 037'yi henüz tanımıyor (açık konu, Codex).
+yalnız 025 ile 030'u ister. Kurulu 032 tabanından paket: `Get-ReleaseSqlPlan.ps1 -UpgradeFromInstalled032Through037`, SSMS
+adımları `docs/release/TEST-033-037-OPERATOR-TR.md` (2026-10-14).
 
 ## Ne uygulanacak
 

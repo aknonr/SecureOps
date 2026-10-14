@@ -4,9 +4,10 @@ Tarih: 2026-10-13. Kime: kurulu TEST veritabanından sorumlu DBA. Durum: **hazı
 şey uygulanmadı.** Uygulama için proje sahibinin ayrı onayı gerekir. Tasarım: `EVENT-GUIDANCE-DESIGN.md` §5.6. Yedeği DBA kendi
 sürecinde alır; bu belge yedek komutu içermez.
 
-**Sıra:** 029 → 030 → 031 → 032 → 033 → 034 → (035, OR-2; ayrı iş, henüz yok) → 036. 036 yalnız 025'e (`svcacct.Accounts`) bağlıdır
+**Sıra:** 029 → 030 → 031 → 032 → 033 → 034 → 035 → 036. 036 yalnız 025'e (`svcacct.Accounts`) bağlıdır
 ve 035'e bağlı değildir; ama paket sırası numara sırasıdır. 035 yokken 036'yı ayrı uygulamak teknik olarak çalışır, sıra kararı
-sahiptedir. Paketleme aracı (`scripts/release/Get-ReleaseSqlPlan.ps1`) 036'yı henüz tanımaz (sahibi ayrı günceller).
+sahiptedir. Kurulu 032 tabanından paket: `Get-ReleaseSqlPlan.ps1 -UpgradeFromInstalled032Through037`, SSMS adımları
+`docs/release/TEST-033-037-OPERATOR-TR.md` (2026-10-14).
 
 ## Ne uygulanacak
 

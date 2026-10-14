@@ -6,8 +6,8 @@ Tasarım: `docs/adr/ADR-0030-service-account-plan-or-creation.md` (**Proposed**,
 yapılandırma varsayılanı kapalı). Yedeği DBA kendi sürecinde alır; bu belge yedek komutu içermez.
 
 **Sıra:** 029 → 030 → 031 → 032 → 033 → 034 → **035** → 036. 035, 033 ve 034'e bağlıdır; 036'ya bağlı değildir (036 da 035'e
-bağlı değildir). 036 daha önce uygulanmışsa 035 sonradan uygulanabilir. Paketleme aracı (`scripts/release/Get-ReleaseSqlPlan.ps1`)
-035'i henüz tanımaz (sahibi ayrı günceller).
+bağlı değildir). 036 daha önce uygulanmışsa 035 sonradan uygulanabilir. Kurulu 032 tabanından
+paket sırası 033 → 037'dir: `Get-ReleaseSqlPlan.ps1 -UpgradeFromInstalled032Through037`; SSMS adımları `docs/release/TEST-033-037-OPERATOR-TR.md` (2026-10-14).
 
 ## Ne uygulanacak
 
