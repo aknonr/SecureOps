@@ -1,0 +1,23 @@
+/* The seven-column table needs about 1340 px. The container (not the viewport) decides, because the
+   drawer shell leaves the content only ~930 px even on a 1280 px window; below that each session is a
+   card and the destructive action stays inside it instead of behind a sideways scroll. */
+.so-session-list { container-type: inline-size; }
+.so-session-cards { display: none; list-style: none; margin: var(--so-space-2) 0 0; padding: 0; gap: var(--so-space-3); }
+
+@container (max-width: 1400px) {
+    .so-session-list > .so-table-scroll { display: none; }
+    .so-session-cards { display: grid; }
+}
+
+.so-session-card { padding: var(--so-space-3) var(--so-space-4); border: 1px solid var(--so-border-soft); border-radius: var(--so-radius-sm); min-width: 0; }
+.so-session-card-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: var(--so-space-2) var(--so-space-3); }
+.so-session-card-head .so-session-user { flex: 1 1 12rem; }
+.so-session-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: var(--so-space-2) var(--so-space-4); margin: var(--so-space-3) 0 0; }
+.so-session-facts > div { min-width: 0; }
+.so-session-facts dt { font-size: 0.8rem; color: var(--so-text-muted); }
+.so-session-facts dd { margin: 0; overflow-wrap: anywhere; }
+.so-session-card-actions { margin-top: var(--so-space-3); }
+.so-session-card-actions ::deep .mud-button-root { min-height: 44px; }
+
+/* MudBlazor 6 marks keyboard focus on buttons only with a faint hover tint (TH-12). */
+.so-page ::deep :is(.mud-button-root, a, summary):focus-visible { outline: 2px solid var(--so-accent); outline-offset: 2px; }

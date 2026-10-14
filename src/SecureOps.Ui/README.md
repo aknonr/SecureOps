@@ -39,6 +39,28 @@ Open UI ↔ API contract gaps: [`docs/26-ui-backend-contract-gaps.md`](../../doc
 Below this point: reference sections (Layout to Testing) and dated handoff logs, kept with their source SHAs and
 evidence paths. Search for the feature or date you need rather than reading top to bottom.
 
+## Access screens at 390 px, 200 % and by keyboard (#67), 2026-10-14
+
+Branch `fix/ui-access-screens-responsive-20261014`. Local run only (macOS, SDK 9.0.317 from `global.json`, Playwright Chromium 156 headless):
+Demo API with `Access__RepositoryProvider=InMemory`, UI on HTTPS. The paged user and request endpoints are SQL-only (503 on InMemory), so those two
+lists were measured through a loopback test proxy with synthetic data (inside `access-screens-responsive.cjs`). Not Windows/IIS, not corporate TEST,
+not SQL data.
+
+- Aktif Oturumlar: the 7-column table needed ~1340 px while the shell leaves ~930 px at 1280, so "Oturumu Sonlandır" sat outside the viewport even on
+  desktop. Below a container width of 1400 px each session is a card (new `Sessions.razor.css`, container query); wide containers keep the table.
+  After a page change focus moves to the list heading and the page is announced (`role=status`); the pager no longer disables itself while loading.
+- Kullanıcılar: the pager stayed under the keyboard user's focus and was removed while loading, so focus fell to `<body>`; it now stays and focus
+  moves to the result count. A bare `span:last-child` rule hid the last role chip and "Son oturum" at ≤ 1000 px; both stay visible. The page count
+  uses the response's `pageSize` instead of a literal 25; the empty result is a `SoEmptyState`.
+- Erişim Talepleri: focus moves to the list heading after paging and the page is announced; tabs follow the arrow-key pattern, stay focusable while
+  busy (`aria-disabled`), and `aria-selected` is now `"true"/"false"` (Blazor wrote an empty attribute).
+- MudBlazor 6 buttons now draw a 2 px `--so-accent` focus ring on these pages (same fix as TH-12).
+- Tests: `AccessScreensResponsiveRenderTests` (4, server markup); `tests/browser/access-screens-responsive.cjs` (1280 / 640 = 200 % / 390 px, light and dark:
+  no page or inner horizontal scroll, revoke action in view, focus after paging, tab arrows, empty / error / loading at 390).
+- Not done / not verified: real browser zoom (640 px viewport used), screen reader, SQL data, `AccessActionDialog` at 390 px, Windows/IIS. Open, in the
+  global theme and so outside this issue: `.so-badge` text is 3.41:1 in the light theme and a filled primary button label is 4.10:1 in the dark theme
+  (both under 4.5:1; the badge also carries a text label). Gap row for the SQL-only list endpoints: `docs/26`.
+
 ## gMSA OR panel (OR-2, ADR-0030 Proposed, Fake only), 2026-10-13
 
 `SaPlanOperationalRecords` on `/service-accounts/plans/{id}` once the plan has an approval: one card per account (list, not table, for 390 px),

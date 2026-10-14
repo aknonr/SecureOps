@@ -11,9 +11,13 @@
 .so-access-table-head { font-size:13px;font-weight:600;color:var(--mud-palette-text-secondary); }
 .so-access-table-row { color:var(--mud-palette-text-primary);text-decoration:none;font-size:14px; }
 .so-access-table-row:hover,.so-access-table-row:focus-visible { background:var(--mud-palette-action-default-hover);outline:2px solid var(--mud-palette-primary);outline-offset:-2px; }
-.so-access-table-row span { min-width:0;overflow-wrap:anywhere; }
+.so-access-table-row > span { min-width:0;overflow-wrap:anywhere; }
 .so-access-table-row small { display:block;color:var(--mud-palette-text-secondary);font-size:13px; }
 .so-access-pagination { display:flex;align-items:center;justify-content:flex-end;gap:16px;min-height:56px; }
-@media(max-width:1000px) { .so-access-filters { grid-template-columns:1fr 1fr; } .so-access-table-row,.so-access-table-head { grid-template-columns:minmax(160px,2fr) minmax(120px,1fr) minmax(110px,1fr); } .so-access-table-head span:last-child,.so-access-table-row span:last-child { display:none; } }
-@media(max-width:600px) { .so-access-filters { grid-template-columns:1fr;gap:12px; } .so-access-table-head { display:none; } .so-access-table-row { grid-template-columns:minmax(0,1fr) auto;gap:8px; } .so-access-table-row span:nth-child(2) { grid-column:1/-1;grid-row:2;font-size:13px; } }
+/* Direct children only: a bare `span:last-child` also matched the last role chip inside the roles cell and hid it. */
+@media(max-width:1000px) { .so-access-filters { grid-template-columns:1fr 1fr; } .so-access-table-row,.so-access-table-head { grid-template-columns:minmax(160px,2fr) minmax(120px,1fr) minmax(110px,1fr); } .so-access-table-head > span:last-child { display:none; } .so-access-table-row > span:last-child { grid-column:1/-1;font-size:13px;color:var(--mud-palette-text-secondary); } }
+@media(max-width:600px) { .so-access-filters { grid-template-columns:1fr;gap:12px; } .so-access-table-head { display:none; } .so-access-table-row { grid-template-columns:minmax(0,1fr) auto;gap:8px; } .so-access-table-row > span:nth-child(2) { grid-column:1/-1;grid-row:2;font-size:13px; } }
 .so-access-roles { display:flex;flex-wrap:wrap;gap:4px; }
+/* MudBlazor 6 marks keyboard focus on buttons only with a faint hover tint (TH-12). */
+.so-page ::deep :is(.mud-button-root, a):focus-visible { outline:2px solid var(--so-accent);outline-offset:2px; }
+.so-access-count:focus { outline:none; }

@@ -43,12 +43,14 @@
         @if (_problem is not null) { <SoProblemPanel Problem="_problem" OnRetry="LoadAsync" /> }
         @* The server pages users in its own stable order, not by name or last sign-in; say so rather
            than imply an order the list does not have. *@
-        <div aria-live="polite" class="so-access-count">@(_page is null ? "" : $"{_page.Total} eşleşen kullanıcı · sıralama sunucu tarafından belirlenir (ada veya son oturuma göre değildir)")</div>
-        @if (_loading) { <SoLoading Message="Kullanıcılar yükleniyor" Bare="true" /> }
-        else if (_page?.Items.Count == 0) { <p>Eşleşen kullanıcı yok.</p> }
+        <div aria-live="polite" class="so-access-count" tabindex="-1" @ref="_count">@(_loading && _page is not null ? "Kullanıcılar yükleniyor…" : _page is null ? "" : $"{_page.Total} eşleşen kullanıcı · sıralama sunucu tarafından belirlenir (ada veya son oturuma göre değildir)")</div>
+        @if (_loading && _page is null) { <SoLoading Message="Kullanıcılar yükleniyor" Bare="true" /> }
+        else if (_page?.Items.Count == 0) { <SoEmptyState Title="Eşleşen kullanıcı yok" Description="Arama ölçütlerini değiştirip yeniden deneyin." Icon="@Icons.Material.Outlined.NoAccounts" /> }
         else if (_page is not null)
         {
-            <div class="so-access-table" role="table" aria-label="Kullanıcılar">
+            @* The list and its pager stay in the DOM while a page loads: removing the pager under a
+               keyboard user's focus drops focus to <body>. *@
+            <div class="so-access-table" role="table" aria-label="Kullanıcılar" aria-busy="@(_loading ? "true" : "false")">
                 <div class="so-access-table-head" role="row"><span role="columnheader">Kullanıcı</span><span role="columnheader">Roller</span><span role="columnheader">Durum</span><span role="columnheader">Son oturum</span></div>
                 @foreach (AccessUserResponse user in _page.Items)
                 {
@@ -66,8 +68,8 @@
             </div>
             <nav class="so-access-pagination" aria-label="Kullanıcı sayfaları">
                 <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" title="Önceki sayfa" aria-label="Önceki sayfa" Disabled="@(Page <= 1)" OnClick="() => GoPage(Page - 1)" />
-                <span>@Page / @Math.Max(1, (int)Math.Ceiling(_page.Total / 25d))</span>
-                <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" title="Sonraki sayfa" aria-label="Sonraki sayfa" Disabled="@(Page * 25L >= _page.Total)" OnClick="() => GoPage(Page + 1)" />
+                <span>@Page / @PageCount(_page)</span>
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" title="Sonraki sayfa" aria-label="Sonraki sayfa" Disabled="@(Page * (long)Math.Max(1, _page.PageSize) >= _page.Total)" OnClick="() => GoPage(Page + 1)" />
             </nav>
         }
     }
@@ -84,6 +86,8 @@
     private UiProblem? _problem;
     private string? _search, _status, _role;
     private bool _loading;
+    private bool _focusCount;
+    private ElementReference _count;
     private int _generation;
     private readonly CancellationTokenSource _lifetime = new();
     protected override void OnInitialized() => AccessProvider.Changed += OnAccessChanged;
@@ -111,7 +115,22 @@
         finally { if (generation == _generation) { _loading = false; } }
     }
     private void ApplyFilters() => Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?> { ["q"] = _search, ["status"] = _status, ["role"] = _role, ["page"] = 1 }));
-    private void GoPage(int page) => Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("page", page));
+    // The pager is the keyboard user's position; after a page change put it on the result count.
+    private void GoPage(int page)
+    {
+        if (_loading) { return; }
+        _focusCount = true;
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameter("page", page));
+    }
+    private static int PageCount(AccessPage<AccessUserResponse> page) => Math.Max(1, (int)Math.Ceiling(page.Total / (double)Math.Max(1, page.PageSize)));
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusCount && !_loading && _page is not null)
+        {
+            _focusCount = false;
+            await _count.FocusAsync();
+        }
+    }
     private string DetailLink(Guid id) => $"access/users/{id}?returnTo={Uri.EscapeDataString("/access/users" + new Uri(Navigation.Uri).Query)}";
     private static string RoleName(AccessRoleDefinition role) => role.Name == role.Code ? AccessLabels.RoleLabel(role.Code) : role.Name;
     private void OnAccessChanged() => _ = InvokeAsync(async () => { await LoadAsync(); StateHasChanged(); });
