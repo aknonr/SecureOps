@@ -1,0 +1,5 @@
+/* MudBlazor 6 marks keyboard focus on buttons and button-links only with a faint hover tint (TH-12). */
+.so-page ::deep :is(.mud-button-root, a):focus-visible {
+    outline: 2px solid var(--so-accent);
+    outline-offset: 2px;
+}

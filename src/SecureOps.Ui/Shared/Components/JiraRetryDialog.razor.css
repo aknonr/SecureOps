@@ -30,3 +30,14 @@
     overflow-wrap: anywhere;
     font-size: 0.85rem;
 }
+
+/* The wrapper only anchors the focus rule (TH-12); display: contents keeps MudBlazor's action row, and the
+   8 px button spacing MudBlazor gives direct children is restated because the buttons are no longer direct children. */
+.so-dialog-actions { display: contents; }
+
+.so-dialog-actions ::deep .mud-button-root + .mud-button-root { margin-inline-start: 8px; }
+
+.so-dialog-actions ::deep .mud-button-root:focus-visible {
+    outline: 2px solid var(--so-accent);
+    outline-offset: 2px;
+}

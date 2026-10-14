@@ -16,9 +16,9 @@ public static class JiraIssueLink
         int separator = issueKey.LastIndexOf('-');
         return separator > 0
             && separator < issueKey.Length - 1
-            && issueKey[..separator].All(character => char.IsAsciiLetterUpper(character) || char.IsDigit(character))
+            && issueKey[..separator].All(character => char.IsAsciiLetterUpper(character) || char.IsAsciiDigit(character))
             && char.IsAsciiLetterUpper(issueKey[0])
-            && issueKey[(separator + 1)..].All(char.IsDigit);
+            && issueKey[(separator + 1)..].All(char.IsAsciiDigit);
     }
 
     /// <summary>
