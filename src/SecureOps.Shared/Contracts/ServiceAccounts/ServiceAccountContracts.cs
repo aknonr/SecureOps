@@ -70,6 +70,7 @@ public sealed record OwnershipView(Guid Id, SaRef? Team, SaRef? Person, string S
 /// <summary>
 /// Request (expected work) row; each open request is shown separately. <c>RequestedGmsaName</c> is the gMSA name the
 /// conversion will use (gMSA work types only; null when none is recorded or migration 031 is not applied).
+/// <c>CloseReadiness</c> is an open request's Completed close readiness from the close rule's single source (G-39); null on closed requests.
 /// </summary>
 public sealed record RequestView(
     Guid Id,
@@ -95,9 +96,12 @@ public sealed record RequestView(
     string? LegacyDisplayId,
     string? CloseReason,
     string Version,
-    string? RequestedGmsaName = null);
+    string? RequestedGmsaName = null,
+    CloseReadiness? CloseReadiness = null);
 
-/// <summary>Action row: plan, reported action and verification on one identity.</summary>
+/// <summary>
+/// Action row: plan, reported action and verification on one identity. <c>VerificationReadiness</c> is set on unverified actions only (G-39).
+/// </summary>
 public sealed record ActionView(
     Guid Id,
     Guid AccountId,
@@ -122,7 +126,18 @@ public sealed record ActionView(
     string? SourceNote,
     IReadOnlyList<SaExternalRef> References,
     string? LegacyDisplayId,
-    string Version);
+    string Version,
+    VerificationReadiness? VerificationReadiness = null);
+
+/// <summary>
+/// Why an action can or cannot be verified now, from the verify command's own rule (<c>EvaluateVerification</c>, G-39). Information only:
+/// the reader is taken as the verifier, a verification note or file typed at verify time counts as evidence, and the two date checks
+/// (VerificationBeforeAction, DateInFuture) run only when the verify command receives the date.
+/// </summary>
+/// <param name="Ready">True when nothing is missing (the verify form still needs a valid date).</param>
+/// <param name="Missing">Rule codes in the verify command's order: ActionVoided, ActionNotPerformed, ActualDateRequired, EvidenceRequired (a note or file is
+/// needed in the form), OrRequiredForDeletion.</param>
+public sealed record VerificationReadiness(bool Ready, IReadOnlyList<string> Missing);
 
 /// <summary>Communication row with its linked accounts.</summary>
 public sealed record CommunicationView(

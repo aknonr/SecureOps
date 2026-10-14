@@ -1,0 +1,6 @@
+/* MudBlazor 6 marks keyboard focus on buttons and button-links only with a faint hover tint, which is not
+   a visible focus indicator (TH-12). The ring uses the same accent token as the submission panel. */
+.so-request-review ::deep :is(.mud-button-root, a):focus-visible {
+    outline: 2px solid var(--so-accent);
+    outline-offset: 2px;
+}

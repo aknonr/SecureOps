@@ -30,8 +30,54 @@ public sealed partial class ServiceAccountService
         }
 
         AccountDetail? detail = await repository.AccountDetailAsync(id, Today, cancellationToken);
-        return detail is null ? SaResult<AccountDetail>.Fail(SaErrors.NotFound)
-            : await WithRulesAsync(detail with { Permissions = Permissions(caller, anchor.Anchor, detail.Requests) }, cancellationToken);
+        if (detail is null)
+        {
+            return SaResult<AccountDetail>.Fail(SaErrors.NotFound);
+        }
+
+        detail = WithVerificationReadiness(await WithCloseReadinessAsync(detail, cancellationToken));
+        return await WithRulesAsync(detail with { Permissions = Permissions(caller, anchor.Anchor, detail.Requests) }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Adds each unverified action's verification readiness (G-39) from <see cref="ServiceAccountRules.EvaluateVerification"/> on the same
+    /// facts the verify command builds: the reader as verifier, the recorded evidence note only, no date yet.
+    /// </summary>
+    private AccountDetail WithVerificationReadiness(AccountDetail detail) =>
+        detail with
+        {
+            Actions = [.. detail.Actions.Select(a => a.Result == nameof(ServiceAccountActionResult.Verified) ? a : a with
+            {
+                VerificationReadiness = ReadinessOf(ServiceAccountRules.EvaluateVerification(Facts(a), null, true, !string.IsNullOrWhiteSpace(a.EvidenceNote), Today))
+            })]
+        };
+
+    private static VerificationReadiness ReadinessOf(IReadOnlyList<string> missing) => new(missing.Count == 0, missing);
+
+    /// <summary>
+    /// Adds each open request's Completed close readiness (G-39): one batched read of the same close facts the close command reads,
+    /// evaluated by <see cref="ServiceAccountRules.EvaluateClose"/>. Information only; the close command revalidates.
+    /// </summary>
+    private async Task<AccountDetail> WithCloseReadinessAsync(AccountDetail detail, CancellationToken cancellationToken)
+    {
+        if (!detail.Requests.Any(r => r.Status == nameof(ServiceAccountRequestStatus.Open)))
+        {
+            return detail;
+        }
+
+        IReadOnlyDictionary<Guid, (ServiceAccountRequestStatus Status, ServiceAccountActionType Type, IReadOnlyList<ActionFacts> Actions, bool OwnershipConfirmed)> facts =
+            await repository!.OpenRequestCloseFactsAsync(detail.Summary.Id, cancellationToken);
+        return detail with
+        {
+            Requests = [.. detail.Requests.Select(r => facts.TryGetValue(r.Id,
+                    out (ServiceAccountRequestStatus Status, ServiceAccountActionType Type, IReadOnlyList<ActionFacts> Actions, bool OwnershipConfirmed) f)
+                ? r with
+                {
+                    CloseReadiness = CloseReadinessView(f.Status, ServiceAccountCloseOutcome.Completed,
+                        ServiceAccountRules.EvaluateClose(f.Status, f.Type, ServiceAccountCloseOutcome.Completed, null, f.Actions, f.OwnershipConfirmed))
+                }
+                : r)]
+        };
     }
 
     /// <summary>

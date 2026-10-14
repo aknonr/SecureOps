@@ -171,7 +171,8 @@ public static class ServiceAccountEventText
                 DateOnly.TryParseExact(value, "yyyy-MM-dd", out DateOnly date) ? ServiceAccountUiText.Date(date) : value,
             "contactTeamId" or "performerTeamId" or "targetTeamId" or "teamId" =>
                 Guid.TryParse(value, out Guid team) ? teams.FirstOrDefault(t => t.Id == team)?.Name ?? "Seçilen ekip" : value,
-            "contactPersonId" or "performerPersonId" or "personId" => "Seçilen kişi",
+            // The server labels only people the caller already sees in this account (G-39); otherwise it stays generic.
+            "contactPersonId" or "performerPersonId" or "personId" => string.IsNullOrWhiteSpace(field.Label) ? "Seçilen kişi" : field.Label,
             "requestId" => Guid.TryParse(value, out Guid request) ? detail.Requests.FirstOrDefault(r => r.Id == request)?.ActionLabel ?? "Seçilen talep" : value,
             "meaningfulReply" => value == "True" ? "Evet" : "Hayır",
             "providerMessageId" => "Var",
@@ -266,6 +267,13 @@ public static class ServiceAccountEventText
         "GiveReason" => "Gerekçe yazın.",
         _ => string.Empty
     };
+
+    /// <summary>
+    /// The server's verification readiness codes (G-39) still open in the verify form: EvidenceRequired is dropped once the form carries a
+    /// note or a file, since that is the evidence the verify command counts. The date checks stay the server's at submit time.
+    /// </summary>
+    public static IReadOnlyList<string> VerificationGaps(VerificationReadiness? readiness, bool evidenceTyped) =>
+        [.. (readiness?.Missing ?? []).Where(c => !(evidenceTyped && c == "EvidenceRequired"))];
 
     /// <summary>The visible "why not" lines of a readiness, without the reason line once a reason is typed (it is written at close time).</summary>
     public static IReadOnlyList<CloseMissing> Blocking(CloseReadiness readiness, bool reasonTyped) =>

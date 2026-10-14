@@ -415,6 +415,32 @@ public sealed class ServiceAccountEventSqlTests
         return [.. await connection.QueryAsync<string>("SELECT Action FROM audit.AuditLog WHERE CorrelationId = @c ORDER BY AuditLogId;", new { c = fx.Context.CorrelationId })];
     }
 
+    [ServiceAccountSqlFact]
+    public async Task Preview_LabelsOnlyPeopleAlreadyVisibleInTheDetail_NeverLooksUpTheDirectory()
+    {
+        (ServiceAccountSqlFixture fx, SynUser coordinator, Guid org) = await SetupAsync();
+        AccountDetail account = await CreateAccountAsync(fx, coordinator, org, "PLBL");
+        Guid accountId = account.Summary.Id;
+        Guid known = await fx.PersonAsync("SYN Görünen Kişi " + fx.Suffix), unknown = await fx.PersonAsync("SYN Görünmeyen Kişi " + fx.Suffix);
+        account = Ok(await fx.Service.CreateRequestAsync(coordinator.Principal, fx.Context, accountId, new CreateWorkRequest("PasswordChange"), _token));
+        Guid request = account.Requests.Single().Id;
+        account = Ok(await fx.Service.ReportActionAsync(coordinator.Principal, fx.Context, accountId,
+            new ReportActionRequest("PasswordChange", "Planned", "Intermediate", request, PerformerPersonId: known), _token));
+
+        EventDraft draft = new("PasswordChanged", _on, "DateOnly", "Mail", account.Summary.Version, request,
+            Communication: new EventCommunication(ContactPersonId: unknown, Summary: "Sentetik bildirim"),
+            Action: new EventAction(PerformerPersonId: known));
+        EventPreview preview = Ok(await fx.Service.PreviewEventAsync(coordinator.Principal, fx.Context, accountId, draft, _token));
+        EventField performer = preview.Items.Single(i => i.Kind == "Action").Fields.Single(f => f.Name == "performerPersonId");
+        performer.Value.Should().Be(known.ToString("D"));
+        performer.Label.Should().Be("SYN Görünen Kişi " + fx.Suffix, "the performer is already shown in the account detail");
+        EventField contact = preview.Items.Single(i => i.Kind == "Communication").Fields.Single(f => f.Name == "contactPersonId");
+        contact.Value.Should().Be(unknown.ToString("D"));
+        contact.Label.Should().BeNull("a person the detail does not show is never looked up for a name");
+        preview.Items.SelectMany(i => i.Fields).Where(f => f.Name is not ("contactPersonId" or "performerPersonId" or "personId"))
+            .Should().OnlyContain(f => f.Label == null);
+    }
+
     private static string? Field(EventPreviewItem item, string name) => item.Fields.Single(f => f.Name == name).Value;
 
     private static async Task<(ServiceAccountSqlFixture Fx, SynUser Coordinator, Guid Org)> SetupAsync(string? connection = null)

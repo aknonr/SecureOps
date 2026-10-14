@@ -67,6 +67,10 @@
                 </MudItem>
                 <MudItem xs="12"><MudTextField @bind-Value="_note" Label="Doğrulama notu / kanıt açıklaması" MaxLength="2000" Lines="2" Variant="Variant.Outlined" /></MudItem>
             </MudGrid>
+            @if (VerificationGaps(target) is { Count: > 0 } verifyGaps)
+            {
+                <p class="so-panel-text--sm mt-1" role="status">Sunucunun doğrulama kuralına göre bu kayıtta eksik olan: @string.Join(" ", verifyGaps.Select(ServiceAccountEventText.SubCode))</p>
+            }
             @if (ClosureGaps(target) is { Count: > 0 } targetGaps)
             {
                 <p class="so-panel-text--sm mt-1">Talebin kapanması için sunucunun bu kayıtta eksik bulduğu: @string.Join(" ", targetGaps.Select(ServiceAccountEventText.SubCode)) Doğrulamada tarih, doğrulayan ve kanıtı birlikte girin.</p>
@@ -186,6 +190,9 @@
     /// <summary>Sub-codes the server's close rule reports for this action as the closest closure candidate (empty when none).</summary>
     private IReadOnlyList<string> ClosureGaps(ActionView action) =>
         [.. Readiness.Values.SelectMany(r => r.Missing).Where(m => m.RelatedActionId == action.Id).SelectMany(m => m.SubCodes ?? []).Distinct()];
+
+    private IReadOnlyList<string> VerificationGaps(ActionView action) =>
+        ServiceAccountEventText.VerificationGaps(action.VerificationReadiness, !string.IsNullOrWhiteSpace(_note) || _evidenceId is not null);
 
     private Task VerifyAsync() => _verifiedOn is null ? Task.CompletedTask : OnCommand.InvokeAsync(new SaCommand(HttpMethod.Post, $"/actions/{_target!.Id}/verify",
         new VerifyActionRequest(_target.Version, ServiceAccountUiText.ToDate(_verifiedOn)!.Value, _verifier, string.IsNullOrWhiteSpace(_note) ? null : _note.Trim(), _evidenceId)));

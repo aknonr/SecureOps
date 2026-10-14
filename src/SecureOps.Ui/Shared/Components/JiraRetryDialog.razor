@@ -17,7 +17,7 @@
             <span class="so-dialog-icon so-dialog--grant" aria-hidden="true">
                 <MudIcon Icon="@Icons.Material.Filled.RestartAlt" />
             </span>
-            <span data-sdm-dialog-title>Aktarımı Yeniden Dene</span>
+            <span id="@_titleId" data-sdm-dialog-title>Aktarımı Yeniden Dene</span>
         </div>
     </TitleContent>
 
@@ -95,16 +95,21 @@
     </DialogContent>
 
     <DialogActions>
-        <MudButton OnClick="Cancel" Variant="Variant.Text">Vazgeç</MudButton>
-        <MudButton OnClick="Confirm" Variant="Variant.Filled" Color="Color.Primary"
-                   Disabled="@(!_acknowledged || Refused)" aria-describedby="@_hintId"
-                   StartIcon="@Icons.Material.Filled.RestartAlt">
-            Yeniden Dene
-        </MudButton>
+        @* display: contents; only gives the scoped focus rule an anchor around MudBlazor's buttons. *@
+        <div class="so-dialog-actions">
+            <MudButton OnClick="Cancel" Variant="Variant.Text">Vazgeç</MudButton>
+            <MudButton OnClick="Confirm" Variant="Variant.Filled" Color="Color.Primary"
+                       Disabled="@(!_acknowledged || Refused)" aria-describedby="@_hintId"
+                       StartIcon="@Icons.Material.Filled.RestartAlt">
+                Yeniden Dene
+            </MudButton>
+        </div>
     </DialogActions>
 </MudDialog>
 
 @code {
+    // The _Host bridge names the dialog from this id; without it the dialog had no accessible name.
+    private readonly string _titleId = "jira-retry-" + Guid.NewGuid().ToString("N");
     private readonly string _hintId = "jira-retry-ack-" + Guid.NewGuid().ToString("N");
     private bool _acknowledged;
 

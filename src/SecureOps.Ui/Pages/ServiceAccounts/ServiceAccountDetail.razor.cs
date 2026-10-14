@@ -91,15 +91,21 @@ public partial class ServiceAccountDetail
     });
 
     /// <summary>
-    /// Why each open request can or cannot be closed as Completed, from the server's close rule (close-readiness route). A hint only:
-    /// a request whose answer failed simply shows no hint, and the close command is still decided by the server.
+    /// Why each open request can or cannot be closed as Completed, from the server's close rule. The account detail carries it on each
+    /// open request (G-39); only a request without it (an older API) is read from the close-readiness route. A hint only: a request whose
+    /// answer failed simply shows no hint, and the close command is still decided by the server.
     /// </summary>
     private async Task LoadAllReadinessAsync(CancellationToken token)
     {
         Dictionary<Guid, CloseReadiness> map = [];
-        foreach (RequestView request in (_detail?.Requests ?? []).Where(r => r.Status == "Open").Take(_readinessLimit))
+        int routeReads = 0;
+        foreach (RequestView request in (_detail?.Requests ?? []).Where(r => r.Status == "Open"))
         {
-            if (await ReadReadinessAsync(request.Id, "Completed", token) is { } readiness)
+            if (request.CloseReadiness is { } carried)
+            {
+                map[request.Id] = carried;
+            }
+            else if (routeReads++ < _readinessLimit && await ReadReadinessAsync(request.Id, "Completed", token) is { } readiness)
             {
                 map[request.Id] = readiness;
             }
