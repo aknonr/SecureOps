@@ -75,3 +75,16 @@ Beklenen: `Tablo = 3`, `Tetikleyici = 3`, `TekCalisanDizin = 1`, `GuvenilmeyenKi
 - Harness: `-ThroughMigration 36` 037'yi dışarıda bırakır (kurulu sistem benzeri); varsayılan 37 tümünü uygular, SA-010 tekrarının
   reddini, rol betiklerini ve `sa-037-guards.sql`'i (tek etkin iş 2601, belge yalnız Ok ile 547, biten sunucu/iş/hesap
   değişmez 51431–51433, silme yok) dener.
+
+## 2026-10-14 düzeltmeleri (TARAMA-C, ilk Windows SQL koşusundan)
+
+- **Boş UPDATE:** üç koruma tetikleyicisi (`AFTER UPDATE, DELETE`) hiç satıra dokunmayan bir UPDATE'te de çalışıyor ve `inserted` boş
+  olduğu için "never deleted" (51431–51433) fırlatıyordu; iş bitirme yolu (`FinishAsync`) bu yüzden düşüyordu. Her tetikleyicinin başına
+  `IF NOT EXISTS (SELECT 1 FROM deleted) RETURN;` eklendi. Koruma gevşemedi: gerçek silme ve biten satır değişikliği yine reddedilir.
+- **Guard sırası:** biten sunucu satırını belgesiz `Ok` yapmak önce `CK_SaScanJobServers_Document` (547) ile reddedilir;
+  `sa-037-guards.sql` artık bunu 547 bekler ve tetikleyiciyi CHECK'ten geçen bir değişiklikle (`Timeout`, 51433) ayrıca dener; boş UPDATE'in
+  geçtiğini de doğrular.
+- **Worker `svcacct.History` SELECT:** sahip kararı (2026-10-14, koordinatör aktarımı): izin **kalır**. Rol testi
+  (`ServiceAccountRoleSqlTests.WorkerRole_OnlyReminderOperationsAreAllowed`) 037 Worker izinleri uygulanmışsa History SELECT/INSERT ve
+  audit INSERT'i kabul eder, UPDATE/DELETE'i yine reddeder. Bilgi: bugünkü Worker kodu History'ye yalnız `INSERT` yapıyor
+  (`SqlServiceAccountRepository.HistoryAsync`, OUTPUT yok); SELECT'i kullanan bir Worker yolu bulunmadı.

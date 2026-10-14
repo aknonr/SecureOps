@@ -38,11 +38,21 @@ PRINT 'document without Ok refused (547)';
 
 UPDATE svcacct.UsageScanJobServers SET State = 'Done', Status = 'Unreachable', FinishedAt = @now, FinishSeq = 1 WHERE JobId = @job1 AND Ordinal = 1;
 BEGIN TRY
+    -- Ok without a document is refused by CK_SaScanJobServers_Document (547) before the trigger runs.
     UPDATE svcacct.UsageScanJobServers SET Status = 'Ok' WHERE JobId = @job1 AND Ordinal = 1;
+    THROW 51000, 'A finished server row changed to Ok without a document.', 1;
+END TRY
+BEGIN CATCH IF ERROR_NUMBER() <> 547 THROW; END CATCH;
+PRINT 'finished server row cannot become Ok without a document (547)';
+BEGIN TRY
+    -- A change every CHECK allows still reaches the trigger, which keeps a finished row as it is.
+    UPDATE svcacct.UsageScanJobServers SET Status = 'Timeout' WHERE JobId = @job1 AND Ordinal = 1;
     THROW 51000, 'A finished server row changed.', 1;
 END TRY
 BEGIN CATCH IF ERROR_NUMBER() <> 51433 THROW; END CATCH;
 PRINT 'finished server row stays (51433)';
+UPDATE svcacct.UsageScanJobServers SET Status = 'Timeout' WHERE 1 = 0;
+PRINT 'an UPDATE touching no row passes the guard';
 
 UPDATE svcacct.UsageScanJobAccounts SET IsActive = 0, LinkOutcome = 'NotLinked' WHERE JobId = @job1;
 INSERT INTO svcacct.UsageScanJobAccounts(JobId, AccountId, SearchedName, IsActive) VALUES(@job2, @account, N'svc_syn', 1);
