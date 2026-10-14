@@ -63,6 +63,10 @@ public static class ServiceAccountReplies
             SaErrors.IdempotencyKeyReused => (409, "account-event", false, "Bu işlem anahtarı başka bir içerikle kullanılmış; hiçbir kayıt yapılmadı."),
             SaErrors.CloseNotAllowed => (422, "account-event", false, "Talep bu kayıtlarla kapatılamıyor; hiçbir kayıt yapılmadı. Kapatmayı seçmeden yeniden kaydedebilirsiniz."),
             SaErrors.EventsNotInstalled => (503, "account-event-schema", false, "Olay kaydı tabloları (036) bu ortamda kurulu değil; hiçbir kayıt yapılmadı."),
+            SaErrors.UsageScanJobsUnavailable => (503, "usage-scan-job", false, "Web taraması bu ortamda kapalı; hiçbir sunucuya bağlanılmadı."),
+            SaErrors.UsageScanJobsNotInstalled => (503, "usage-scan-job-schema", false, "Web taraması tabloları (037) bu ortamda kurulu değil."),
+            SaErrors.UsageScanAlreadyRunning => (409, "usage-scan-job", false, "Bu hesap için çalışan bir web taraması var; bitmesini bekleyin veya iptal edin."),
+            SaErrors.UsageScanJobState => (409, "usage-scan-job", true, "Tarama bu adım için uygun durumda değil; güncel durumu inceleyin."),
             SaErrors.NotConfigured => (503, "configuration", false, "Servis hesapları modülü bu ortamda etkin değil."),
             SaErrors.DirectoryUnavailable => (503, "directory", true, "Dizin sağlayıcısına şu an ulaşılamıyor."),
             _ => (503, "persistence", true, "Kayıt deposuna şu an ulaşılamıyor.")

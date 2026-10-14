@@ -68,6 +68,14 @@ public static class SaErrors
     public const string IdempotencyKeyReused = "ServiceAccountEventIdempotencyKeyReused";
     /// <summary>The request cannot be closed after these records (missing conditions in <c>current</c>); nothing was written.</summary>
     public const string CloseNotAllowed = "ServiceAccountEventCloseNotAllowed";
+    /// <summary>Web usage scans are off on this host (no collector, fake outside test, or no queue); the field names the reason.</summary>
+    public const string UsageScanJobsUnavailable = "ServiceAccountUsageScanJobsUnavailable";
+    /// <summary>Web usage scan tables (migration 037) are not installed on this database.</summary>
+    public const string UsageScanJobsNotInstalled = "ServiceAccountUsageScanJobsNotInstalled";
+    /// <summary>An account already has a queued or running web usage scan (<c>current.accountId</c>).</summary>
+    public const string UsageScanAlreadyRunning = "ServiceAccountUsageScanAlreadyRunning";
+    /// <summary>The scan is not in the state the command needs (already finished, or still running for a retry).</summary>
+    public const string UsageScanJobState = "ServiceAccountUsageScanJobStateConflict";
 }
 
 /// <summary>Scope inputs loaded for one caller.</summary>

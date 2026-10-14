@@ -81,6 +81,16 @@ internal sealed class ServiceAccountSqlFixture
         new(Repository, _access, Options.Create(new ServiceAccountOptions { Provider = "SqlServer" }), TimeProvider.System, new SafeSqlLogger(SqlDiagnostics),
             directory);
 
+    /// <summary>The same service wired to web usage scan jobs (037) with the given availability and dispatcher.</summary>
+    public ServiceAccountService WithUsageScanJobs(ServiceAccountOptions options,
+        SecureOps.Infrastructure.ServiceAccounts.UsageScans.Jobs.UsageScanJobAvailability availability,
+        SecureOps.Infrastructure.ServiceAccounts.UsageScans.Jobs.IUsageScanJobDispatcher dispatcher) =>
+        new(Repository, _access, Options.Create(options), TimeProvider.System, new SafeSqlLogger(SqlDiagnostics), null,
+            new UsageScanJobServices(Repository, availability, dispatcher));
+
+    /// <summary>Synthetic access repository answering the persisted users of this fixture (for the job runner's starter re-check).</summary>
+    public ApplicationUser? User(Guid id) => _users.Values.FirstOrDefault(u => u.Id == id);
+
     public IConfiguration Configuration { get; }
 
     public SqlServiceAccountRepository Repository { get; }

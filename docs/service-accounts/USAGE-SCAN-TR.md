@@ -8,7 +8,7 @@ dönüşümden sonra "artık gMSA ile mi çalışıyor" kanıtı verir. Örnekle
 
 | Yapar | Yapmaz |
 |---|---|
-| Kişi taramayı kendi yetkisiyle çalıştırır; sistem çıktıyı içe alır ve hesaba bağlar | Sistem sunuculara bağlanmaz, tarama başlatmaz, zamanlanmış tarama yoktur |
+| Kişi taramayı kendi yetkisiyle çalıştırır; sistem çıktıyı içe alır ve hesaba bağlar | Yükleme yolunda sistem sunuculara bağlanmaz; zamanlanmış tarama yoktur (web taraması: aşağıda §0) |
 | Servis/görev/IIS kimliklerini **okur** | Hiçbir şeyi değiştirmez: servis, görev, IIS, dosya, kayıt defteri, hesap, parola |
 | Bulunan bileşenleri listeler; kişi tek tek kullanım kaydına alır | Otomatik kullanım kaydı, otomatik bağlama, otomatik dönüşüm yok (Phase 8) |
 | Taranamayan sunucuyu "bilgi yok" diye gösterir | "Bulunmadı"yı "kullanılmıyor" saymaz; hiçbir sonuç hesabı kapatmaz/serbest bırakmaz/doğrulamaz |
@@ -16,6 +16,21 @@ dönüşümden sonra "artık gMSA ile mi çalışıyor" kanıtı verir. Örnekle
 
 Taramanın göremedikleri: COM+ kimlikleri, kullanıcı hakları (ör. hizmet olarak oturum açma), uygulama/bağlantı dizesi
 içindeki kimlikler, veritabanı oturumları, dosya paylaşımı izinleri, Linux/Oracle sunucuları ve planlanmamış sunucular.
+
+## 0. Webden tarama (2026-10-13; toplayıcı kuruluysa)
+
+Aynı salt okunur taramayı web arayüzünden başlatabilirsiniz: hesap sayfası → **Kullanım taraması** → **Webden tara**, ya da
+listede hesapları seçip **Bu hesapları webden tara**. Sunucu listesini her satıra bir ad olarak yapıştırın (en çok 500; en çok
+20 hesap). İsterseniz beklenen gMSA adını yazın (gMSA kontrol taraması). Tarama Worker hizmetinde, JEA uç noktası üzerinden,
+okuma gMSA'sı ile yapılır; sizin parolanız veya oturumunuz kullanılmaz, sunucuda hiçbir şey değiştirilmez.
+
+- Canlı sayfada her sunucu bir kutucuktur: **Bekliyor → Bağlanıyor → kullanım bulundu / aranan kaynaklarda bulunamadı / bilgi
+  yok** (erişilemedi, uç nokta yok, okuma yetkisi yok, zaman aşımı, yanıt bozuk, çalışmadı). Bulunanlar listeye anında düşer.
+- Hesap başına aynı anda tek web taraması çalışır. Başlatan kişi veya modül yöneticisi iptal edebilir; biten sunucular kanıt
+  olarak kalır. Bitince **yalnız bilgi alınamayan veya kısmi okunan sunucuları yeniden dene** düğmesi çıkar.
+- Bitince sonuç, bu kılavuzun 4. adımındaki yüklemeyle aynı biçimde hesaba bağlanır (`tool = Jea`); 5–7. adımlar aynen geçerlidir.
+- Toplayıcı kurulu değilse panel "Web taraması bu ortamda kapalı" der; o zaman aşağıdaki script yolu kullanılır. Geliştirme/demo
+  ortamında "SAHTE toplayıcı" uyarısı görürseniz hiçbir sunucuya bağlanılmamıştır ve sonuçlar gerçek değildir.
 
 ## 1. Plan
 

@@ -1,0 +1,38 @@
+.sa-wscan-subtitle {
+    margin: 1rem 0 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+/* Account names are long and unbroken; they must wrap at 390 px and 200 % zoom. */
+.sa-wscan-wrap {
+    overflow-wrap: anywhere;
+    min-width: 0;
+}
+
+/* The reason beside a not-ready start button (aria-describedby target). */
+.sa-wscan-why {
+    margin: 0.25rem 0 0;
+}
+
+.sa-wscan-next {
+    border-left: 4px solid var(--so-text);
+    padding-left: var(--so-space-2);
+    margin-top: var(--so-space-2);
+}
+
+.sa-wscan-history {
+    margin: 0;
+    padding-left: var(--so-space-5);
+}
+
+.sa-wscan-history li {
+    margin-bottom: var(--so-space-1);
+    overflow-wrap: anywhere;
+}
+
+::deep .mud-button-root:focus-visible,
+::deep .mud-link:focus-visible {
+    outline: 2px solid var(--so-text);
+    outline-offset: 2px;
+}

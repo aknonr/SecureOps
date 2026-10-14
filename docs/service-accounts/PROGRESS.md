@@ -17,6 +17,19 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
 - Push on the owner's workstation: Git Credential Manager holds two GitHub accounts, so name the owner's:
   `git -c credential.https://github.com.username=aknonr push origin <branch>`.
 
+## Web usage scan, TARAMA-S (branch `feature/service-accounts-web-usage-scan-20261013`, from master `b64068a`, master `e79ac0b` merged in, not merged)
+
+- Owner decision 2026-10-13: the product runs the same read-only scan from the web; Worker is a Windows service; access is
+  direct WinRM + Kerberos + JEA (rules 1 and 3 unchanged). Contract first (`616fa0e`): `USAGE-SCAN-JOB-CONTRACT.md`,
+  `IServiceAccountUsageCollector` + deterministic fake. The Worker JEA runner, service setup and endpoint package are TARAMA-C
+  (Codex, separate branch).
+- Migration 037 (SA-010; SA-008 and 035 are left to OR-2, 036 is SA-009; `DBA-037-TR.md`): job/account/server tables, one active scan per account (filtered unique index),
+  guard triggers, API/Worker grants; harness 001–034, 036, 037 + `sa-037-guards.sql`; errors 51430–51435. Runner on the existing Hangfire queue,
+  lease-fenced; each document validated by the ADR-0027 parser; final evidence in the 030 tables (`tool = Jea`). API: six
+  routes (OpenAPI snapshot: additions only). UI: live page + start panel. Off by default (`Collector=None`).
+- Verified here (Linux cloud, SDK 9.0.317): build 0/0, unit tests, format gate on a CRLF copy, the OpenAPI snapshot test.
+  Not verified: SQL (037, guards, SQL tests), Windows/IIS, browser, real JEA. Report: `TARAMA-S-RAPOR.md`.
+- Open: release selector `Get-ReleaseSqlPlan.ps1` does not know 037 (Codex); 035 belongs to OR-2.
 ## Event guidance UI OLAY-3 (branch `feature/service-accounts-event-guidance-ui-20261013`, from master `4a7ea77`, master `0556459` merged in, not merged)
 
 - Account page: "Bir gelişme mi oldu?" stepped flow (Ne oldu? → Ayrıntılar + optional mail paste → Önizleme "Şunlar kaydedilecek / Kaydedilmeyecek" →

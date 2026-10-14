@@ -60,6 +60,18 @@ public static class ServiceAccountProblems
         "ServiceAccountEventsNotInstalled" => Build(UiProblemKind.NotConfigured, code, "Gelişme bildirme bu ortamda kurulu değil",
             "Olay kaydı için veritabanı güncellemesi (036) uygulanmamış; hiçbir kayıt yapılmadı. İşlemleri İşler sekmesinden ayrı ayrı kaydedebilirsiniz.",
             ["Veritabanı sorumlusu 036'nın uygulanma sırasını DBA kılavuzundan kontrol etmelidir."], false, false),
+        "ServiceAccountUsageScanJobsUnavailable" => Build(UiProblemKind.NotConfigured, code, "Web taraması bu ortamda kapalı",
+            "Sunucu tarafı toplayıcı veya iş kuyruğu yapılandırılmamış; hiçbir sunucuya bağlanılmadı ve tarama başlatılmadı.",
+            ["Taramayı onaylı script ile yapıp çıktısını \"Tarama sonucu yükle\" ile ekleyin."], false, false),
+        "ServiceAccountUsageScanJobsNotInstalled" => Build(UiProblemKind.NotConfigured, code, "Web taraması bu ortamda kurulu değil",
+            "Web taraması için veritabanı güncellemesi (037) uygulanmamış. Tarama başlatılamaz ve okunamaz; hiçbir şey değiştirilmedi.",
+            ["Veritabanı sorumlusu 037'nin uygulanma sırasını DBA-037-TR.md'den kontrol etmelidir."], false, false),
+        "ServiceAccountUsageScanAlreadyRunning" => Build(UiProblemKind.Conflict, code, "Bu hesap için çalışan bir web taraması var",
+            "Hesap başına aynı anda tek web taraması çalışır. Hiçbir yeni tarama başlatılmadı.",
+            ["Çalışan taramanın bitmesini bekleyin veya iptal edin, sonra yeniden başlatın."], false, true),
+        "ServiceAccountUsageScanJobStateConflict" => Build(UiProblemKind.Conflict, code, "Tarama bu adım için uygun durumda değil",
+            "Tarama siz bakarken bitti, iptal edildi ya da hâlâ çalışıyor. Hiçbir şey değiştirilmedi.",
+            ["Güncel durumu inceleyin."], true, true),
         _ => null
     };
 
