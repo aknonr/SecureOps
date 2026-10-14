@@ -23,8 +23,10 @@ if ($IncludeServiceAccounts -and !$UpgradeFromRc626 -and !$UpgradeFromInstalled0
     throw '025 selection requires the reviewed rc6.26/023 upgrade path.'
 }
 if (!$IncludeServiceAccounts -and $SqlUpgradeReview) { throw 'SQL upgrade review requires explicit 025 selection.' }
-$last = if ($through037) { 37 } elseif ($planEvidence) { 34 } elseif ($changePlans) { 33 } elseif ($current) { 32 } elseif ($UpgradeFromInstalled026) { 27 } elseif ($IncludeServiceAccounts) { 26 } else { 24 }
-$first = if ($through037) { 33 } elseif ($planEvidence) { 34 } elseif ($changePlans) { 33 } elseif ($UpgradeFromInstalled027) { 28 } elseif ($UpgradeFromInstalled028) { 29 } elseif ($UpgradeFromInstalled026) { 27 } elseif ($UpgradeFromRc626) { 24 } elseif ($UpgradeFromRc624) { 23 } elseif ($UpgradeFromRc622) { 22 } else { 19 }
+$last = if ($planEvidence) { 34 } elseif ($changePlans) { 33 } elseif ($current) { 32 } elseif ($UpgradeFromInstalled026) { 27 } elseif ($IncludeServiceAccounts) { 26 } else { 24 }
+$first = if ($planEvidence) { 34 } elseif ($changePlans) { 33 } elseif ($UpgradeFromInstalled027) { 28 } elseif ($UpgradeFromInstalled028) { 29 } elseif ($UpgradeFromInstalled026) { 27 } elseif ($UpgradeFromRc626) { 24 } elseif ($UpgradeFromRc624) { 23 } elseif ($UpgradeFromRc622) { 22 } else { 19 }
+# The installed-032 to 037 review is its own range; the single-baseline ladder above stays as published.
+if ($through037) { $first = 33; $last = 37 }
 # A known successor in source does not extend an installed-baseline package; 038+ is never recognized here.
 $successors = @{ 33='033-service-account-change-plans.sql'; 34='034-service-account-plan-evidence.sql'
     35='035-service-account-plan-operational-records.sql'; 36='036-service-account-events.sql'; 37='037-service-account-usage-scan-jobs.sql' }
