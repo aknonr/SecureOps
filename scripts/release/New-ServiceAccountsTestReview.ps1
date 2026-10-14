@@ -8,16 +8,21 @@ param([Parameter(Mandatory)][ValidatePattern('^[A-Za-z]:[\\/]')][string]$OutputD
     [switch]$ApiUiOnly,
     [switch]$UpgradeFromInstalled026,
     [switch]$UpgradeFromInstalled027, [switch]$UpgradeFromInstalled028,
+    [switch]$UpgradeFromInstalled032Through037,
     [Parameter(Mandatory)][string]$SqlUpgradeReview)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $destination = [IO.Path]::GetFullPath($OutputDirectory)
 $current = $UpgradeFromInstalled027 -or $UpgradeFromInstalled028
+$through037 = $UpgradeFromInstalled032Through037
 if ($current -and (!$FromExactSource -or !$ApiUiOnly -or !$ExpectedSource -or $ResumeFailedReview -or $FromVerifiedMaster)) {
     throw '028-032 review requires exact ExpectedSource, API/UI-only, fresh output and FromExactSource.'
 }
-if ($FromExactSource -and !$current) { throw 'Exact-source mode is reserved for explicit installed 027/028 review.' }
+if ($through037 -and (!$FromExactSource -or !$ApiUiOnly -or !$ExpectedSource -or $ResumeFailedReview -or $FromVerifiedMaster)) {
+    throw '033-037 review requires exact ExpectedSource, API/UI-only, fresh output and FromExactSource.'
+}
+if ($FromExactSource -and !$current -and !$through037) { throw 'Exact-source mode is reserved for explicit installed 027/028 or 032 review.' }
 if ($destination.StartsWith($repo + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or $destination -ieq $repo) {
     throw 'Candidate output must be outside the source tree.'
 }
@@ -32,7 +37,8 @@ try {
     $preparation = (& git rev-parse HEAD).Trim()
     $branch = (& git branch --show-current).Trim()
     if ($FromExactSource) {
-        if ($branch -cnotin @('master','fix/release-packaging-028-032-20261007') -or $preparation -cne $ExpectedSource) {
+        $authorized = if ($through037) { @('master','fix/release-sql-033-037-20261014') } else { @('master','fix/release-packaging-028-032-20261007') }
+        if ($branch -cnotin $authorized -or $preparation -cne $ExpectedSource) {
             throw 'Expected authorized branch and exact preparation source.'
         }
         $master = (& git rev-parse origin/master).Trim()
@@ -51,8 +57,8 @@ try {
     & git diff --quiet $TestedProductSource HEAD -- src contracts Directory.Build.props Directory.Build.targets Directory.Packages.props global.json NuGet.config
     if ($LASTEXITCODE -ne 0) { throw 'Product inputs differ from tested source; new verification is required.' }
     if ($UpgradeFromInstalled026 -and (!$FromVerifiedMaster -or !$ApiUiOnly)) { throw '027 review requires exact master and API/UI-only selection.' }
-    $baseline = if ($UpgradeFromInstalled027) { @{ UpgradeFromInstalled027=$true } } elseif ($UpgradeFromInstalled028) { @{ UpgradeFromInstalled028=$true } } elseif ($UpgradeFromInstalled026) { @{ UpgradeFromInstalled026=$true } } else { @{ UpgradeFromRc626=$true } }
-    if (@($UpgradeFromInstalled026,$UpgradeFromInstalled027,$UpgradeFromInstalled028 | Where-Object { $_ }).Count -gt 1) { throw 'Choose exactly one upgrade baseline.' }
+    $baseline = if ($through037) { @{ UpgradeFromInstalled032Through037=$true } } elseif ($UpgradeFromInstalled027) { @{ UpgradeFromInstalled027=$true } } elseif ($UpgradeFromInstalled028) { @{ UpgradeFromInstalled028=$true } } elseif ($UpgradeFromInstalled026) { @{ UpgradeFromInstalled026=$true } } else { @{ UpgradeFromRc626=$true } }
+    if (@($UpgradeFromInstalled026,$UpgradeFromInstalled027,$UpgradeFromInstalled028,$through037 | Where-Object { $_ }).Count -gt 1) { throw 'Choose exactly one upgrade baseline.' }
     $sqlPlan = & "$PSScriptRoot/Get-ReleaseSqlPlan.ps1" -RepositoryRoot $repo @baseline -IncludeServiceAccounts `
         -ExpectedSource $preparation -SqlUpgradeReview $SqlUpgradeReview
     $directories = @('API','UI','manifests','staging/api','staging/ui','payload/api','payload/ui','DBA/sql/migrations','DBA/sql/schema','DBA/sql/pending/service-accounts','configuration')
@@ -106,7 +112,41 @@ try {
     Copy-Item sql/README.md (Join-Path $destination 'DBA/README.md')
     Copy-Item "$PSScriptRoot/configuration/AdminLookupRecovery.delta.xml" (Join-Path $destination 'configuration/recovery.delta.xml')
     $operatorEntry = 'operator/docs/service-accounts/ADMIN-LOOKUP-OPERATOR-CHECKLIST-20261003.md'
-    if ($current) {
+    $ssmsScripts = @()
+    if ($through037) {
+        $operatorEntry = 'operator/docs/release/TEST-033-037-OPERATOR-TR.md'
+        $guidance = @('docs/release/TEST-033-037-OPERATOR-TR.md') + @($sqlPlan.GuidanceFiles | Where-Object { $_ -like '*.md' }) +
+            @('docs/adr/ADR-0029-api-csrf-origin-guard.md','docs/adr/ADR-0030-service-account-plan-or-creation.md')
+        New-Item -ItemType Directory (Join-Path $destination 'DBA/checks') -Force | Out-Null
+        foreach ($check in @($sqlPlan.GuidanceFiles | Where-Object { $_ -like '*.sql' })) {
+            Copy-Item -LiteralPath $check -Destination (Join-Path $destination "DBA/checks/$([IO.Path]::GetFileName($check))")
+        }
+        $inventories = @('scripts/diagnostics/Get-InstalledMigrationInventory025To032.sql','scripts/release/sql/Get-InstalledMigrationInventory033To037.sql')
+        foreach ($inventory in $inventories) { Copy-Item -LiteralPath $inventory -Destination (Join-Path $destination "DBA/$([IO.Path]::GetFileName($inventory))") }
+        # SSMS single files, in the operator order: inventories, then per step pre-check, migration, grants, post-check.
+        $ssmsOrder = @(@{ file='00-envanter-025-032.sql'; title='Envanter 025-032 (salt okunur)'; source=$inventories[0] },
+            @{ file='01-envanter-033-037.sql'; title='Envanter 033-037 (salt okunur)'; source=$inventories[1] })
+        foreach ($step in $sqlPlan.Steps) {
+            $k = [int]$step.migration - 32; $m = $step.migration
+            $ssmsOrder += @{ file="$($k)1-$m-on-kontrol.sql"; title="$m on kontrol (salt okunur)"; source=$step.dbaChecks; phase='pre' }
+            $ssmsOrder += @{ file="$($k)2-$m-uygula.sql"; title="$m migration"; source=$step.execution[0] }
+            $r = 3
+            foreach ($role in @($step.execution | Select-Object -Skip 1)) {
+                $ssmsOrder += @{ file="$($k)$($r)-$m-$([IO.Path]::GetFileName($role))"; title="$m izin adayi $([IO.Path]::GetFileNameWithoutExtension($role))"; source=$role }; $r++
+            }
+            $ssmsOrder += @{ file="$($k)9-$m-son-kontrol.sql"; title="$m son kontrol (salt okunur)"; source=$step.dbaChecks; phase='post' }
+        }
+        foreach ($entry in $ssmsOrder) {
+            $arguments = @{ RepositoryRoot=$repo; SourcePath=$entry.source; OutputPath=(Join-Path $destination "DBA/ssms/$($entry.file)");
+                Title=$entry.title; PreparationSource=$preparation }
+            if ($entry.ContainsKey('phase')) { $arguments.Phase = $entry.phase }
+            $made = & "$PSScriptRoot/ConvertTo-SsmsSingleFile.ps1" @arguments
+            $ssmsScripts += [ordered]@{ file=$entry.file; title=$entry.title; source=$made.source; includes=$made.includes; phase=$made.phase;
+                sha256=$made.sha256; bytes=(Get-Item -LiteralPath $made.path).Length }
+        }
+        [IO.File]::WriteAllText((Join-Path $destination 'DBA/ssms/ssms-scripts.json'),
+            ([ordered]@{ preparationSource=$preparation; sqlcmdModeRequired=$true; scripts=$ssmsScripts } | ConvertTo-Json -Depth 6), [Text.UTF8Encoding]::new($false))
+    } elseif ($current) {
         $operatorEntry = 'operator/docs/release/TEST-028-032-OPERATOR-TR.md'
         $guidance = @('docs/release/TEST-028-032-OPERATOR-TR.md','docs/service-accounts/DBA-029-030-TR.md',
             'docs/access-registration-dba-032.md','docs/adr/ADR-0029-api-csrf-origin-guard.md')
@@ -131,7 +171,7 @@ try {
         [ordered]@{path=$_.FullName.Substring($destination.Length+1).Replace('\','/');bytes=$_.Length;sha256=(Get-FileHash $_.FullName).Hash}
     })
     $sequence = if ($UpgradeFromInstalled026) { @('preserve installed 024-026; verify baseline','027 only if not already satisfied','API grant scripts are existing references, not replay or membership commands') } else { @('024 after verified 023','025 if missing','026 after 025','separate reviewed API/Worker roles and 026 API grants') }
-    if ($current) { $sequence = $sqlPlan.ExecutionFiles }
+    if ($current -or $through037) { $sequence = $sqlPlan.ExecutionFiles }
     $record = [ordered]@{kind='Matched TEST review candidate, not a numbered release';readyForInstallation=$false;
         testedProductSource=$TestedProductSource;preparationSource=$preparation;expectedSource=$ExpectedSource;requiredSchema=$sqlPlan.RequiredSchema;
         sqlReview=$sqlPlan.Review;sqlSequence=$sequence;components=$components;
@@ -139,6 +179,25 @@ try {
         targetChanged=$false;corporateAcceptance='Not executed';payloads=$payloads;supportingFiles=$support;
         exclusions=@('appsettings*.json','web.config','secrets','private evidence','local test outputs','diagnostic package');
         releaseGuard='Numbered release requires the existing combined branch, clean exact ExpectedSource and explicit source-bound 023/024/025/026 SQL review; not run'}
+    if ($through037) {
+        # CVE-2026-70179: both hosts must ship the patched Negotiate handler.
+        $negotiate = foreach ($component in $components) {
+            $lower = $component.ToLowerInvariant()
+            $dll = Join-Path $destination "payload/$lower/Microsoft.AspNetCore.Authentication.Negotiate.dll"
+            $deps = Get-Content -LiteralPath (Join-Path $destination "payload/$lower/SecureOps.$component.deps.json") -Raw | ConvertFrom-Json
+            $library = @($deps.libraries.PSObject.Properties.Name | Where-Object { $_ -like 'Microsoft.AspNetCore.Authentication.Negotiate/*' })
+            $version = (Get-Item -LiteralPath $dll).VersionInfo.ProductVersion
+            if ($library.Count -ne 1 -or $library[0] -cne 'Microsoft.AspNetCore.Authentication.Negotiate/8.0.32' -or !$version.StartsWith('8.0.32+', [StringComparison]::Ordinal)) {
+                throw "$component does not ship Negotiate 8.0.32."
+            }
+            [ordered]@{ component=$component; package=$library[0]; productVersion=$version; sha256=(Get-FileHash -LiteralPath $dll).Hash }
+        }
+        $record.negotiate = @($negotiate)
+        $record.sqlSteps = $sqlPlan.Steps
+        $record.ssmsSequence = @($ssmsScripts | ForEach-Object { "DBA/ssms/$($_.file)" })
+        $record.defaultsOff = [ordered]@{ 'ItsmRequestCreation:Provider'='Disabled'; 'ServiceAccounts:UsageScanJobs:Collector'='None' }
+        $record.workerIncluded = $false
+    }
     [IO.File]::WriteAllText((Join-Path $destination 'candidate.json'), ($record | ConvertTo-Json -Depth 9), [Text.UTF8Encoding]::new($false))
     Write-Output ($payloads | ForEach-Object { [pscustomobject]$_ } | Select-Object component,path,sha256,entrySha256 | ConvertTo-Json)
 } finally { Pop-Location }

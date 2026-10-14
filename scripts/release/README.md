@@ -84,6 +84,43 @@ Use the preserved pre-034 master `e15089a` as that baseline. It compares complet
 028-based and separate 033 plans, exact exported SQL file sets, metadata and bytes,
 then tests explicit 034 selection and refusals. It needs no database connection.
 
+## Installed 032 to 037 Review Candidate (SSMS single files)
+
+`New-ServiceAccountsTestReview.ps1 -FromExactSource -ApiUiOnly -UpgradeFromInstalled032Through037
+-ExpectedSource <clean-preparation-SHA> -TestedProductSource <verified-origin/master-SHA>
+-SqlUpgradeReview <private-review.json> -OutputDirectory <new-directory>` on `master` or the authorized
+`fix/release-sql-033-037-20261014` branch (owner exception 2026-10-14: Claude packages this one). Product inputs
+must equal tested master; API and UI are built from it together. Worker is not packaged.
+
+`Get-ReleaseSqlPlan.ps1 -UpgradeFromInstalled032Through037 -IncludeServiceAccounts` selects migration/schema
+033–037 with includes SA-006…SA-010 as the delta, and the role candidates SA-006, SA-008, SA-009, SA-010 API and
+SA-010 Worker. Execution: 033, SA-006 API, 034, 035, SA-008 API, 036, SA-009 API, 037, SA-010 API, SA-010 Worker.
+`Steps` binds each number to its migration, schema, include, grants, `docs/service-accounts/DBA-0xx-TR.md` and
+`tests/sql/service-accounts/sa-0xx-dba-checks.sql`; `GuidanceFiles` lists those notes and checks. The source must be
+exactly 001–037 with the recognized names; 038+ fails closed for this and every installed baseline. The older
+installed-027/028, separate 033 and separate 034 paths keep their exact plans with 035–037 in source.
+
+The source-bound `wasas.sql-upgrade-review.v1` record requires typed-true `Baseline032Verified`,
+`Inventory025To032Verified`, `Unapplied033To037Verified`, `RuntimeApiRoleVerified`, `RuntimeWorkerRoleVerified`,
+`Delta033Reviewed` … `Delta037Reviewed`, nonempty `InstalledInventoryEvidenceReference` and `Delta033ReviewReference`
+… `Delta037ReviewReference`, and `Files` with the exact Path/Sha256 set of delta, role and guidance files.
+
+TEST has no `sqlcmd` and SSMS did not resolve relative `:r` paths (2026-10-13), so the candidate adds `DBA/ssms/`:
+one file per step from `ConvertTo-SsmsSingleFile.ps1` — the exact source lines with each `:r` inlined, a fixed
+preamble (`:on error exit`, `QUOTED_IDENTIFIER ON`, and a SQLCMD-mode check that turns on `NOEXEC` in normal
+mode), a duplicate-DECLARE-per-batch refusal, UTF-8 BOM and CRLF; identities in `DBA/ssms/ssms-scripts.json`.
+Read-only inventories (`scripts/release/sql/Get-InstalledMigrationInventory033To037.sql` and the 025–032 one) and
+pre/post checks are included. `candidate.json` records `negotiate` (both hosts must ship Negotiate 8.0.32,
+CVE-2026-70179), `sqlSteps`, `ssmsSequence`, `defaultsOff` and `readyForInstallation=false`.
+Operator entry: `docs/release/TEST-033-037-OPERATOR-TR.md`.
+
+Offline tests: `tests/release/Test-ServiceAccount033To037ReviewSelection.ps1 -EvidenceDirectory <fresh>` and
+`tests/release/Test-SsmsSingleFile.ps1 -EvidenceDirectory <fresh> [-PackageDirectory <candidate>]` (re-derives every
+line independently). Local SQL proof: `tests/release/Test-Release037SsmsRehearsal.ps1 -PackageDirectory <candidate>
+-DatabaseSuffix <new>` builds a LocalDB copy at 032 with the module harness, applies the package's SSMS files in
+order with expected check values, runs the harness 033–037 guards, and drops the database. Windows PowerShell 5.1
+needs a short evidence path (MAX_PATH).
+
 ## Admin / Lookup 027 API/UI Review
 
 For this correction, `New-ServiceAccountsTestReview.ps1 -FromVerifiedMaster
