@@ -210,8 +210,10 @@ public sealed class JeaServiceAccountUsageCollectorTests
 
         Dictionary<string, string?> fakeInProduction = new()
         {
-            ["environment"] = "Production", ["JeaRunner:Transport"] = "Fake",
-            ["ServiceAccounts:Provider"] = "SqlServer", ["ServiceAccounts:UsageScanJobs:Collector"] = "Jea"
+            ["environment"] = "Production",
+            ["JeaRunner:Transport"] = "Fake",
+            ["ServiceAccounts:Provider"] = "SqlServer",
+            ["ServiceAccounts:UsageScanJobs:Collector"] = "Jea"
         };
         (string? transport, IServiceAccountUsageCollector? collector, IJeaRunner? jea) = Composition(fakeInProduction);
         transport.Should().BeNull();
@@ -226,8 +228,10 @@ public sealed class JeaServiceAccountUsageCollectorTests
     {
         Dictionary<string, string?> settings = new()
         {
-            ["environment"] = "Test", ["JeaRunner:Transport"] = "Fake",
-            ["ServiceAccounts:Provider"] = "SqlServer", ["ServiceAccounts:UsageScanJobs:Collector"] = "Jea"
+            ["environment"] = "Test",
+            ["JeaRunner:Transport"] = "Fake",
+            ["ServiceAccounts:Provider"] = "SqlServer",
+            ["ServiceAccounts:UsageScanJobs:Collector"] = "Jea"
         };
 
         (string? transport, IServiceAccountUsageCollector? collector, IJeaRunner? jea) = Composition(settings);

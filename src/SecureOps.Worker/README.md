@@ -115,3 +115,24 @@ read-only configuration/readiness inspection and does not query a collection.
 Run only in the approved operator window under the normal effective identity and
 startup overrides. The current Turkish entry contains the procedure; do not run
 legacy scripts as probes or replace the installed Worker with a diagnostic build.
+
+## JEA runner (TARAMA-C, 2026-10-14)
+
+`Jea/` holds the generic read-only JEA runner (`IJeaRunner`, `JeaRunner` + `WsManJeaTransport`, deterministic `FakeJeaRunner`) and the
+service account usage collector (`JeaServiceAccountUsageCollector`, `Kind = "Jea"`, contract
+`docs/service-accounts/USAGE-SCAN-JOB-CONTRACT.md`). Commands exist only in `JeaEndpointCatalog` (one configuration name, one function,
+typed and pattern-checked parameters); no script text, no default endpoint, no credential object: Kerberos authenticates the service
+identity, which is the read gMSA. Per call: open timeout, operation timeout, output size limit; results
+Ok/Unreachable/NoEndpoint/Forbidden/Timeout/Malformed. The WinRM error-code mapping is not yet confirmed on Windows/TEST.
+
+- **Configuration (fail closed).** Nothing is registered unless `JeaRunner:Transport` is usable here (`WsMan` on Windows; `Fake` only
+  in Development/Demo/Test) and, for the collector, `ServiceAccounts:Provider = SqlServer` and
+  `ServiceAccounts:UsageScanJobs:Collector = Jea`. `JeaRunner:UseSsl` (default true, port 5986) / `JeaRunner:Port`.
+- **With Hangfire.** A web scan is one Hangfire job on the existing server and queue (`UsageScanJobRunner`, retries off, SQL lease).
+  It occupies one Hangfire worker for its duration; the per-server parallelism (`MaxParallel`, default 32) is inside that job, not
+  extra Hangfire workers, so other jobs keep the remaining workers. Host shutdown cancels the job token: no new server starts, open
+  calls are abandoned and closed in the background, unreported servers become NotRun and the job ends `workerLost` within the 90 s
+  budget. Remote sessions are never reused between jobs.
+- **Packaging.** No new package: `System.Management.Automation` comes with the existing `Microsoft.PowerShell.SDK` reference; the
+  WinRM client is the operating system's. The endpoint package is not part of the Worker payload; it ships as `scripts/jea/` and is
+  installed per server by its owner. Service registration: `scripts/worker/`.

@@ -14,10 +14,12 @@ Service account usage scan (ADR-0027), run by a person under their own authority
 `service-account-usage-scan-v1` from the collected documents and the planned server list). Operator guide:
 `docs/service-accounts/USAGE-SCAN-TR.md`.
 
-Proposed, **not deployable**: ADR-0024 revision 2 is accepted (owner, 2026-10-06) but Bilgi Güvenliği has not approved the
-role capability and the endpoint registration: `jea/proposed/SecureOps.ServiceAccountUsage/` (one visible function, module, role capability and
-session configuration; the collector above carries its functions verbatim) and the dormant `-UseJeaEndpoint` mode of
-`Invoke-ServiceAccountUsageScan.ps1`.
+JEA endpoint package (ADR-0024 R2), **registered by nobody yet**: `jea/SecureOps.ServiceAccountUsage/` 1.0.0 (one visible
+function, module, role capability and session configuration template; the collector above carries its functions verbatim) with
+`jea/Install-…Endpoint.ps1` / `Uninstall-…Endpoint.ps1`, run once per server by its owner (`jea/README.md`). The Worker calls it
+through its JEA runner (`src/SecureOps.Worker/Jea/`); the person-run dormant `-UseJeaEndpoint` mode of
+`Invoke-ServiceAccountUsageScan.ps1` stays as it was. Worker service registration: `worker/` (gMSA, no password).
+Registration on an installed server needs the owner's approval for that server.
 
 Planned for Phase 1, **not yet present**:
 
