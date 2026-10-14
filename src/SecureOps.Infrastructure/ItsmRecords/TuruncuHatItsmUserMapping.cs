@@ -7,8 +7,9 @@ using SecureOps.Shared.Configuration;
 namespace SecureOps.Infrastructure.ItsmRecords;
 
 /// <summary>
-/// Read-only Turuncu Hat adapter for <see cref="IItsmUserMapping"/> (ADR-0032 and its 2026-10-13 amendment). Each
-/// key is one exact-equality <c>/query</c> on <c>cmn_user</c>: the user-name column or the registration-number column.
+/// Read-only Turuncu Hat adapter for <see cref="IItsmUserMapping"/> (ADR-0032 and its 2026-10-13 and 2026-10-14
+/// amendments). Each key is one exact-equality <c>/query</c> on the active users of <c>cmn_user</c>
+/// (<c>m_active='True'</c>; the source keeps passive users): the user-name column or the registration-number column.
 /// It selects only the user id, the organization id, the home location id and the key column used to verify the
 /// match, and maps every failure to Unknown. It never selects a person name, e-mail or phone number, never returns
 /// the key, and never logs the session, credentials, base URL, user name or registration number.
@@ -43,10 +44,11 @@ public sealed class TuruncuHatItsmUserMapping(
             return ItsmUserMatchResult.Unknown(ItsmRecordLookupReason.InvalidIdentifier, ProviderName);
         }
 
-        // The name passed the allow-list, so it is placed in the filter verbatim; nothing is escaped.
+        // The name passed the allow-list, so it is placed in the filter verbatim, case preserved; nothing is escaped.
+        // The source compares m_username case-sensitively, so the returned value must match ordinally as well.
         return await QueryAsync(new KeyQuery("itsm-user-match", "user name",
-            string.Concat("#%m_username%#='", name, "'"), _userNameSelects, "SET.m_username",
-            returned => string.Equals(returned?.Trim(), name, StringComparison.OrdinalIgnoreCase)), cancellationToken);
+            ActiveUserFilter("m_username", name), _userNameSelects, "SET.m_username",
+            returned => string.Equals(returned?.Trim(), name, StringComparison.Ordinal)), cancellationToken);
     }
 
     /// <inheritdoc />
@@ -59,10 +61,11 @@ public sealed class TuruncuHatItsmUserMapping(
             return ItsmUserMatchResult.Unknown(ItsmRecordLookupReason.InvalidIdentifier, ProviderName);
         }
 
-        // The number passed the digit-only allow-list without leading zeros, so it is placed in the filter verbatim.
-        // The returned value is normalized the same way, so a source that kept leading zeros still verifies.
+        // The number passed the letter-or-digit allow-list and is in the source form, so it is placed in the filter
+        // verbatim. The returned value is brought to the same form, so a source that returns it as a number (without
+        // its leading zeros) still verifies.
         return await QueryAsync(new KeyQuery("itsm-user-match-registration", "registration number",
-            string.Concat("#%c_registration_number%#='", number, "'"), _registrationSelects, "SET.c_registration_number",
+            ActiveUserFilter("c_registration_number", number), _registrationSelects, "SET.c_registration_number",
             returned => string.Equals(ItsmRegistrationNumber.Normalize(returned), number, StringComparison.Ordinal)), cancellationToken);
     }
 
@@ -139,6 +142,10 @@ public sealed class TuruncuHatItsmUserMapping(
         value = string.IsNullOrEmpty(text) ? null : text;
         return text is not { Length: > _maxTextLength };
     }
+
+    // The key value has passed its allow-list; passive users are excluded by the source filter.
+    private static string ActiveUserFilter(string column, string key) =>
+        string.Concat("#%m_active%#='True' AND #%", column, "%#='", key, "'");
 
     private static string Outcome(ItsmUserMatchResult result) => result.Status == ItsmUserMatchStatus.Unknown
         ? "unknown-" + result.Reason.ToString().ToLowerInvariant()

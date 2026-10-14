@@ -10,13 +10,14 @@ namespace SecureOps.Infrastructure.ItsmRecords;
 public interface IItsmUserMapping
 {
     /// <summary>
-    /// Maps an exact user name. An invalid name returns Unknown/InvalidIdentifier without a remote call.
+    /// Maps an exact, case-sensitive user name (the source compares <c>m_username</c> case-sensitively; ADR-0032
+    /// amendment 2026-10-14). An invalid name returns Unknown/InvalidIdentifier without a remote call.
     /// Caller cancellation propagates as <see cref="OperationCanceledException"/>; a dependency timeout is Unknown.
     /// </summary>
     public Task<ItsmUserMatchResult> MatchByUserNameAsync(string? userName, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Maps an exact registration number (leading zeros dropped, see <see cref="ItsmRegistrationNumber"/>). An invalid
+    /// Maps an exact registration number in the source's canonical form (see <see cref="ItsmRegistrationNumber"/>). An invalid
     /// number returns Unknown/InvalidIdentifier without a remote call. The number is a query key only: it is never
     /// returned, logged or recorded in telemetry. Cancellation and timeouts behave as for the user name.
     /// </summary>
@@ -86,7 +87,8 @@ public sealed record ItsmUserMatchResult(
 /// Strict allow-list for the user name sent to the source: 1-64 ASCII letters, digits, dot, underscore or hyphen,
 /// starting with a letter or digit, after trimming outer whitespace. Domain prefixes (<c>\</c>), UPN suffixes
 /// (<c>@</c>), quotes, wildcards, filter markers and inner spaces are rejected, so the value is placed in the
-/// filter verbatim and cannot widen the match.
+/// filter verbatim and cannot widen the match. Case is preserved: the source compares <c>m_username</c>
+/// case-sensitively (ADR-0032 amendment 2026-10-14).
 /// </summary>
 public static class ItsmUserName
 {
@@ -120,33 +122,44 @@ public static class ItsmUserName
 }
 
 /// <summary>
-/// Strict allow-list for the registration number sent to the source (ADR-0032 amendment 2026-10-13): after trimming
-/// outer whitespace, 1-20 ASCII digits. Leading zeros are dropped because the source searches the number without
-/// them; a value of only zeros is rejected. Letters, signs, inner spaces, quotes, wildcards, filter markers and
-/// non-ASCII digits are rejected, so the value is placed in the filter verbatim and cannot widen the match. The
-/// number is personal data used only as a query key; the mapping never returns, logs or stores it.
+/// The Turuncu Hat registration-number rule (ADR-0032 amendment 2026-10-14, the source team's official rule), applied
+/// to the value sent and to the value returned. After trimming outer whitespace the value must be 1-20 ASCII letters
+/// or digits; anything else (inner spaces, signs, quotes, wildcards, filter markers, non-ASCII letters or digits) is
+/// rejected, so the value is placed in the filter verbatim and cannot widen the match. A value that is not all digits
+/// is kept as it is. An all-digit value is brought to the source form: leading zeros are dropped and what remains is
+/// left-padded with zeros to <see cref="CanonicalDigits"/> digits (so shorter numbers are padded, six-digit numbers
+/// keep their leading zeros, longer numbers lose theirs). A value of only zeros is rejected. The number is personal
+/// data used only as a query key; the mapping never returns, logs or stores it.
 /// </summary>
 public static class ItsmRegistrationNumber
 {
-    /// <summary>Maximum accepted digit count, leading zeros included.</summary>
-    public const int MaxDigits = 20;
+    /// <summary>Maximum accepted length, leading zeros included.</summary>
+    public const int MaxLength = 20;
 
-    /// <summary>Returns the digits without leading zeros, or null when the value is not an acceptable registration number.</summary>
+    /// <summary>Digit count an all-digit number is padded to.</summary>
+    public const int CanonicalDigits = 6;
+
+    /// <summary>Returns the source form of the number, or null when the value is not an acceptable registration number.</summary>
     public static string? Normalize(string? value)
     {
-        if (value is null || value.Length > MaxDigits + 16)
+        if (value is null || value.Length > MaxLength + 16)
         {
             return null;
         }
 
         string trimmed = value.Trim();
-        if (trimmed.Length is 0 or > MaxDigits || !trimmed.All(char.IsAsciiDigit))
+        if (trimmed.Length is 0 or > MaxLength || !trimmed.All(char.IsAsciiLetterOrDigit))
         {
             return null;
         }
 
+        if (!trimmed.All(char.IsAsciiDigit))
+        {
+            return trimmed;
+        }
+
         string significant = trimmed.TrimStart('0');
-        return significant.Length == 0 ? null : significant;
+        return significant.Length == 0 ? null : significant.PadLeft(CanonicalDigits, '0');
     }
 }
 
