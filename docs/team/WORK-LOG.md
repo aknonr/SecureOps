@@ -6,7 +6,7 @@ Short claim register for collaborators. It does **not** replace the owner's coor
 
 | Date | Who (GitHub handle) | Branch | Issue | Files / area touched | Status |
 |---|---|---|---|---|---|
-| | | | | | |
+| 2026-10-14 | nurseliii | docs/mac-first-verification-20261014 | #62 | docs/team/WORK-LOG.md (docs only, no code) | PR #65 open; waiting for windows-dogrulama |
 
 ## Number requests
 
