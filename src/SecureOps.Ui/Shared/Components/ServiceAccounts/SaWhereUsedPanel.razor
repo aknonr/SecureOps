@@ -1,0 +1,241 @@
+@* "Hangi sunucularda?": one row per server with what each source says about this account - scans (web or script), the Excel
+   technical findings, manual records and the Active Directory SPN. Evidence only: every source keeps its own badge and date,
+   nothing overwrites another, a conflict is shown as a conflict, and "bulunamadı" is never worded as "kullanılmıyor". An SPN is
+   a definition, not a use. A source that could not be read (no permission, directory down, scan tables missing) says so and
+   never makes the list look complete. The server decides scope, permission and every status; this panel only shows the answer.
+   There is deliberately no way to ask the other way round (server to accounts). *@
+@using SecureOps.Shared.Contracts.ServiceAccounts
+@using SecureOps.Ui.Services.ServiceAccounts
+@inject ServiceAccountApiClient Api
+@implements IDisposable
+
+<section class="so-panel sa-wu" aria-labelledby="sa-wu-title" aria-busy="@(_loading ? "true" : "false")">
+    <div class="so-panel-head">
+        <h2 id="sa-wu-title" class="so-panel-title">Hangi sunucularda?</h2>
+        @if (_view is not null)
+        {
+            <MudButton Size="Size.Small" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" Disabled="_loading" OnClick="@(() => LoadAsync(_view.Page))">Yenile</MudButton>
+        }
+    </div>
+    <p class="so-panel-text--sm">
+        Taramalar, Excel bulguları, elle girilen kayıtlar ve Active Directory SPN tanımları tek listede birleşir. Her kaynak kendi rozeti ve
+        tarihiyle ayrı görünür; biri diğerini ezmez. "Bulunamadı" yalnız taranan kaynaklar için geçerlidir ve hesabın kullanılmadığı anlamına gelmez.
+        SPN bir tanımdır, kullanım kanıtı değildir.
+    </p>
+
+    @if (_view is null && _problem is null)
+    {
+        @if (_started)
+        {
+            <SoLoading Message="Sunucu listesi okunuyor" />
+        }
+        else
+        {
+            <p class="so-panel-text--sm" role="status">Bu sekme açıldığında okunur.</p>
+        }
+    }
+    else if (_problem is not null && _view is null)
+    {
+        <SaProblem Problem="_problem" OnRetry="@(() => LoadAsync(1))" />
+    }
+    else if (_view is { } view)
+    {
+        @if (_problem is not null)
+        {
+            <SaProblem Problem="_problem" OnRetry="@(() => LoadAsync(view.Page))" />
+            <p class="so-panel-text--sm" role="status">Aşağıdaki liste son başarılı okumadır; güncel olmayabilir.</p>
+        }
+
+        <p class="so-panel-text sa-wu-headline" role="status">@WhereUsedPresentation.Headline(view.Summary)</p>
+
+        @if (view.Sources.Where(WhereUsedPresentation.IsIncomplete).ToArray() is { Length: > 0 } incomplete)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2" role="note">
+                Bazı kaynaklar tam okunamadı; liste eksik olabilir:
+                @string.Join(" · ", incomplete.Select(s => $"{WhereUsedPresentation.SourceName(s.Source)}: {WhereUsedPresentation.StateLabel(s.State).ToLowerInvariant()}"))
+            </MudAlert>
+        }
+
+        <ul class="sa-wu-sources" aria-label="Kaynakların durumu">
+            @foreach (WhereUsedSourceStatus source in view.Sources)
+            {
+                <li>
+                    <SoStatusBadge Label="@($"{WhereUsedPresentation.SourceName(source.Source)}: {WhereUsedPresentation.StateLabel(source.State)}")"
+                                   Tone="@WhereUsedPresentation.StateTone(source.State)" />
+                    <span class="so-panel-text--sm sa-wu-wrap">@source.Text</span>
+                </li>
+            }
+        </ul>
+        @if (view.Summary.UsagesWithoutServer > 0 || view.Summary.FindingsWithoutServer > 0)
+        {
+            <p class="so-panel-text--sm">
+                Sunucu adı olmayan kayıtlar listede yer almaz: @view.Summary.UsagesWithoutServer elle kayıt, @view.Summary.FindingsWithoutServer Excel bulgusu.
+            </p>
+        }
+
+        <div class="sa-wu-filters" role="group" aria-label="Sunucu listesi süzgeci">
+            <div>
+                <label for="sa-wu-source" class="so-panel-text--sm">Kaynak</label>
+                <select id="sa-wu-source" class="sa-wu-select" @onchange="SourceChangedAsync">
+                    @foreach ((string? value, string label) in WhereUsedPresentation.SourceFilters)
+                    {
+                        <option value="@(value ?? string.Empty)" selected="@(value == _source)">@label</option>
+                    }
+                </select>
+            </div>
+            <label class="sa-wu-check so-panel-text--sm">
+                <input type="checkbox" checked="@_foundOnly" @onchange="FoundOnlyChangedAsync" />
+                Yalnız bir kaynağın bulduğu sunucular
+            </label>
+        </div>
+
+        @if (view.Servers.Count == 0)
+        {
+            @if (_source is null && !_foundOnly)
+            {
+                <SoEmptyState Title="Bu hesap için sunucu bilgisi yok"
+                              Description="Hiçbir kaynakta sunucu adı yok. Bu, hesabın hiçbir yerde kullanılmadığı anlamına gelmez: tarama yüklenmemiş ya da bazı kaynaklar okunamamış olabilir (yukarıdaki kaynak durumlarına bakın)." />
+            }
+            else
+            {
+                <SoEmptyState Title="Süzgece uyan sunucu yok" Description="Süzgeci gevşetin; bu sonuç yalnız seçili kaynak ve koşul için geçerlidir." />
+            }
+        }
+        else
+        {
+            <ul class="sa-wu-list" aria-label="Sunucular">
+                @foreach (WhereUsedServer server in view.Servers)
+                {
+                    <li class="@($"sa-wu-item sa-wu-item--{server.Status.ToLowerInvariant()}")">
+                        <div class="sa-wu-head">
+                            <strong class="sa-wu-name sa-wu-wrap">@server.Name</strong>
+                            <SoStatusBadge Label="@server.StatusLabel" Tone="@WhereUsedPresentation.StatusTone(server.Status)"
+                                           Icon="@WhereUsedPresentation.StatusIcon(server.Status)" />
+                        </div>
+                        @if (server.AlsoSeenAs.Count > 0)
+                        {
+                            <p class="so-panel-text--sm sa-wu-wrap">Aynı sunucu olarak birleştirildi: @string.Join(", ", server.AlsoSeenAs)</p>
+                        }
+                        <p class="so-panel-text--sm">@WhereUsedPresentation.Dates(server)</p>
+                        @if (server.ConflictText is { } conflict)
+                        {
+                            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-1 mb-1" role="note">@conflict</MudAlert>
+                        }
+                        <ul class="sa-wu-badges" aria-label="Kaynak kanıtları">
+                            @foreach (WhereUsedEvidence evidence in server.Evidence)
+                            {
+                                <li><SoStatusBadge Label="@WhereUsedPresentation.EvidenceLabel(evidence)" Tone="@WhereUsedPresentation.EvidenceTone(evidence.Outcome)"
+                                                   Icon="@WhereUsedPresentation.EvidenceIcon(evidence.Outcome)" /></li>
+                            }
+                        </ul>
+                        <details class="sa-wu-details">
+                            <summary>Kanıt ayrıntısı</summary>
+                            <ul class="sa-wu-evidence">
+                                @foreach (WhereUsedEvidence evidence in server.Evidence)
+                                {
+                                    <li>
+                                        <span class="sa-wu-wrap">@evidence.Text</span>
+                                        @if (evidence.At is { } at) { <span class="so-panel-text--sm"> (@ServiceAccountUiText.Instant(at))</span> }
+                                        @if (evidence.Components.Count > 0)
+                                        {
+                                            <ul class="sa-wu-components">
+                                                @foreach (WhereUsedComponent component in evidence.Components)
+                                                {
+                                                    <li class="sa-wu-wrap">@component.TypeLabel@(string.IsNullOrEmpty(component.Name) ? "" : ": " + component.Name)</li>
+                                                }
+                                            </ul>
+                                            @if (evidence.ComponentCount > evidence.Components.Count)
+                                            {
+                                                <span class="so-panel-text--sm">Toplam @evidence.ComponentCount bileşen; ilk @evidence.Components.Count listelendi.</span>
+                                            }
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                        </details>
+                    </li>
+                }
+            </ul>
+            <SaPager Label="Sunucular" Page="view.Page" PageSize="view.PageSize" Total="view.Total" Unit="sunucu" Busy="_loading" OnPage="LoadAsync" />
+        }
+    }
+</section>
+
+@code {
+    private readonly CancellationTokenSource _lifetime = new();
+    private WhereUsedView? _view;
+    private UiProblem? _problem;
+    private bool _loading, _started;
+    private string? _source;
+    private bool _foundOnly;
+    private int _request;
+
+    /// <summary>The account.</summary>
+    [Parameter, EditorRequired] public Guid AccountId { get; set; }
+
+    /// <summary>The tab holding this panel is open; the list is read once, the first time (the directory is asked then, not on every page open).</summary>
+    [Parameter] public bool Active { get; set; }
+
+    /// <inheritdoc />
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Active && !_started)
+        {
+            _started = true;
+            await LoadAsync(1);
+        }
+    }
+
+    private Task SourceChangedAsync(ChangeEventArgs args)
+    {
+        _source = string.IsNullOrEmpty(args.Value?.ToString()) ? null : args.Value!.ToString();
+        return LoadAsync(1);
+    }
+
+    private Task FoundOnlyChangedAsync(ChangeEventArgs args)
+    {
+        _foundOnly = args.Value is true;
+        return LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int page)
+    {
+        int request = ++_request;
+        _loading = true;
+        _problem = null;
+        try
+        {
+            string path = $"/accounts/{AccountId}/where-used?page={page}&foundOnly={(_foundOnly ? "true" : "false")}" + (_source is null ? string.Empty : $"&source={_source}");
+            WhereUsedView result = await Api.GetAsync<WhereUsedView>(path, _lifetime.Token);
+            if (request == _request)
+            {
+                _view = result;
+            }
+        }
+        catch (SecureOpsApiException ex)
+        {
+            if (request == _request)
+            {
+                _problem = ex.Problem;
+            }
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+            return;
+        }
+        finally
+        {
+            if (request == _request)
+            {
+                _loading = false;
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+    }
+}

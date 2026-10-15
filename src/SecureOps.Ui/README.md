@@ -39,6 +39,21 @@ Open UI ↔ API contract gaps: [`docs/26-ui-backend-contract-gaps.md`](../../doc
 Below this point: reference sections (Layout to Testing) and dated handoff logs, kept with their source SHAs and
 evidence paths. Search for the feature or date you need rather than reading top to bottom.
 
+## Service accounts: "Hangi sunucularda?" (KULLANIM-1), 2026-10-15
+
+`SaWhereUsedPanel` at the top of the account page's usage tab (`/service-accounts/{id}`), read once when the tab first opens (the directory is asked
+then, not on every page open). One card per server (list, not table, for 390 px): name, status badge with icon and text, "aynı sunucu olarak
+birleştirildi" for joined short names, last seen / last looked / source count, the server's conflict text, one badge per source ("Tarama-Betik",
+"Tarama-Web", "Excel", "Elle", "SPN" with what it said and when) and a native `details` with the evidence text and components. Above the list:
+the headline ("N sunucu · M sunucuda görüldü · K çelişki · son tarama tarihi"), one badge and text per source state (Okundu / Kayıt yok / Kısmen
+okundu / Kurulu değil / Yetki yok / Yapılandırılmamış / Bilinmiyor) and a warning naming every source that could not be read; filters are a native
+`select` and checkbox; `SaPager` pages. Loading, empty ("sunucu bilgisi yok", not "kullanılmıyor"), filter-empty and error (`SaProblem`, retry) are
+distinct. The scan panel now shows the scan's `Tool` as a badge ("Betik çıktısı (yükleme)" / "Web taraması (JEA)"). Wording and tone live in
+`WhereUsedPresentation`; labels shared with the server texts in `WhereUsedLabels` (Shared). Tests: `ServiceAccountWhereUsedUiTests` (14, static
+renderer, canned API). Checked in the built-in browser against a local Demo API+UI on a disposable database (dark theme; 375 px without horizontal
+overflow after letting badges wrap). Not verified: light theme by eye, 200 % zoom by eye, screen reader, `tests/browser` journey (no Playwright here),
+Windows/IIS, corporate TEST.
+
 ## gMSA OR panel (OR-2, ADR-0030 Proposed, Fake only), 2026-10-13
 
 `SaPlanOperationalRecords` on `/service-accounts/plans/{id}` once the plan has an approval: one card per account (list, not table, for 390 px),

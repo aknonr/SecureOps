@@ -86,6 +86,11 @@ internal sealed class ServiceAccountSqlFixture
         new(Repository, _access, Options.Create(options ?? new ServiceAccountOptions { Provider = "SqlServer" }), TimeProvider.System,
             new SafeSqlLogger(SqlDiagnostics), null, ports);
 
+    /// <summary>The same service wired to a (synthetic) directory enrichment service, for the SPN source of the where-used view.</summary>
+    public ServiceAccountService WithServiceEvidence(SecureOps.Infrastructure.DirectoryExplorer.IDirectoryEnrichmentQueryService? serviceEvidence) =>
+        new(Repository, _access, Options.Create(new ServiceAccountOptions { Provider = "SqlServer" }), TimeProvider.System, new SafeSqlLogger(SqlDiagnostics),
+            serviceEvidence: serviceEvidence);
+
     /// <summary>A synthetic user whose server-held login name and registration number feed the ITSM user match (ADR-0032).</summary>
     public async Task<SynUser> UserWithItsmIdentityAsync(string? loginName, string? uid, params string[] capabilities)
     {

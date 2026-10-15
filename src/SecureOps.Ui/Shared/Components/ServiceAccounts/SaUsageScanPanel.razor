@@ -100,6 +100,9 @@
             <h2 id="@headingId" class="so-panel-title">
                 @(scan.Purpose == "GmsaCheck" ? "gMSA kontrol taraması" : "Kullanım taraması") · @ServiceAccountUiText.Instant(scan.LastScannedAt ?? scan.CombinedAt)
             </h2>
+            <SoStatusBadge Label="@WhereUsedLabels.Tool(scan.Tool)" Tone="SoStatusBadge.BadgeTone.Info"
+                Icon="@(scan.Tool == "Jea" ? Icons.Material.Filled.Cloud : Icons.Material.Filled.UploadFile)"
+                Title="@(scan.Tool == "Jea" ? "Web üzerinden, Worker'ın JEA ile okuduğu tarama" : "Bir kişinin kendi yetkisiyle çalıştırıp yüklediği betik çıktısı")" />
             <SoStatusBadge Label="@CoverageLabel(scan.Coverage)" Tone="@(gaps.Length == 0 && scan.Coverage.Failed == 0 ? SoStatusBadge.BadgeTone.Positive : SoStatusBadge.BadgeTone.Caution)"
                 Icon="@(gaps.Length == 0 ? Icons.Material.Filled.FactCheck : Icons.Material.Filled.ReportProblem)" />
             @if (scan.Gmsa is { } check)

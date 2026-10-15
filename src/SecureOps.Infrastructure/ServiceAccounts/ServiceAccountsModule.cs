@@ -36,7 +36,8 @@ public static class ServiceAccountsModule
             provider.GetService<SecureOps.Infrastructure.Identity.IDirectoryNameSearchProvider>(),
             OperationalRecordPorts(provider),
             new UsageScanJobServices(enabled ? provider.GetRequiredService<SqlServiceAccountRepository>() : null,
-                provider.GetRequiredService<UsageScanJobAvailability>(), provider.GetRequiredService<IUsageScanJobDispatcher>())));
+                provider.GetRequiredService<UsageScanJobAvailability>(), provider.GetRequiredService<IUsageScanJobDispatcher>()),
+            provider.GetService<SecureOps.Infrastructure.DirectoryExplorer.IDirectoryEnrichmentQueryService>()));
         services.AddScoped(provider => new ServiceAccountReminderJob(
             enabled ? provider.GetRequiredService<SqlServiceAccountRepository>() : null,
             provider.GetRequiredService<IOptions<ServiceAccountOptions>>(),
