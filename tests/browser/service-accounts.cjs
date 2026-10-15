@@ -326,7 +326,7 @@ async function problem(page) {
 
         await step('accessible names: module fields expose their labels', async () => {
             await navigate(page, adminUi, 'service-accounts');
-            const unnamed = await page.evaluate(() => [...document.querySelectorAll('.sa-page input:not([type=hidden]), .sa-page textarea, .sa-page [role=button].mud-input-slot')]
+            const unnamed = await page.evaluate(() => [...document.querySelectorAll('.sa-page input:not([type=hidden]), .sa-page textarea, .sa-page [role=combobox].mud-input-slot')]
                 .filter(e => !(e.labels?.length || e.getAttribute('aria-label') || e.getAttribute('aria-labelledby'))).length);
             assert.equal(unnamed, 0);
         });

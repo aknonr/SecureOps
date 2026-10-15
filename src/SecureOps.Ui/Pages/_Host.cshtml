@@ -143,24 +143,17 @@
             panel.querySelector('[data-so-open-status]').hidden = false;
         });
 
-        // MudBlazor 6 puts select attributes on a hidden input, not its keyboard target.
-        // Transfer resource field names to that target without replacing its keyboard behavior.
+        // MudBlazor 6 select semantics (combobox, listbox, option, name) live in js/so-select-a11y.js for every MudSelect.
         var saLabelSequence = 0;
         function labelResourceSelects() {
             // Service Accounts pages: MudBlazor 6 regenerates label[for] on every render without an input id, so fields
-            // had no accessible name. Give the label a stable id and reference it from the input or select slot.
+            // had no accessible name. Give the label a stable id and reference it from the input.
             document.querySelectorAll('.sa-page .mud-input-control').forEach(function (control) {
                 var label = control.querySelector('label.mud-input-label');
                 if (!label) { return; }
                 if (!label.id) { label.id = 'sa-label-' + (++saLabelSequence); }
                 var input = control.querySelector('input:not([type="hidden"]), textarea');
-                var slot = control.querySelector('div.mud-input-slot[tabindex="0"]');
                 if (input && input.getAttribute('aria-labelledby') !== label.id) { input.setAttribute('aria-labelledby', label.id); }
-                if (slot && slot.getAttribute('aria-labelledby') !== label.id) {
-                    slot.setAttribute('aria-labelledby', label.id);
-                    slot.setAttribute('role', 'button');
-                    slot.setAttribute('aria-haspopup', 'listbox');
-                }
             });
             // MudBlazor 6 does not forward dialog attributes to its outer dialog container.
             document.querySelectorAll('[data-sdm-dialog-title]').forEach(function (title) {
@@ -175,16 +168,6 @@
                     }
                 }
             });
-            document.querySelectorAll('.so-resource-filters .mud-select, .so-resource-dialog .mud-select')
-                .forEach(function (select) {
-                    var input = select.querySelector('input[aria-label]');
-                    var target = select.querySelector('div.mud-input-slot[tabindex="0"]');
-                    if (input && target) {
-                        target.setAttribute('aria-label', input.getAttribute('aria-label'));
-                        target.setAttribute('role', 'button');
-                        target.setAttribute('aria-haspopup', 'listbox');
-                    }
-                });
             document.querySelectorAll('.so-resource-dialog button svg[aria-label="Increment"], .so-resource-dialog button svg[aria-label="Decrement"]')
                 .forEach(function (icon) {
                     // The library labels an aria-hidden icon instead of the actual spin button.
@@ -247,6 +230,7 @@
             target.focus();
         } };
     </script>
+    <script src="~/js/so-select-a11y.js" asp-append-version="true"></script>
     <script src="~/js/workspace-guide.js" asp-append-version="true"></script>
 </body>
 </html>
