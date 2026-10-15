@@ -42,6 +42,7 @@ SQL Server in Docker (arm64 runs it under emulation) can help you read and try S
 - **Commits:** subject with area prefix (`[UI] …`, `[Docs] …`, `[Phase 1] …`), never a broken build. If an AI agent helped, end the message with its attribution trailer, e.g. `Co-Authored-By: Claude <noreply@anthropic.com>` (use the exact line your tool produces).
 - **PR:** push your branch, open a PR against `master`; the template [`.github/pull_request_template.md`](.github/pull_request_template.md) fills in automatically. At least one owner approval is required; only the owner merges. Do not merge your own PR.
 - **Agents work through GitHub:** tasks arrive as issues (label `gorev`), questions go back as issue comments (label `soru`), Windows-only checks are requested with the label `windows-dogrulama`. Full loop: [`docs/team/AGENT-PROTOCOL.md`](docs/team/AGENT-PROTOCOL.md).
+- **Task board:** all open work is on the [SecureOps — işler](https://github.com/users/aknonr/projects/2) board; move your card to *Çalışıyor* when you start and *İncelemede* when you open the PR (see `docs/team/AGENT-PROTOCOL.md` → Pano).
 
 ### New to Claude Code? Start here
 

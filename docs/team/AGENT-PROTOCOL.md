@@ -48,6 +48,17 @@ The coordinator checks open `soru` issues and `windows-dogrulama` PRs (`gh issue
 `master`, posts exact results, and tells the owner whether the PR is ready to merge. Migration and ADR numbers are handed
 out by the owner/coordinator only (record them in `docs/team/WORK-LOG.md`).
 
+## Pano
+
+İşlerin tek ekrandaki görünümü: [SecureOps — işler](https://github.com/users/aknonr/projects/2) (GitHub Project; sahibe ait, özel).
+Üç orkestra (SA, TH, Ekip) ve sahip aynı panoya bakar.
+
+- **Status:** Sırada → Çalışıyor → İncelemede → Bitti.
+- **Orkestra:** işin sahibi (SA, TH, Ekip, Sahip). **İki orkestra aynı kartı almaz**: kart başkasındaysa önce issue'ya yorum yaz.
+- **Ortam:** Mac yapılabilir / Windows gerekir / Kurumsal TEST/PROD.
+- İşe başlarken kartı **Çalışıyor**'a, PR açınca **İncelemede**'ye taşı. Bitti'yi merge'den sonra sahip (ya da koordinatör) koyar.
+- Kart başlığı ve issue gövdesi genel/sentetik kalır; kurum içi ayrıntı panoya yazılmaz.
+- Panoya yalnız sahibin hesabı yazabilir; yetkin yoksa kart taşıma isteğini issue yorumuna yaz.
 ---
 
 **Türkçe özet:** Ortak kanal GitHub. Görev = issue (`gorev`). Arkadaşın ajanı issue'yu okur, plan yorumu yazar, dal açar,
