@@ -194,3 +194,6 @@
 }
 #inuse-review::before { content: "1"; }
 #inuse-answers::before { content: "2"; }
+/* MudBlazor 6 marks keyboard focus on buttons and links only with a faint hover tint (TH-12). */
+.so-inuse ::deep :is(.mud-button-root, a):focus-visible { outline: 2px solid var(--so-accent); outline-offset: 2px; }
+.so-inuse-band .so-panel-note { margin-block: .5rem 1rem; font-size: 16px; }

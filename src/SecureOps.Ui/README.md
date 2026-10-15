@@ -39,6 +39,103 @@ Open UI ↔ API contract gaps: [`docs/26-ui-backend-contract-gaps.md`](../../doc
 Below this point: reference sections (Layout to Testing) and dated handoff logs, kept with their source SHAs and
 evidence paths. Search for the feature or date you need rather than reading top to bottom.
 
+## Service accounts: "Hangi sunucularda?" (KULLANIM-1), 2026-10-15
+
+`SaWhereUsedPanel` at the top of the account page's usage tab (`/service-accounts/{id}`), read once when the tab first opens (the directory is asked
+then, not on every page open). One card per server (list, not table, for 390 px): name, status badge with icon and text, "aynı sunucu olarak
+birleştirildi" for joined short names, last seen / last looked / source count, the server's conflict text, one badge per source ("Tarama-Betik",
+"Tarama-Web", "Excel", "Elle", "SPN" with what it said and when) and a native `details` with the evidence text and components. Above the list:
+the headline ("N sunucu · M sunucuda görüldü · K çelişki · son tarama tarihi"), one badge and text per source state (Okundu / Kayıt yok / Kısmen
+okundu / Kurulu değil / Yetki yok / Yapılandırılmamış / Bilinmiyor) and a warning naming every source that could not be read; filters are a native
+`select` and checkbox; `SaPager` pages. Loading, empty ("sunucu bilgisi yok", not "kullanılmıyor"), filter-empty and error (`SaProblem`, retry) are
+distinct. The scan panel now shows the scan's `Tool` as a badge ("Betik çıktısı (yükleme)" / "Web taraması (JEA)"). Wording and tone live in
+`WhereUsedPresentation`; labels shared with the server texts in `WhereUsedLabels` (Shared). Tests: `ServiceAccountWhereUsedUiTests` (14, static
+renderer, canned API). Checked in the built-in browser against a local Demo API+UI on a disposable database (dark theme; 375 px without horizontal
+overflow after letting badges wrap). Not verified: light theme by eye, 200 % zoom by eye, screen reader, `tests/browser` journey (no Playwright here),
+Windows/IIS, corporate TEST.
+
+## gMSA OR panel (OR-2, ADR-0030 Proposed, Fake only), 2026-10-13
+
+`SaPlanOperationalRecords` on `/service-accounts/plans/{id}` once the plan has an approval: one card per account (list, not table, for 390 px),
+the server's `canOpen/canLink/canConfirmNotCreated` only. "OR aç" opens a preview (requester mapping badge, environment radios, plain-text short
+description and description with counters, fixed plan reference line, every field with its source); the separate "Bu içerikle OR aç" is active only
+for a sendable preview of exactly the current text (edits need "Önizlemeyi güncelle") and sends the preview's fingerprint with an idempotency key
+made when that preview arrived; an unknown answer offers "Aynı anahtarla yeniden dene" (the server replays, no second OR). Belirsiz/Kısmen stay
+caution-toned with the line to search and a reconciliation form; tracking is a live read where every unproven value says "bilinmiyor" and codes are
+raw. Fake results say "sentetik". Tests: `ServiceAccountOperationalRecordUiTests` (19). Not verified: browser journey, 200 % zoom by eye, screen
+reader, dark theme by eye (CSS uses theme tokens only).
+
+## TH-12 OR → Jira and In Use UI acceptance, 2026-10-13
+
+Branch `feature/th12-ui-acceptance-20261013` from master `e79ac0b`. Local run only (Linux container, SDK 9.0.317 from `global.json`,
+Chromium 1194 headless): Demo API with Simulation source/Jira and InMemory persistence, UI on HTTPS. Not Windows/IIS, not corporate TEST.
+
+- Journeys: `sdm-jira-submission.cjs` and `inuse-v2-presentation.cjs` (native 100/200 %, light/dark, contrast ≥ 4.5, focus in view) passed
+  unchanged; new `th12-ui-acceptance.cjs` covers what those hosts cannot reach on their own through a test-only loopback proxy that rewrites
+  response fields with synthetic values: Jira link only with `jiraIssueUrl`, replay note (attempt-only, gone after F5), retry preview
+  matching vs. changed (changed hides the draft and keeps "Yeniden Dene" closed), F5 "gönderildi, yanıt yok" (claim active / lapsed),
+  date sort closed with its note on unknown source dates, In Use completion closed for `Disabled` / `WriteFence` / `SourceContractsMissing`;
+  1440 and 390 px, light and dark, native 200 % zoom, keyboard only. The SQL/LocalDB journeys were not run on Linux; see "Windows LocalDB
+  journeys" below. `sdm-milestone` is stale: it waits for the old "Bağlantı Gruplarım" heading (now "Kişisel bağlantı gruplarım") and expects
+  a Disabled OR source; not run.
+- Fixed: MudBlazor 6 buttons and button-links showed keyboard focus only as a faint tint on the OR list/detail, In Use and both Jira
+  dialogs; scoped `.razor.css` now draws a 2 px `--so-accent` ring. `JiraRetryDialog` had no accessible name (its title had no id for the
+  `_Host` bridge). In Use step 4 shows a closed completion as "Onay düğmesi kapalı." plus the server's explanation and links it to the
+  button with `aria-describedby`. Tests: `Th12UiAcceptanceTests`; `OperationalRecordListRenderTests` ignores the new scope attribute.
+- Shell: the brand link and the account-menu trigger had no focus ring; resolved in #58.
+- Evidence: `artifacts/th12-ui-acceptance-20261013/` (synthetic data only).
+- Windows LocalDB journeys, 2026-10-14 (master `f3788fa`, Windows 11, SDK 9.0.317, Chrome headless, Release publish of Api/Ui/Worker, loopback,
+  synthetic data; test-owned databases with `th12` in the name, all dropped afterwards; local only, not IIS, not corporate TEST):
+  - Passed: `sdm-jira-only`, `sdm-jira-negative` (with `sdm-fault-proxy`), `inuse-v2-review` (needs `-InUseExecutionFixture`, the Worker and the Hangfire
+    schema installed by hand because the host script keeps `PrepareSchema=false`), `inuse-v2-outcomes` (after the `InUseExecution` SQL tests).
+    `sdm-jira-only` needs the SDM evaluation rows that `ResourceSqlTests` create (`Test-ResourceCatalogueSql.ps1 -RunTests`).
+  - Failed, stale test: `sdm-journey` waits for the heading "Jira aktarımı" (the panel is now "Önizleme ve işlem" since TH-9) and for the text
+    "SDM kategori politikası onaylanmadı." (no longer in the UI). The script was last touched 2026-09-07. Needs a rewrite; not changed here.
+  - Failed, probable product gap: `inuse-rc626-repair` stops in the reviewer-assignment dialog. The MudBlazor 6 `MudSelect` "İnceleyici" renders a
+    `div tabindex=0` with a hidden input: no `combobox` role, `getByLabel` finds nothing (the label's `for` points at no element), and the options
+    have no `option` role. Screen readers and role-based tests cannot name or drive it. Everything before that step (answers, themes, reflow) ran.
+    Not fixed here; other `MudSelect`s probably share the pattern. The script also needs `playwright/test` (`expect`), but only `playwright-core`
+    is installed; a scratch shim stood in for the nine `expect` calls, so this was not a stock run. Native-zoom mode (`WASAS_NATIVE_ZOOM`) was not run.
+  - Not run: `sdm-milestone` (stale), native 200 % zoom of the In Use journeys, IIS, corporate TEST. One `ResourceSqlTests` case
+    (`AccessBundles_PreserveRights_PageDecisions_ImpactAndConcurrentGuards`) failed during seeding; its cause was not investigated.
+  - LocalDB note: the shared `SecureOpsResourcesV1` instance repeatedly stopped answering (orphaned `sqlservr` shown as Stopped) during the run;
+    killing that instance's own process and restarting it restored it.
+
+## TH-13 MudSelect accessibility and stale journey, 2026-10-14
+
+Branch `claude/fix-th13-mudselect-a11y-da19d3` from master `5f22a69`. Local only: Windows 11, SDK 9.0.317, Chrome headless, Debug build, Demo API
+(Simulation source and Jira, InMemory persistence) on a free loopback port, UI on HTTPS. Not IIS, not corporate TEST, no SQL.
+
+- Root cause (read from the running Demo, not guessed): MudBlazor 6.16 `MudSelect` renders a hidden `<input>` that receives the page's
+  attributes, a `div.mud-input-slot[tabindex=0]` as the keyboard target, a `label[for]` pointing at an id nobody owns, and role-less
+  `div.mud-list-item` options in a popover outside the control. When no registered item matches the value it instead shows a visible
+  read-only `<input type=text>` and hides that div. No upgrade or JS interop was needed.
+- Fix, one place: `wwwroot/js/so-select-a11y.js` (loaded from `_Host.cshtml`, attribute-only, no key handling) gives every
+  `.mud-input-control.mud-select` `role=combobox`, a name (the input's `aria-label`, else `aria-labelledby` the visible label),
+  `aria-haspopup`, `aria-expanded`, `aria-controls`, `aria-activedescendant` (focus stays on the combobox; arrows move
+  `mud-selected-item`), `aria-disabled`, and the popover list `role=listbox` / items `role=option` + `aria-selected`. It replaces the two
+  page-specific `role=button` patches in `_Host` (Service Accounts pages and resource dialogs), so those selects are now `combobox` too.
+- Inventory: 76 `<MudSelect>` tags in 27 `.razor` files: 7 outside Service Accounts (`InUseReports`, `OperatorReport`, `Sessions`,
+  `InUseAssignmentDialog`, `ResourceLinkDialog`, `SoGroupAnalysisSection`, `SoGroupDirectMembers`) and 69 in 20 Service Accounts
+  pages/components; all are covered by the bridge and every one has a `Label` or `aria-label` (unit-tested). No Service Accounts file was edited.
+- Dialog defects found while doing this, fixed in `InUseAssignmentDialog` only: the select was drawn before the reviewer search returned,
+  so a current reviewer showed as a raw id in a text box (now the select appears after the options load); and the label overlapped the
+  "Atanmamış" value (empty-string value does not shrink the MudBlazor 6 label; `ShrinkLabel`).
+- `tests/browser/sdm-journey.cjs`: selectors only. The submission panel is under "Önizleme ve işlem" (TH-9); the stale text
+  "SDM kategori politikası onaylanmadı." is replaced by the "Uygun değil" badge plus the record's own `eligibilityReason` from the API.
+  `resource-ui.cjs` and `service-accounts.cjs` looked for `role=button` on selects and now look for `combobox`.
+- Tests: `SelectAccessibilityTests` (5 render/source tests: real MudSelect markup the bridge depends on, bridge contract, `_Host` wiring,
+  every select named, dialog load order) and the new journey `tests/browser/select-a11y.cjs`.
+- Ran, passed: `select-a11y.cjs` (in-use reports, admin sessions, Service Accounts work: 1440 and 390 px, light and dark, no horizontal scroll;
+  Enter opens, ArrowDown moves the selection and `aria-activedescendant`, Escape closes the list and keeps focus, Space reopens, option click
+  closes; reviewer assignment dialog by keyboard, value shows the label, Escape closes the list not the dialog).
+  `inuse-rc626-repair.cjs` with real `playwright` 1.56.1 (`playwright/test`, no shim): every step up to and including the reviewer
+  assignment dialog (answers, assignment to a reviewer and back to none, themes, 1366 and 390 px) passes.
+- Not run: `inuse-rc626-repair` after the report-archive step (the Demo API's report index answers 503 `PersistenceUnavailable` without SQL),
+  `sdm-journey` (needs the SQL evaluation rows; an isolated `th13` LocalDB database was created and dropped, but migrations 025–037, the
+  integration tests and a Worker were not set up), native 200 % zoom (`WASAS_NATIVE_ZOOM`), a real screen reader, IIS, corporate TEST.
+  The second reviewer came from the access API (`InUseReviewer` role on a demo actor), not a fixture.
+
 ## gMSA change plan UI (d, PR 3), 2026-10-12
 
 Branch `feature/service-accounts-change-plan-ui-20261012`, cut from the API branch `feature/service-accounts-change-plan-api-20261007`

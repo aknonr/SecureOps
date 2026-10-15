@@ -1,0 +1,146 @@
+/* Server, component and SPN host names are long and unbroken; they must wrap at 390 px and 200 % zoom. */
+.sa-wu-wrap {
+    overflow-wrap: anywhere;
+    min-width: 0;
+}
+
+.sa-wu-headline {
+    margin: 0.5rem 0;
+    font-weight: 600;
+}
+
+.sa-wu-sources,
+.sa-wu-badges,
+.sa-wu-list,
+.sa-wu-evidence,
+.sa-wu-components {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.sa-wu-sources {
+    display: grid;
+    gap: var(--so-space-2);
+    margin: var(--so-space-2) 0;
+}
+
+.sa-wu-sources li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--so-space-2);
+}
+
+.sa-wu-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: var(--so-space-4);
+    margin: var(--so-space-3) 0;
+}
+
+.sa-wu-select {
+    display: block;
+    min-height: 2.5rem;
+    min-width: 12rem;
+    max-width: 100%;
+    padding: 0 var(--so-space-2);
+    color: var(--so-text);
+    background: var(--so-surface);
+    border: 1px solid var(--so-border-input);
+    border-radius: var(--so-radius-sm);
+}
+
+.sa-wu-check {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--so-space-2);
+    min-height: 2.5rem;
+}
+
+.sa-wu-select:focus-visible,
+.sa-wu-check input:focus-visible,
+.sa-wu-details summary:focus-visible {
+    outline: 2px solid var(--so-text);
+    outline-offset: 2px;
+}
+
+.sa-wu-list {
+    display: grid;
+    gap: var(--so-space-3);
+}
+
+.sa-wu-item {
+    padding: var(--so-space-3);
+    background: var(--so-surface);
+    border: 1px solid var(--so-border);
+    border-radius: var(--so-radius);
+}
+
+/* A conflict also gets a thicker rule, a second signal beside the badge text and icon. */
+.sa-wu-item--conflict {
+    border-left: 4px solid var(--so-warning);
+}
+
+.sa-wu-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--so-space-2);
+}
+
+.sa-wu-name {
+    flex: 1 1 12rem;
+}
+
+.sa-wu-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--so-space-2);
+    margin-top: var(--so-space-2);
+}
+
+.sa-wu-details {
+    margin-top: var(--so-space-2);
+}
+
+.sa-wu-details summary {
+    cursor: pointer;
+    width: fit-content;
+    font-weight: 600;
+}
+
+.sa-wu-evidence {
+    display: grid;
+    gap: var(--so-space-2);
+    margin-top: var(--so-space-2);
+}
+
+.sa-wu-components {
+    margin: var(--so-space-1) 0 0;
+    padding-left: var(--so-space-4);
+    list-style: disc;
+}
+
+.so-panel ::deep .mud-button-root:focus-visible {
+    outline: 2px solid var(--so-text);
+    outline-offset: 2px;
+}
+
+/* 390 px and 200 % zoom: a long badge ("Tarama-Betik · tam taramada bulunamadı · 04.10.2026") wraps inside its card instead of
+   widening the page; grid children may shrink below their content width. */
+.sa-wu-list {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.sa-wu-item,
+.sa-wu-badges li,
+.sa-wu-sources li {
+    min-width: 0;
+}
+
+.sa-wu ::deep .so-badge {
+    max-width: 100%;
+    white-space: normal;
+}

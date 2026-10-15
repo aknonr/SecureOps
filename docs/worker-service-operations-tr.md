@@ -29,7 +29,11 @@ engeli asmayin. Yerel inceleme ZIP'leri kurulum onayi degildir.
   exception govdesi, kimlik bilgisi veya tum config yazilmaz. Is ayrintilari mevcut
   SQL command/audit kaydindadir. Log yazilabilirligi ve disk dolulugu izlenmelidir.
   Servis kipinde otomatik Windows Event Log source yaratimi kullanilmaz; SCM'nin
-  sistem olaylari ayridir. Konsol kipinin mevcut logging provider'lari korunur.
+  sistem olaylari ayridir. `scripts/worker/Install-SecureOpsWorkerService.ps1`
+  (yonetici, bir kez) Application altinda `SecureOps.Worker` kaynagini olusturur;
+  kaynak varsa Worker yalniz sabit metinli 1000/1001/1002 (basladi/hata/durdu)
+  yazar. Ayni betik servisi gMSA ile (parolasiz, `sc.exe config obj=`) Manual
+  olarak kaydeder ve baslatmaz; adim 7 yerine kullanilabilir (2026-10-14). Konsol kipinin mevcut logging provider'lari korunur.
 - Servis hesabi: operatorun dogruladigi mevcut hesap; parola kod/komut satiri/
   dosyada bulunmaz. Gerekirse kurumsal guvenli credential istemi kullanilir.
 - Windows sahibi etkin GPO'da `Log on as a service` hakkini ve `Deny log on as a

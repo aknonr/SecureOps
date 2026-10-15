@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
-    SecureOps.ServiceAccountUsage — PROPOSED (ADR-0024), not deployable until ADR-0024 is accepted and Bilgi Güvenliği
-    has approved the JEA role capability. Read-only by construction:
+    SecureOps.ServiceAccountUsage 1.0.0 (ADR-0024 R2). Registered once per server by its owner with
+    Install-SecureOpsServiceAccountUsageEndpoint.ps1; the Worker calls it as the read gMSA. Read-only by construction:
 
     - One exported command, Get-SecureOpsAccountUsage, which a JEA role capability exposes as the only visible function.
       Function bodies run outside JEA's language restrictions (Microsoft PowerShell-Docs, "JEA role capabilities"), so the
@@ -210,8 +210,11 @@ function Get-SecureOpsAccountUsage {
         1-20 account names: name, DOMAIN\name or gMSA name ending with "$". No wildcards.
     .PARAMETER ExpectedAccount
         Optional gMSA (ending with "$"): also report whether the components now run as it (post-conversion check).
+    .PARAMETER AsJson
+        Return the document as one compressed JSON text instead of an object. Remote callers (the Worker) use it, because PowerShell
+        remoting serializes nested objects only to a shallow depth.
     .OUTPUTS
-        One object, schema service-account-usage-v1 (contracts/schemas/service-account-usage.schema.json).
+        One object (or with -AsJson one JSON text), schema service-account-usage-v1 (contracts/schemas/service-account-usage.schema.json).
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
@@ -222,7 +225,9 @@ function Get-SecureOpsAccountUsage {
         [string[]]$Account,
 
         [ValidateScript({ $_ -match $script:AccountPattern -and $_.EndsWith('$') })]
-        [string]$ExpectedAccount
+        [string]$ExpectedAccount,
+
+        [switch]$AsJson
     )
 
     $ErrorActionPreference = 'Stop'
@@ -264,7 +269,7 @@ function Get-SecureOpsAccountUsage {
     } else { $null }
 
     $timer.Stop()
-    [pscustomobject]@{
+    $document = [pscustomobject]@{
         schema       = $script:SchemaName
         serverName   = $env:COMPUTERNAME
         generatedAt  = $started.ToString('o')
@@ -276,6 +281,7 @@ function Get-SecureOpsAccountUsage {
         verification = $verification
         warnings     = @($warnings)
     }
+    if ($AsJson) { Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $document -Depth 8 -Compress } else { $document }
 }
 
 Export-ModuleMember -Function Get-SecureOpsAccountUsage, ConvertTo-SoAccountKey, Test-SoAccountMatch, Read-SoIisIdentity, Find-SoAccountUsage, Test-SoGmsaConversion

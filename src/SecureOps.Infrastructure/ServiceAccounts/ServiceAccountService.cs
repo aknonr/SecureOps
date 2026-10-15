@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using SecureOps.Domain.Access;
 using SecureOps.Domain.ServiceAccounts;
 using SecureOps.Infrastructure.Access;
+using SecureOps.Infrastructure.DirectoryExplorer;
 using SecureOps.Shared.Contracts.ServiceAccounts;
 
 namespace SecureOps.Infrastructure.ServiceAccounts;
@@ -26,7 +27,8 @@ public sealed record SaCaller(ApplicationUser User, ServiceAccountScope Scope, S
 /// </summary>
 public sealed partial class ServiceAccountService(SqlServiceAccountRepository? repository, IApplicationAccessService access,
     IOptions<ServiceAccountOptions> options, TimeProvider clock, ILogger<ServiceAccountService> logger,
-    SecureOps.Infrastructure.Identity.IDirectoryNameSearchProvider? directory = null)
+    SecureOps.Infrastructure.Identity.IDirectoryNameSearchProvider? directory = null, ServiceAccountOperationalRecordPorts? operationalRecords = null,
+    UsageScanJobServices? jobs = null, IDirectoryEnrichmentQueryService? serviceEvidence = null)
 {
     private readonly ServiceAccountOptions _options = options.Value;
 

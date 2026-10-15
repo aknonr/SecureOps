@@ -211,8 +211,9 @@ nothing in the directory. The audit keeps a query hash and counts, never the nam
 ## Usage scans (ADR-0027)
 
 A person runs the read-only collector on each server under their own authority, combines the per-server documents with
-the planned server list on their own workstation and uploads the file on the account page. The module never connects to a
-server and never starts a scan. Operator guide: [USAGE-SCAN-TR.md](USAGE-SCAN-TR.md).
+the planned server list on their own workstation and uploads the file on the account page. The API never connects to a
+server; since 2026-10-13 a person may also start the same read-only scan from the web, run by the Worker through the JEA
+endpoint (rule 10). Operator guide: [USAGE-SCAN-TR.md](USAGE-SCAN-TR.md).
 
 1. **Evidence, not a decision.** Attaching a scan changes nothing else: no ownership, request, action, finding, closure,
    suitability or report figure. Scan matches are not counted as open findings.
@@ -252,6 +253,37 @@ server and never starts a scan. Operator guide: [USAGE-SCAN-TR.md](USAGE-SCAN-TR
    adds one `ServiceAccount.UsageScanBatchRefused` audit row with reason and counts only. Both upload routes re-check scope and basis inside the
    link's write transaction (locked account/request rows, HOLDLOCK on grants and the tree), so a change after the check
    writes nothing. ADR-0027 §4.
+10. **Web scan (2026-10-13, migration 037, ADR-0024 R2-4, owner decision 2026-10-13).** The same read-only scan can be started
+    from the web: Work plus the responsible basis on every account, 1–20 accounts, 1–500 planned servers, optional expected
+    gMSA, at most one queued or running scan per account (409). The Worker reads the servers through the JEA endpoint
+    (`IServiceAccountUsageCollector`, contract `USAGE-SCAN-JOB-CONTRACT.md`); each server's document passes the same parser
+    as an upload before it is kept; at the end one ordinary scan record (`tool = Jea`) is written and linked to each account
+    under the starter, scope re-checked in the write. A server that did not answer (`Unreachable`, no endpoint, refused,
+    timed out, malformed, not run) is "no information" in the record (`Unreachable`/`NoResult`), never "not used". Cancel
+    (starter or administrator) keeps the finished servers; retry repeats only servers not read completely. Off by default:
+    without a configured collector the feature says so and the upload path stays. The person-run upload is unchanged.
+
+## Where used (2026-10-15, no migration)
+
+"Hangi sunucularda?" answers, per account, on which servers the stored sources place it, without choosing an RFS first.
+`GET accounts/{id}/where-used` (View; same scope rule as the detail, out of scope = missing).
+
+1. **Evidence per source, never merged away.** A server row lists one evidence line per source: `Scan` (date, `Tool` Combined = uploaded script
+   output or Jea = web scan, the server's result, components), `Finding` (Excel technical finding), `Manual` (a person's usage record), `Spn`
+   (Active Directory service principal name host). Each line says what that source said: Found, NotFound (only after a complete read), NoInformation
+   (partial, failed, unreachable, uncertain) or Defined (SPN).
+2. **Nothing says "not used".** A row is Found if any source found it; Conflict if one source found it and another complete read did not (named, not
+   resolved, with both dates); DefinedOnly if only an SPN names the host; NotFoundInScanned ("not found in the scanned sources", never "unused") or
+   NoInformation otherwise. An SPN is a definition, not a use, and never creates a conflict.
+3. **Names.** Case, trailing dot and a UNC prefix are ignored. A short name joins an FQDN only when exactly one FQDN in the data carries that label
+   (rule: exact one-to-one); two FQDNs with the same label, IP addresses and free text stay separate rows.
+4. **Honest sources.** `Sources` states each source: Available, Empty, Partial (older scans or components omitted, SPN list cut), NotInstalled (030
+   missing), Denied (no `Identity.Groups.View`), NotConfigured (no directory), Unknown (directory down or account not in the directory). A source that
+   cannot be read never hides the others and never makes the list look complete.
+5. **Bounds.** Newest 20 scans, 3 000 component rows (per-server match counts exact), 5 000 findings/usages, 50 rows per page (max 100); filters
+   `source` (Scan, Finding, Manual, Spn) and `foundOnly` apply to the rows, the summary counts the whole account.
+6. **No reverse direction.** There is no "which accounts run on this server" route or view (AGENTS rule 5, ADR-0008). Read only: nothing is written,
+   no history or audit row except the Directory Explorer's own for the SPN read.
 
 ## Requested gMSA name (migration 031, 2026-10-05)
 

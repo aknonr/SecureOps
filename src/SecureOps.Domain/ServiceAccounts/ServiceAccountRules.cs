@@ -123,48 +123,59 @@ public static class ServiceAccountRules
 
     /// <summary>
     /// Validates a verification of an existing performed action (rule 4: same identity, no new action).
-    /// Returns the first violated rule, or null.
+    /// Returns the first violated rule of <see cref="EvaluateVerification"/>, or null.
     /// </summary>
-    public static string? ValidateVerification(ActionFacts current, DateOnly verifiedOn, bool hasVerifier, bool hasEvidence, DateOnly today)
+    public static string? ValidateVerification(ActionFacts current, DateOnly verifiedOn, bool hasVerifier, bool hasEvidence, DateOnly today) =>
+        EvaluateVerification(current, verifiedOn, hasVerifier, hasEvidence, today) is [var first, ..] ? first : null;
+
+    /// <summary>
+    /// Single source of the verification rule (rule 4): every violated condition in a fixed order, the first one being the code
+    /// <see cref="ValidateVerification"/> returns. With no <paramref name="verifiedOn"/> (a readiness read before a date is typed) the
+    /// two date checks (VerificationBeforeAction, DateInFuture) are skipped; the verify command always supplies the date.
+    /// </summary>
+    public static IReadOnlyList<string> EvaluateVerification(ActionFacts current, DateOnly? verifiedOn, bool hasVerifier, bool hasEvidence, DateOnly today)
     {
+        List<string> missing = [];
         if (current.Voided)
         {
-            return Errors.Voided;
+            missing.Add(Errors.Voided);
         }
 
         if (current.Result != ServiceAccountActionResult.Performed)
         {
-            return Errors.NotPerformed;
+            missing.Add(Errors.NotPerformed);
         }
 
         if (current.ActualOn is not { } actual)
         {
-            return Errors.ActualDateRequired;
+            missing.Add(Errors.ActualDateRequired);
+        }
+        else if (verifiedOn is { } beforeCheck && beforeCheck < actual)
+        {
+            missing.Add(Errors.VerificationBeforeAction);
         }
 
-        if (verifiedOn < actual)
+        if (verifiedOn is { } futureCheck && futureCheck > today)
         {
-            return Errors.VerificationBeforeAction;
-        }
-
-        if (verifiedOn > today)
-        {
-            return Errors.DateInFuture;
+            missing.Add(Errors.DateInFuture);
         }
 
         if (!hasVerifier)
         {
-            return Errors.VerifierRequired;
+            missing.Add(Errors.VerifierRequired);
         }
 
         if (!hasEvidence)
         {
-            return Errors.EvidenceRequired;
+            missing.Add(Errors.EvidenceRequired);
         }
 
-        return current.RecordKind == ServiceAccountRecordKind.Closure && current.ActionType == ServiceAccountActionType.Deletion && !current.HasOrReference
-            ? Errors.OrRequiredForDeletion
-            : null;
+        if (current.RecordKind == ServiceAccountRecordKind.Closure && current.ActionType == ServiceAccountActionType.Deletion && !current.HasOrReference)
+        {
+            missing.Add(Errors.OrRequiredForDeletion);
+        }
+
+        return missing;
     }
 
     /// <summary>Validates a new or updated performed report; real dates cannot be in the future.</summary>

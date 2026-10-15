@@ -356,6 +356,36 @@ public sealed partial class SqlServiceAccountRepository
         return await RequestCloseFactsAsync(connection, null, requestId, cancellationToken);
     }
 
+    /// <summary>
+    /// Close facts of every open request of one account in one round trip (the same columns as the single-request read), so the
+    /// account detail carries each request's close readiness without a query per request (G-39).
+    /// </summary>
+    public async Task<IReadOnlyDictionary<Guid, (ServiceAccountRequestStatus Status, ServiceAccountActionType Type, IReadOnlyList<ActionFacts> Actions, bool OwnershipConfirmed)>>
+        OpenRequestCloseFactsAsync(Guid accountId, CancellationToken cancellationToken)
+    {
+        await using SqlConnection connection = await OpenAsync(cancellationToken);
+        using SqlMapper.GridReader grid = await connection.QueryMultipleAsync(Cmd("""
+            SELECT r.Id, r.Status, r.ActionType, CAST(CASE WHEN a.CurrentOwnerTeamId IS NOT NULL OR a.CurrentOwnerPersonId IS NOT NULL THEN 1 ELSE 0 END AS bit)
+            FROM svcacct.WorkRequests r JOIN svcacct.Accounts a ON a.Id = r.AccountId WHERE r.AccountId = @accountId AND r.Status = 'Open';
+            SELECT e.RequestId, e.ActionType, e.Result, e.RecordKind, e.ActualOn, e.VerifiedOn,
+                CAST(CASE WHEN e.VerifiedByUserId IS NOT NULL OR e.VerifiedByPersonId IS NOT NULL THEN 1 ELSE 0 END AS bit),
+                CAST(CASE WHEN NULLIF(e.EvidenceNote, '') IS NOT NULL OR NULLIF(e.VerificationNote, '') IS NOT NULL OR e.VerificationEvidenceId IS NOT NULL THEN 1 ELSE 0 END AS bit),
+                CAST(CASE WHEN EXISTS (SELECT 1 FROM svcacct.ExternalRecordLinks l JOIN svcacct.ExternalRecords x ON x.Id = l.ExternalRecordId
+                    WHERE l.EntityType = 'Action' AND l.EntityId = e.Id AND x.RecordType = 'OR') THEN 1 ELSE 0 END AS bit),
+                CAST(CASE WHEN e.VoidedAt IS NOT NULL THEN 1 ELSE 0 END AS bit), e.Id
+            FROM svcacct.ActionEvents e JOIN svcacct.WorkRequests r ON r.Id = e.RequestId
+            WHERE r.AccountId = @accountId AND r.Status = 'Open'
+            ORDER BY e.CreatedAt DESC, e.Id;
+            """, new { accountId }, null, cancellationToken));
+        (Guid Id, string Status, string Type, bool Owned)[] requests = [.. await grid.ReadAsync<(Guid Id, string Status, string Type, bool Owned)>()];
+        ILookup<Guid, ActionFacts> actions = (await grid.ReadAsync<(Guid RequestId, string Type, string Result, string Kind, DateOnly? Actual, DateOnly? Verified,
+                bool HasVerifier, bool HasEvidence, bool HasOr, bool Voided, Guid Id)>())
+            .ToLookup(a => a.RequestId, a => new ActionFacts(Enum.Parse<ServiceAccountActionType>(a.Type), Enum.Parse<ServiceAccountActionResult>(a.Result),
+                Enum.Parse<ServiceAccountRecordKind>(a.Kind), a.Actual, a.Verified, a.HasVerifier, a.HasEvidence, a.HasOr, a.Voided, a.Id));
+        return requests.ToDictionary(r => r.Id, r => (Enum.Parse<ServiceAccountRequestStatus>(r.Status), Enum.Parse<ServiceAccountActionType>(r.Type),
+            (IReadOnlyList<ActionFacts>)[.. actions[r.Id]], r.Owned));
+    }
+
     /// <summary>Close facts read on the caller's connection, inside its transaction when one is given (sees the transaction's own writes).</summary>
     private static async Task<(ServiceAccountRequestStatus Status, ServiceAccountActionType Type, IReadOnlyList<ActionFacts> Actions, bool OwnershipConfirmed)?> RequestCloseFactsAsync(
         SqlConnection connection, SqlTransaction? transaction, Guid requestId, CancellationToken cancellationToken)

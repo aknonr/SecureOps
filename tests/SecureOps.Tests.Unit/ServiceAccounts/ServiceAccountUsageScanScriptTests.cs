@@ -257,7 +257,7 @@ public sealed class ServiceAccountUsageScanScriptTests
 
     private static string Combine() => Path.Combine(Root(), "scripts", "powershell", "Invoke-ServiceAccountUsageScan.ps1");
 
-    private static string ModuleFolder() => Path.Combine(Root(), "scripts", "jea", "proposed", "SecureOps.ServiceAccountUsage");
+    private static string ModuleFolder() => Path.Combine(Root(), "scripts", "jea", "SecureOps.ServiceAccountUsage");
 
     private static string Root()
     {

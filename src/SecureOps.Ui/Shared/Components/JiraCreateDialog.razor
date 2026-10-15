@@ -115,15 +115,18 @@
     </DialogContent>
 
     <DialogActions>
-        <MudButton OnClick="Cancel" Variant="Variant.Text" data-sdm-cancel>Vazgeç</MudButton>
-        <MudButton OnClick="Confirm"
-                   Variant="Variant.Filled"
-                   Color="Color.Primary"
-                   Disabled="@(!_acknowledged)"
-                   aria-describedby="@_ackHintId"
-                   StartIcon="@Icons.Material.Filled.AddTask">
-            Oluştur
-        </MudButton>
+        @* display: contents; only gives the scoped focus rule an anchor around MudBlazor's buttons. *@
+        <div class="so-dialog-actions">
+            <MudButton OnClick="Cancel" Variant="Variant.Text" data-sdm-cancel>Vazgeç</MudButton>
+            <MudButton OnClick="Confirm"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Disabled="@(!_acknowledged)"
+                       aria-describedby="@_ackHintId"
+                       StartIcon="@Icons.Material.Filled.AddTask">
+                Oluştur
+            </MudButton>
+        </div>
     </DialogActions>
 </MudDialog>
 

@@ -82,6 +82,35 @@ internal sealed class ServiceAccountSqlFixture
         new(Repository, _access, Options.Create(new ServiceAccountOptions { Provider = "SqlServer" }), TimeProvider.System, new SafeSqlLogger(SqlDiagnostics),
             directory);
 
+    /// <summary>The same service wired to the OR ports (ADR-0030, OR-2: Fake or Disabled creator, Fake ITSM lookup, tracking and user match).</summary>
+    public ServiceAccountService WithOperationalRecords(ServiceAccountOperationalRecordPorts ports, ServiceAccountOptions? options = null) =>
+        new(Repository, _access, Options.Create(options ?? new ServiceAccountOptions { Provider = "SqlServer" }), TimeProvider.System,
+            new SafeSqlLogger(SqlDiagnostics), null, ports);
+
+    /// <summary>The same service wired to a (synthetic) directory enrichment service, for the SPN source of the where-used view.</summary>
+    public ServiceAccountService WithServiceEvidence(SecureOps.Infrastructure.DirectoryExplorer.IDirectoryEnrichmentQueryService? serviceEvidence) =>
+        new(Repository, _access, Options.Create(new ServiceAccountOptions { Provider = "SqlServer" }), TimeProvider.System, new SafeSqlLogger(SqlDiagnostics),
+            serviceEvidence: serviceEvidence);
+
+    /// <summary>A synthetic user whose server-held login name and registration number feed the ITSM user match (ADR-0032).</summary>
+    public async Task<SynUser> UserWithItsmIdentityAsync(string? loginName, string? uid, params string[] capabilities)
+    {
+        SynUser user = await UserAsync(capabilities);
+        ApplicationUser named = user.User with { LoginName = loginName, Uid = uid };
+        _users[named.CorporateIdentity] = named;
+        return user with { User = named };
+    }
+
+    /// <summary>The same service wired to web usage scan jobs (037) with the given availability and dispatcher.</summary>
+    public ServiceAccountService WithUsageScanJobs(ServiceAccountOptions options,
+        SecureOps.Infrastructure.ServiceAccounts.UsageScans.Jobs.UsageScanJobAvailability availability,
+        SecureOps.Infrastructure.ServiceAccounts.UsageScans.Jobs.IUsageScanJobDispatcher dispatcher) =>
+        new(Repository, _access, Options.Create(options), TimeProvider.System, new SafeSqlLogger(SqlDiagnostics), null,
+            jobs: new UsageScanJobServices(Repository, availability, dispatcher));
+
+    /// <summary>Synthetic access repository answering the persisted users of this fixture (for the job runner's starter re-check).</summary>
+    public ApplicationUser? User(Guid id) => _users.Values.FirstOrDefault(u => u.Id == id);
+
     public IConfiguration Configuration { get; }
 
     public SqlServiceAccountRepository Repository { get; }
@@ -139,6 +168,17 @@ internal sealed class ServiceAccountSqlFixture
             INSERT INTO svcacct.Teams(Id, OrganizationId, Name, NormalizedName, Provisional, CreatedAt, CreatedBy, UpdatedAt, UpdatedBy)
             VALUES(@id, @organization, @name, @key, 0, SYSUTCDATETIME(), @grantor, SYSUTCDATETIME(), @grantor);
             """, new { id, organization, name, key = ServiceAccountText.LabelKey(name), grantor = _grantor });
+        return id;
+    }
+
+    public async Task<Guid> PersonAsync(string name)
+    {
+        var id = Guid.NewGuid();
+        await using SqlConnection connection = Connection();
+        await connection.ExecuteAsync("""
+            INSERT INTO svcacct.People(Id, DisplayName, NormalizedName, VerificationState, CreatedAt, CreatedBy, UpdatedAt, UpdatedBy)
+            VALUES(@id, @name, @key, 'Provisional', SYSUTCDATETIME(), @grantor, SYSUTCDATETIME(), @grantor);
+            """, new { id, name, key = ServiceAccountText.LabelKey(name), grantor = _grantor });
         return id;
     }
 

@@ -110,6 +110,56 @@ public sealed class ServiceAccountCloseReadinessSqlTests
             .Should().Be(account.Requests.Single().Version);
     }
 
+    [ServiceAccountSqlFact]
+    public async Task AccountDetail_CarriesEachOpenRequestsReadiness_EqualToTheRoute_AndUnverifiedActionsVerificationReadiness()
+    {
+        ServiceAccountSqlFixture fx = new();
+        Guid org = await fx.OrganizationAsync("SYN CR DETAY " + fx.Suffix);
+        SynUser coordinator = await fx.UserAsync(_all);
+        await fx.GrantAsync(coordinator, ScopeKind.Organization, org);
+        AccountDetail account = Ok(await fx.Service.CreateAccountAsync(coordinator.Principal, fx.Context,
+            new CreateAccountRequest($"SYN{fx.Suffix}_CRDETAY", null, org, "Sentetik test hesabı"), _token));
+        Guid accountId = account.Summary.Id;
+        account = Ok(await fx.Service.CreateRequestAsync(coordinator.Principal, fx.Context, accountId, new CreateWorkRequest("Deletion"), _token));
+        Guid deletionRequest = account.Requests.Single().Id;
+        account = Ok(await fx.Service.CreateRequestAsync(coordinator.Principal, fx.Context, accountId, new CreateWorkRequest("PasswordChange"), _token));
+        Guid passwordRequest = account.Requests.Single(r => r.Id != deletionRequest).Id;
+        account = Ok(await fx.Service.ReportActionAsync(coordinator.Principal, fx.Context, accountId,
+            new ReportActionRequest("Deletion", "Performed", "Closure", deletionRequest, ActualOn: new(2026, 9, 12)), _token));
+        account = Ok(await fx.Service.ReportActionAsync(coordinator.Principal, fx.Context, accountId,
+            new ReportActionRequest("PasswordChange", "Performed", "Intermediate", passwordRequest, ActualOn: new(2026, 9, 12), EvidenceNote: "parola değişti"), _token));
+
+        account = Ok(await fx.Service.AccountAsync(coordinator.Principal, fx.Context, accountId, _token));
+        await DetailMatchesRouteAsync(fx, coordinator, account);
+        account.Requests.Single(r => r.Id == passwordRequest).CloseReadiness!.CanClose.Should().BeTrue();
+        account.Requests.Single(r => r.Id == deletionRequest).CloseReadiness!.Missing.Single().Code.Should().Be(ServiceAccountRules.Errors.VerifiedClosureRequired);
+
+        ActionView deletion = account.Actions.Single(a => a.ActionType == "Deletion");
+        deletion.VerificationReadiness.Should().BeEquivalentTo(new VerificationReadiness(false,
+            [ServiceAccountRules.Errors.EvidenceRequired, ServiceAccountRules.Errors.OrRequiredForDeletion]));
+        account.Actions.Single(a => a.ActionType == "PasswordChange").VerificationReadiness.Should().BeEquivalentTo(new VerificationReadiness(true, []));
+        SaResult<AccountDetail> refused = await fx.Service.VerifyActionAsync(coordinator.Principal, fx.Context, deletion.Id,
+            new VerifyActionRequest(deletion.Version, new(2026, 9, 13)), _token);
+        refused.Field.Should().Be(deletion.VerificationReadiness!.Missing[0], "readiness and the verify command use the same rule");
+
+        Ok(await fx.Service.CloseRequestAsync(coordinator.Principal, fx.Context, passwordRequest,
+            new CloseWorkRequest(account.Requests.Single(r => r.Id == passwordRequest).Version, "Completed"), _token));
+        account = Ok(await fx.Service.VerifyActionAsync(coordinator.Principal, fx.Context, account.Actions.Single(a => a.ActionType == "PasswordChange").Id,
+            new VerifyActionRequest(account.Actions.Single(a => a.ActionType == "PasswordChange").Version, new(2026, 9, 13)), _token));
+        account.Requests.Single(r => r.Id == passwordRequest).CloseReadiness.Should().BeNull("a closed request carries no readiness");
+        account.Actions.Single(a => a.ActionType == "PasswordChange").VerificationReadiness.Should().BeNull("a verified action carries no readiness");
+        await DetailMatchesRouteAsync(fx, coordinator, account);
+    }
+
+    private static async Task DetailMatchesRouteAsync(ServiceAccountSqlFixture fx, SynUser user, AccountDetail account)
+    {
+        foreach (RequestView request in account.Requests.Where(r => r.Status == "Open"))
+        {
+            CloseReadiness route = Ok(await fx.Service.CloseReadinessAsync(user.Principal, fx.Context, request.Id, null, _token));
+            request.CloseReadiness.Should().BeEquivalentTo(route, o => o.WithStrictOrdering(), "the detail and the route use the same facts and rule");
+        }
+    }
+
     private static async Task CloseRefusedWithFirstMissingAsync(ServiceAccountSqlFixture fx, SynUser user, Guid accountId, Guid request, CloseReadiness readiness)
     {
         AccountDetail current = Ok(await fx.Service.AccountAsync(user.Principal, fx.Context, accountId, _token));

@@ -145,7 +145,8 @@
 
         // Accessibility fallbacks written for MudBlazor 6 markup. Since the 9.11 upgrade they only fill in an
         // attribute that is still missing: they never replace a role, name or relationship MudBlazor itself sets,
-        // so a library fix always wins over these bridges. Re-check them in a browser before removing any.
+        // so a library fix always wins over these bridges. Select semantics (combobox, listbox, option, name) live
+        // in js/so-select-a11y.js for every MudSelect. Re-check these in a browser before removing any.
         function setIfMissing(element, name, value) {
             if (element && !element.hasAttribute(name)) { element.setAttribute(name, value); }
         }
@@ -160,13 +161,7 @@
                 if (!label) { return; }
                 if (!label.id) { label.id = 'sa-label-' + (++saLabelSequence); }
                 var input = control.querySelector('input:not([type="hidden"]), textarea');
-                var slot = control.querySelector('div.mud-input-slot[tabindex="0"]');
                 if (input && !hasAccessibleName(input)) { input.setAttribute('aria-labelledby', label.id); }
-                if (slot && !hasAccessibleName(slot)) {
-                    slot.setAttribute('aria-labelledby', label.id);
-                    setIfMissing(slot, 'role', 'button');
-                    setIfMissing(slot, 'aria-haspopup', 'listbox');
-                }
             });
             // Dialog name/modality when the dialog container does not already carry them.
             document.querySelectorAll('[data-sdm-dialog-title]').forEach(function (title) {
@@ -181,16 +176,6 @@
                     }
                 }
             });
-            document.querySelectorAll('.so-resource-filters .mud-select, .so-resource-dialog .mud-select')
-                .forEach(function (select) {
-                    var input = select.querySelector('input[aria-label]');
-                    var target = select.querySelector('div.mud-input-slot[tabindex="0"]');
-                    if (input && target && !hasAccessibleName(target)) {
-                        target.setAttribute('aria-label', input.getAttribute('aria-label'));
-                        setIfMissing(target, 'role', 'button');
-                        setIfMissing(target, 'aria-haspopup', 'listbox');
-                    }
-                });
             document.querySelectorAll('.so-resource-dialog button svg[aria-label="Increment"], .so-resource-dialog button svg[aria-label="Decrement"]')
                 .forEach(function (icon) {
                     // A labelled aria-hidden icon does not name its spin button; name the button if it has no name.
@@ -256,6 +241,7 @@
             target.focus();
         } };
     </script>
+    <script src="~/js/so-select-a11y.js" asp-append-version="true"></script>
     <script src="~/js/workspace-guide.js" asp-append-version="true"></script>
 </body>
 </html>

@@ -66,7 +66,7 @@ async function navigate(page, route) {
         await page.waitForURL(url => !url.pathname.includes('login'));
         console.log('Connected to local UI');
         await navigate(page, 'resources');
-        await page.getByRole('button', { name: 'Sayfa boyutu', exact: true }).waitFor();
+        await page.getByRole('combobox', { name: 'Sayfa boyutu', exact: true }).waitFor();
         console.log('PASS: visible select keyboard target has an accessible name');
         await navigate(page, 'resources/sets');
         assert.equal(await page.locator('a[href="resources"].active').count(), 0);

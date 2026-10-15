@@ -20,7 +20,7 @@
     A source that cannot be read is reported as Failed (scan Partial or Failed), never as "not used".
 
     The functions between the BEGIN/END markers are a verbatim copy of
-    scripts/jea/proposed/SecureOps.ServiceAccountUsage/SecureOps.ServiceAccountUsage.psm1; a unit test fails on any drift.
+    scripts/jea/SecureOps.ServiceAccountUsage/SecureOps.ServiceAccountUsage.psm1; a unit test fails on any drift.
 
 .EXAMPLE
     .\Get-ServiceAccountUsage.ps1 -Account 'SYN\svc_synapp'
@@ -233,8 +233,11 @@ function Get-SecureOpsAccountUsage {
         1-20 account names: name, DOMAIN\name or gMSA name ending with "$". No wildcards.
     .PARAMETER ExpectedAccount
         Optional gMSA (ending with "$"): also report whether the components now run as it (post-conversion check).
+    .PARAMETER AsJson
+        Return the document as one compressed JSON text instead of an object. Remote callers (the Worker) use it, because PowerShell
+        remoting serializes nested objects only to a shallow depth.
     .OUTPUTS
-        One object, schema service-account-usage-v1 (contracts/schemas/service-account-usage.schema.json).
+        One object (or with -AsJson one JSON text), schema service-account-usage-v1 (contracts/schemas/service-account-usage.schema.json).
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
@@ -245,7 +248,9 @@ function Get-SecureOpsAccountUsage {
         [string[]]$Account,
 
         [ValidateScript({ $_ -match $script:AccountPattern -and $_.EndsWith('$') })]
-        [string]$ExpectedAccount
+        [string]$ExpectedAccount,
+
+        [switch]$AsJson
     )
 
     $ErrorActionPreference = 'Stop'
@@ -287,7 +292,7 @@ function Get-SecureOpsAccountUsage {
     } else { $null }
 
     $timer.Stop()
-    [pscustomobject]@{
+    $document = [pscustomobject]@{
         schema       = $script:SchemaName
         serverName   = $env:COMPUTERNAME
         generatedAt  = $started.ToString('o')
@@ -299,6 +304,7 @@ function Get-SecureOpsAccountUsage {
         verification = $verification
         warnings     = @($warnings)
     }
+    if ($AsJson) { Microsoft.PowerShell.Utility\ConvertTo-Json -InputObject $document -Depth 8 -Compress } else { $document }
 }
 # <<< END SecureOps.ServiceAccountUsage functions
 

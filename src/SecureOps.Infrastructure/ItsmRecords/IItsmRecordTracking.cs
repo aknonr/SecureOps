@@ -41,11 +41,21 @@ public sealed record ItsmTrackingPart<T>(ItsmTrackingPartState State, ItsmRecord
 /// <summary>
 /// OR header fields. Values are raw source text: the update time's time-zone semantics are not proven, and status
 /// and stage are source codes, not meanings, and are null unless their field names are configured (ADR-0032).
+/// The labels are the source's own display text for those two codes (the <c>KEY.</c> cell next to the
+/// <c>SET.</c> value, ADR-0032 amendment 2026-10-14), shown beside the code as the source wrote it; they are not
+/// a product interpretation and are null when the source sent none. No other display cell is read.
 /// </summary>
 /// <param name="LastModifiedText">Raw last-modified text (<c>m_last_mod_dt</c>); null when the source left it empty.</param>
 /// <param name="RawStatusCode">Raw status code when a status field is configured and filled.</param>
 /// <param name="RawStage">Raw stage code when a stage field is configured and filled.</param>
-public sealed record ItsmOrState(string? LastModifiedText, string? RawStatusCode, string? RawStage);
+/// <param name="StatusLabel">Source display text of the status code; null when absent, empty or no status field is configured.</param>
+/// <param name="StageLabel">Source display text of the stage code; null when absent, empty or no stage field is configured.</param>
+public sealed record ItsmOrState(
+    string? LastModifiedText,
+    string? RawStatusCode,
+    string? RawStage,
+    string? StatusLabel = null,
+    string? StageLabel = null);
 
 /// <summary>
 /// One workflow activity of the OR. The person who completed it is never selected. Group and status are source

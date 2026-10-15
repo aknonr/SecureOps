@@ -1,0 +1,124 @@
+/* One card per plan account; a list (not a table) so 390 px and 200 % zoom need no horizontal scroll. */
+.sa-or-list {
+    list-style: none;
+    margin: var(--so-space-2) 0 0;
+    padding: 0;
+    display: grid;
+    gap: var(--so-space-3);
+}
+
+.sa-or-item {
+    border: 1px solid var(--so-border);
+    border-radius: 6px;
+    padding: var(--so-space-3);
+    min-width: 0;
+}
+
+.sa-or-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--so-space-2);
+    align-items: center;
+    justify-content: space-between;
+}
+
+.sa-or-account {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.sa-or-sub {
+    margin: var(--so-space-3) 0 var(--so-space-2);
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.sa-or-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--so-space-2);
+    align-items: center;
+    margin-top: var(--so-space-2);
+}
+
+.sa-or-note {
+    display: flex;
+    gap: var(--so-space-2);
+    align-items: flex-start;
+}
+
+.sa-or-flow,
+.sa-or-tracking {
+    margin-top: var(--so-space-3);
+    padding-top: var(--so-space-3);
+    border-top: 1px solid var(--so-border);
+}
+
+/* The separate confirmation stands apart from the editing controls: a thicker edge, not a colour, marks it. */
+.sa-or-confirm {
+    margin-top: var(--so-space-3);
+    padding: var(--so-space-3);
+    border: 2px solid var(--so-text);
+    border-radius: 6px;
+}
+
+.sa-or-requester {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--so-space-2);
+    align-items: center;
+}
+
+.sa-or-environments {
+    margin: var(--so-space-2) 0 0;
+    padding: 0;
+    border: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--so-space-3);
+}
+
+.sa-or-radio {
+    display: inline-flex;
+    gap: var(--so-space-1);
+    align-items: center;
+}
+
+.sa-or-radio input:focus-visible {
+    outline: 2px solid var(--so-text);
+    outline-offset: 2px;
+}
+
+.sa-or-fields {
+    margin: 0;
+    display: grid;
+    gap: var(--so-space-1);
+}
+
+.sa-or-fields dd {
+    margin: 0 0 var(--so-space-2);
+}
+
+/* Sent text keeps its line breaks and wraps long tokens (server names, the plan reference). */
+.sa-or-value,
+.sa-or-reference {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.sa-or-reference {
+    display: block;
+}
+
+.sa-or-history {
+    margin: 0;
+    padding-left: var(--so-space-5);
+    overflow-wrap: anywhere;
+}
+
+::deep .mud-button-root:focus-visible {
+    outline: 2px solid var(--so-text);
+    outline-offset: 2px;
+}

@@ -23,13 +23,17 @@
         { <p>Önceki öneri kararı: @DecisionText(previous.Decision) · @previous.ActorLabel · @previous.At.ToString("u")</p> }
         <MudTextField T="string" Label="Uygun WASAS inceleyicisi ara" aria-label="Uygun WASAS inceleyicisi ara" Value="_search" ValueChanged="SearchAsync"
                       MaxLength="100" Immediate="true" DebounceInterval="350" Variant="Variant.Outlined" Disabled="_busy" />
-        <MudSelect T="string" Label="İnceleyici" @bind-Value="_selected" Disabled="_busy" Variant="Variant.Outlined">
+        @if (_loaded)
+        {
+        <MudSelect T="string" Label="İnceleyici" @bind-Value="_selected" Disabled="_busy" Variant="Variant.Outlined" ShrinkLabel="true">
             <MudSelectItem T="string" Value="@(string.Empty)">Atanmamış</MudSelectItem>
             @if (Record.AssigneeId is { } current && !_people.Any(p => p.Id == current))
             { <MudSelectItem T="string" Value="@(current.ToString("D"))">@Record.AssigneeLabel</MudSelectItem> }
             @foreach (var person in _people)
             { <MudSelectItem T="string" Value="@(person.Id.ToString("D"))">@person.Label</MudSelectItem> }
         </MudSelect>
+        }
+        else { <p role="status">Uygun inceleyiciler yükleniyor...</p> }
         <MudTextField T="string" Label="Atama gerekçesi" aria-label="Atama gerekçesi" @bind-Value="_reason" MaxLength="500" Immediate="true"
                       Required="true" Variant="Variant.Outlined" Disabled="_busy" />
         @if (_error is not null) { <p role="alert">@_error</p> }
@@ -74,6 +78,7 @@
     private string _selected = "", _search = "", _reason = "";
     private string? _error;
     private bool _busy;
+    private bool _loaded;
     private int _searchVersion;
     private string[] ReporterLabels => Record.Source.Servers.Select(s => s.RelatedRequestReporter)
         .Where(r => r is not null && r.EffectiveState(DateTimeOffset.UtcNow) == "ExactMatch" && r.DisplayState == "Returned"
@@ -83,6 +88,7 @@
     {
         _selected = Record.AssigneeId?.ToString("D") ?? "";
         await SearchAsync("");
+        _loaded = true;
         if (Suggest is not null)
         {
             try { _suggestion = await Suggest(); }

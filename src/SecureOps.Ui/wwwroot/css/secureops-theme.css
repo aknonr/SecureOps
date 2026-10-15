@@ -277,6 +277,15 @@ body {
     border-color: color-mix(in srgb, var(--so-appbar-text) 20%, transparent);
 }
 
+/* Keyboard focus ring for the app bar chrome (brand link, account menu). The hover
+   tint alone is not a focus indicator; the ring uses the app bar text colour so it
+   holds contrast on the navy bar in light and dark. */
+.so-appbar a:focus-visible,
+.so-appbar button:focus-visible {
+    outline: 2px solid var(--so-appbar-text);
+    outline-offset: 2px;
+}
+
 .so-user-trigger-text {
     display: flex;
     flex-direction: column;

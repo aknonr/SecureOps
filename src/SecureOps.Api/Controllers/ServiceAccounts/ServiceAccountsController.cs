@@ -301,6 +301,17 @@ public sealed class ServiceAccountsController(ServiceAccountService service) : C
         [FromQuery] int? pageSize = null, CancellationToken cancellationToken = default) =>
         ServiceAccountReplies.Reply(this, await service.UsageScanDiffAsync(User, Context(), id, linkId, against, page, pageSize, cancellationToken));
 
+    /// <summary>
+    /// "Hangi sunucularda?" for one account: one row per server with what each stored source (scan, Excel finding, manual record) and,
+    /// when readable, the directory SPN says. Read only, same scope rule as the account detail (out of scope = 404). Evidence only:
+    /// "not found" never means "not used", and there is no reverse (server to accounts) route.
+    /// </summary>
+    [HttpGet("accounts/{id:guid}/where-used")]
+    [ProducesResponseType(typeof(WhereUsedView), StatusCodes.Status200OK)]
+    public async Task<ActionResult<WhereUsedView>> WhereUsedAsync(Guid id, [FromQuery] string? source = null, [FromQuery] bool foundOnly = false,
+        [FromQuery] int page = 1, [FromQuery] int? pageSize = null, CancellationToken cancellationToken = default) =>
+        ServiceAccountReplies.Reply(this, await service.WhereUsedAsync(User, Context(), id, source, foundOnly, page, pageSize, cancellationToken));
+
     /// <summary>Records a matched component of an attached scan as a usage (a person's decision, never automatic).</summary>
     [HttpPost("accounts/{id:guid}/usage-scan-items/{itemId:guid}/usage")]
     [Authorize(Policy = ServiceAccountPolicies.Work)]

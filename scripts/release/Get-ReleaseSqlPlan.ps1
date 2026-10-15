@@ -4,30 +4,37 @@ param([Parameter(Mandatory)][string]$RepositoryRoot,
     [switch]$UpgradeFromInstalled026,
     [switch]$UpgradeFromInstalled027, [switch]$UpgradeFromInstalled028,
     [switch]$UpgradeFromInstalled032, [switch]$UpgradeFromInstalled033,
+    [switch]$UpgradeFromInstalled032Through037,
     [switch]$IncludeServiceAccounts,
     [string]$SqlUpgradeReview,
     [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$ExpectedSource)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $root = (Resolve-Path -LiteralPath $RepositoryRoot).Path
-if (@($UpgradeFromRc622,$UpgradeFromRc624,$UpgradeFromRc626,$UpgradeFromInstalled026,$UpgradeFromInstalled027,$UpgradeFromInstalled028,$UpgradeFromInstalled032,$UpgradeFromInstalled033 | Where-Object { $_ }).Count -gt 1) {
+if (@($UpgradeFromRc622,$UpgradeFromRc624,$UpgradeFromRc626,$UpgradeFromInstalled026,$UpgradeFromInstalled027,$UpgradeFromInstalled028,$UpgradeFromInstalled032,$UpgradeFromInstalled033,$UpgradeFromInstalled032Through037 | Where-Object { $_ }).Count -gt 1) {
     throw 'Choose exactly one upgrade baseline.'
 }
 $current = $UpgradeFromInstalled027 -or $UpgradeFromInstalled028
 $changePlans = $UpgradeFromInstalled032
 $planEvidence = $UpgradeFromInstalled033
-if (($UpgradeFromInstalled026 -or $current -or $changePlans -or $planEvidence) -and !$IncludeServiceAccounts) { throw 'Installed baseline selection requires explicit Service Accounts review.' }
-if ($IncludeServiceAccounts -and !$UpgradeFromRc626 -and !$UpgradeFromInstalled026 -and !$current -and !$changePlans -and !$planEvidence) {
+$through037 = $UpgradeFromInstalled032Through037
+if (($UpgradeFromInstalled026 -or $current -or $changePlans -or $planEvidence -or $through037) -and !$IncludeServiceAccounts) { throw 'Installed baseline selection requires explicit Service Accounts review.' }
+if ($IncludeServiceAccounts -and !$UpgradeFromRc626 -and !$UpgradeFromInstalled026 -and !$current -and !$changePlans -and !$planEvidence -and !$through037) {
     throw '025 selection requires the reviewed rc6.26/023 upgrade path.'
 }
 if (!$IncludeServiceAccounts -and $SqlUpgradeReview) { throw 'SQL upgrade review requires explicit 025 selection.' }
 $last = if ($planEvidence) { 34 } elseif ($changePlans) { 33 } elseif ($current) { 32 } elseif ($UpgradeFromInstalled026) { 27 } elseif ($IncludeServiceAccounts) { 26 } else { 24 }
 $first = if ($planEvidence) { 34 } elseif ($changePlans) { 33 } elseif ($UpgradeFromInstalled027) { 28 } elseif ($UpgradeFromInstalled028) { 29 } elseif ($UpgradeFromInstalled026) { 27 } elseif ($UpgradeFromRc626) { 24 } elseif ($UpgradeFromRc624) { 23 } elseif ($UpgradeFromRc622) { 22 } else { 19 }
-# A known successor in source does not extend the installed-027/028 package.
+# The installed-032 to 037 review is its own range; the single-baseline ladder above stays as published.
+if ($through037) { $first = 33; $last = 37 }
+# A known successor in source does not extend an installed-baseline package; 038+ is never recognized here.
+$successors = @{ 33='033-service-account-change-plans.sql'; 34='034-service-account-plan-evidence.sql'
+    35='035-service-account-plan-operational-records.sql'; 36='036-service-account-events.sql'; 37='037-service-account-usage-scan-jobs.sql' }
 $sourceLast = $last
-if ($current -or $changePlans) {
-    if (Test-Path -LiteralPath (Join-Path $root 'sql/migrations/033-service-account-change-plans.sql') -PathType Leaf) { $sourceLast = 33 }
-    if (Test-Path -LiteralPath (Join-Path $root 'sql/migrations/034-service-account-plan-evidence.sql') -PathType Leaf) { $sourceLast = 34 }
+if ($current -or $changePlans -or $planEvidence -or $through037) {
+    foreach ($number in 33..37) {
+        if ($number -gt $sourceLast -and (Test-Path -LiteralPath (Join-Path $root "sql/migrations/$($successors[$number])") -PathType Leaf)) { $sourceLast = $number }
+    }
 }
 $all = @()
 foreach ($folder in @('migrations','schema')) {
@@ -39,26 +46,32 @@ foreach ($folder in @('migrations','schema')) {
     if ($numbers -cne ((1..$sourceLast | ForEach-Object { '{0:D3}' -f $_ }) -join ',')) {
         throw "Expected the exact complete 001-$sourceLast SQL chain; later migrations must be explicitly reviewed."
     }
-    if ($sourceLast -ge 33 -and $files[32].Name -cne '033-service-account-change-plans.sql') { throw 'Unexpected 033 SQL asset name.' }
-    if ($sourceLast -ge 34 -and $files[33].Name -cne '034-service-account-plan-evidence.sql') { throw 'Unexpected 034 SQL asset name.' }
+    foreach ($number in 33..37) {
+        if ($sourceLast -ge $number -and $files[$number-1].Name -cne $successors[$number]) { throw "Unexpected $('{0:D3}' -f $number) SQL asset name." }
+    }
     $all += @($files | Where-Object { [int]$_.Name.Substring(0,3) -le $last } | ForEach-Object { "sql/$folder/$($_.Name)" })
 }
 $delta = @($all | Where-Object { [int]([IO.Path]::GetFileName($_).Substring(0,3)) -ge $first })
 $roles = @()
 $reviewIdentity = $null
+$guidance = @()
+$steps = @()
 if ($IncludeServiceAccounts) {
     $include = 'sql/pending/service-accounts/SA-001-service-accounts.sql'
     $usageInclude = 'sql/pending/service-accounts/SA-002-usage-rules.sql'
     $roles = @('sql/pending/service-accounts/SA-API-permissions.sql','sql/pending/service-accounts/SA-Worker-permissions.sql',
         'sql/pending/service-accounts/SA-002-API-permissions.sql')
-    if ($planEvidence) { $roles = @() }
+    if ($through037) { $roles = @('sql/pending/service-accounts/SA-006-API-permissions.sql','sql/pending/service-accounts/SA-008-API-permissions.sql',
+        'sql/pending/service-accounts/SA-009-API-permissions.sql','sql/pending/service-accounts/SA-010-API-permissions.sql',
+        'sql/pending/service-accounts/SA-010-Worker-permissions.sql') }
+    elseif ($planEvidence) { $roles = @() }
     elseif ($changePlans) { $roles = @('sql/pending/service-accounts/SA-006-API-permissions.sql') }
     elseif ($current) { $roles = @('sql/pending/service-accounts/SA-004-API-permissions.sql') }
     elseif ($UpgradeFromInstalled026) { $roles = @('sql/pending/service-accounts/SA-API-permissions.sql','sql/pending/service-accounts/SA-002-API-permissions.sql') }
     $all += $include
-    if (!$UpgradeFromInstalled026 -and !$current -and !$changePlans -and !$planEvidence) { $delta += $include }
+    if (!$UpgradeFromInstalled026 -and !$current -and !$changePlans -and !$planEvidence -and !$through037) { $delta += $include }
     $all += $usageInclude
-    if (!$UpgradeFromInstalled026 -and !$current -and !$changePlans -and !$planEvidence) { $delta += $usageInclude }
+    if (!$UpgradeFromInstalled026 -and !$current -and !$changePlans -and !$planEvidence -and !$through037) { $delta += $usageInclude }
     if ($changePlans -or $planEvidence) {
         $dependency = 'sql/pending/service-accounts/SA-006-change-plans.sql'
         $all += $dependency
@@ -69,13 +82,31 @@ if ($IncludeServiceAccounts) {
         $all += $dependency
         $delta += $dependency
     }
-    if ($current -or $changePlans -or $planEvidence) {
+    if ($through037) {
+        $dependencies = @('sql/pending/service-accounts/SA-006-change-plans.sql','sql/pending/service-accounts/SA-007-plan-evidence.sql',
+            'sql/pending/service-accounts/SA-008-plan-operational-records.sql','sql/pending/service-accounts/SA-009-account-events.sql',
+            'sql/pending/service-accounts/SA-010-usage-scan-jobs.sql')
+        $all += $dependencies
+        $delta += $dependencies
+        # Each step binds its numbered migration, include, role candidates, DBA note and read-only DBA checks.
+        $steps = @(foreach ($number in 33..37) {
+            $stepInclude = $dependencies[$number-33]
+            $prefix = [IO.Path]::GetFileName($stepInclude).Substring(0,7)
+            $stepRoles = @($roles | Where-Object { [IO.Path]::GetFileName($_).StartsWith($prefix, [StringComparison]::Ordinal) })
+            [ordered]@{ migration='{0:D3}' -f $number; files=@("sql/migrations/$($successors[$number])","sql/schema/$($successors[$number])",$stepInclude);
+                execution=@("sql/migrations/$($successors[$number])") + $stepRoles; dbaNote="docs/service-accounts/DBA-0$number-TR.md";
+                dbaChecks="tests/sql/service-accounts/sa-0$number-dba-checks.sql" }
+        })
+        $guidance = @($steps | ForEach-Object { $_.dbaNote; $_.dbaChecks })
+    }
+    if ($current -or $changePlans -or $planEvidence -or $through037) {
         $dependencies = @('sql/pending/service-accounts/SA-003-scope-bootstrap.sql',
             'sql/pending/service-accounts/SA-004-usage-scans.sql','sql/pending/service-accounts/SA-005-requested-gmsa-name.sql')
         $all += $dependencies
         if ($current) { $delta += $dependencies }
     }
     if (!$SqlUpgradeReview) {
+        if ($through037) { throw '033-037 requires a source-bound installed 032 baseline and reviewed 033-037 file identities.' }
         if ($planEvidence) { throw '034 requires a source-bound installed 033 baseline and reviewed 034 file identities.' }
         if ($changePlans) { throw '033 requires a source-bound installed 032 baseline and reviewed 033 file identities.' }
         throw '025 requires a source-bound 023 comparison and reviewed 024/025 file identities.'
@@ -100,20 +131,31 @@ if ($IncludeServiceAccounts) {
         $flags = @('Baseline033Verified','Inventory025To034Verified','Unapplied034Verified','RuntimeApiRoleVerified','Delta034Reviewed')
         $references = @('InstalledInventoryEvidenceReference','Delta034ReviewReference')
     }
+    if ($through037) {
+        $flags = @('Baseline032Verified','Inventory025To032Verified','Unapplied033To037Verified','RuntimeApiRoleVerified','RuntimeWorkerRoleVerified') +
+            @(33..37 | ForEach-Object { "Delta0${_}Reviewed" })
+        $references = @('InstalledInventoryEvidenceReference') + @(33..37 | ForEach-Object { "Delta0${_}ReviewReference" })
+    }
     foreach ($flag in $flags) {
         if ($review.$flag -isnot [bool] -or !$review.$flag) { throw 'SQL baseline/delta review gate is not verified.' }
     }
     foreach ($reference in $references) {
         if ($review.$reference -isnot [string] -or [string]::IsNullOrWhiteSpace($review.$reference)) { throw 'SQL review evidence reference is missing.' }
     }
-    $required = @($delta + $roles | Sort-Object)
+    $required = @($delta + $roles + $guidance | Sort-Object)
     $reviewed = @($review.Files | Sort-Object Path)
     if (($required -join '|') -cne (($reviewed | ForEach-Object { $_.Path }) -join '|')) { throw 'SQL review must cover the exact selected dependency and role files.' }
     foreach ($entry in $reviewed) {
         if ($entry.Sha256 -notmatch '^[0-9A-Fa-f]{64}$' -or
             (Get-FileHash -LiteralPath (Join-Path $root $entry.Path)).Hash -ine $entry.Sha256) { throw 'Reviewed SQL file hash mismatch.' }
     }
-    if ($planEvidence) {
+    if ($through037) {
+        $deltaReviews = [ordered]@{}
+        foreach ($number in 33..37) { $deltaReviews["0$number"] = $review."Delta0${number}ReviewReference" }
+        $reviewIdentity = [ordered]@{ sha256=(Get-FileHash -LiteralPath $reviewFile.FullName).Hash;
+            installedBaseline='032'; inventoryEvidence=$review.InstalledInventoryEvidenceReference; deltaReviews=$deltaReviews;
+            files=@($reviewed | ForEach-Object { [ordered]@{ path=$_.Path; sha256=$_.Sha256.ToUpperInvariant() } }) }
+    } elseif ($planEvidence) {
         $reviewIdentity = [ordered]@{ sha256=(Get-FileHash -LiteralPath $reviewFile.FullName).Hash;
             installedBaseline='033'; inventoryEvidence=$review.InstalledInventoryEvidenceReference;
             deltaReview=$review.Delta034ReviewReference }
@@ -147,12 +189,13 @@ foreach ($relative in @($all) + @($roles)) {
             if (!$resolved.StartsWith($root + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw 'SQLCMD include escapes repository.' }
             $dependency = $resolved.Substring($root.Length+1).Replace('\','/')
             if ($all -cnotcontains $dependency -or !(Test-Path -LiteralPath $resolved -PathType Leaf)) { throw 'SQLCMD include is missing from selected dependency closure.' }
-            if (($current -or $changePlans -or $planEvidence) -and ($delta -ccontains $relative -or ($changePlans -and $roles -ccontains $relative)) -and
+            if (($current -or $changePlans -or $planEvidence -or $through037) -and ($delta -ccontains $relative -or (($changePlans -or $through037) -and $roles -ccontains $relative)) -and
                 $delta -cnotcontains $dependency) { throw 'SQLCMD delta include would replay an installed dependency.' }
         }
     }
 }
 $execution = @()
+if ($through037) { $execution = @($steps | ForEach-Object { $_.execution }) }
 if ($planEvidence) {
     $execution = @('sql/migrations/034-service-account-plan-evidence.sql')
 }
@@ -165,6 +208,9 @@ if ($current) {
         'sql/pending/service-accounts/SA-004-API-permissions.sql','sql/migrations/031-service-account-requested-gmsa-name.sql',
         'sql/migrations/032-access-request-user-index.sql')
 }
-[pscustomobject]@{ RequiredSchema="001-$('{0:D3}' -f $last)";
+$plan = [ordered]@{ RequiredSchema="001-$('{0:D3}' -f $last)";
     DeltaRange=if ($first -eq $last) { '{0:D3}' -f $first } else { '{0:D3}-{1:D3}' -f $first,$last };
     AllFiles=$all; DeltaFiles=$delta; RoleFiles=$roles; ExecutionFiles=$execution; Review=$reviewIdentity }
+# Only the 033-037 path reports steps and guidance, so every earlier plan keeps its exact shape.
+if ($through037) { $plan.GuidanceFiles = $guidance; $plan.Steps = $steps }
+[pscustomobject]$plan

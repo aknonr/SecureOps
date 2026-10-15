@@ -1,8 +1,22 @@
 # sql/
 
+## Service Account Plan OR Submissions 035, 2026-10-13
+
+Inventory is 001-036. **035-service-account-plan-operational-records** requires reviewed 033 and 034 and includes
+`pending/service-accounts/SA-008-plan-operational-records.sql` unchanged: two new tables for OR-2 (ADR-0030, still PROPOSED; only
+a Fake adapter exists and the provider default is Disabled). `svcacct.ChangePlanRecordSubmissions` holds one row per explicit
+"open OR" attempt for one plan account, written as `Sending` before any remote call with the exact content sent, the client
+idempotency key (unique per account) and the server fingerprint; a filtered unique index allows one live submission per (plan,
+account) and one live holder per OR number; a trigger allows only the outcome/reconciliation transitions and never a content
+change or delete (51403/51404). `svcacct.ChangePlanRecordSubmissionEvents` is append-only (51402). A replay stops before any
+change (51400). Grants: `SA-008-API-permissions.sql` (SELECT, INSERT; UPDATE only on the outcome columns). Binaries with this
+code keep working before 035 (the OR routes answer 503 `ServiceAccountOperationalRecordsNotInstalled`). Not executed in the Linux
+container that wrote it; DBA addendum [DBA-035-TR.md](../docs/service-accounts/DBA-035-TR.md); harness
+`tests/sql/service-accounts/sa-035-guards.sql`. The release selector does not know 035 or 036 yet (its owner updates it).
+
 ## Service Account Events 036, 2026-10-13
 
-Inventory is 001-034 plus 036; **035 is reserved for OR-2** (not on this branch). **036-service-account-events** requires reviewed
+Inventory was 001-034 plus 036 (035 followed on the OR-2 branch). **036-service-account-events** requires reviewed
 025 and includes `pending/service-accounts/SA-009-account-events.sql` unchanged: two append-only tables, `svcacct.AccountEvents`
 (one per recorded event, `(AccountId, IdempotencyKey)` unique) and `svcacct.AccountEventItems` (which records the event produced).
 No mail body, sender, name or other text column. UPDATE/DELETE is refused by trigger (51411); a replay stops before any change
