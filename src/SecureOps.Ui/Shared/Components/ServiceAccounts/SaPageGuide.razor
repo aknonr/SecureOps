@@ -1,7 +1,8 @@
 @* In-page guide for the Service Accounts pages: a compact strip that shows the page's flow as numbered steps with a gentle
-   animated highlight moving from step to step, and a "Nasıl kullanılır?" disclosure with what the page is for, what each
-   step means and what the page never does. Pure CSS animation (no script); it stops for users who prefer reduced motion.
-   No state is stored: the details start closed (or open when the page asks, e.g. on first setup). *@
+   animated highlight moving from step to step, a "Nasıl kullanılır?" disclosure with what the page is for, a few short steps and
+   what the page never does, and, when the page gives one, an "Adım adım göster" tour (SoGuidedTour) that points at each area on
+   the screen. The strip animation is pure CSS and stops for users who prefer reduced motion. No state is stored: the details
+   start closed (or open when the page asks, e.g. on first setup) and the tour never opens on its own (GUIDED-TOUR-DESIGN.md). *@
 
 <section class="sa-guide" aria-label="@($"{Title}: sayfa rehberi")">
     <div class="sa-guide-strip">
@@ -17,8 +18,14 @@
                 </li>
             }
         </ol>
-        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => _open = !_open)" aria-expanded="@(_open ? "true" : "false")"
-                   StartIcon="@Icons.Material.Filled.HelpOutline" Class="sa-guide-toggle">@(_open ? "Rehberi kapat" : "Nasıl kullanılır?")</MudButton>
+        <div class="sa-guide-actions">
+            @if (Tour is { Count: > 0 })
+            {
+                <SoGuidedTour Id="@TourId" Title="@Title" Steps="Tour" />
+            }
+            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="@(() => _open = !_open)" aria-expanded="@(_open ? "true" : "false")"
+                       StartIcon="@Icons.Material.Filled.HelpOutline" Class="sa-guide-toggle">@(_open ? "Rehberi kapat" : "Nasıl kullanılır?")</MudButton>
+        </div>
     </div>
     @if (_open)
     {
@@ -59,6 +66,12 @@
 
     /// <summary>One or two sentences for the caller's role on this record (from the server's permissions); omitted when null.</summary>
     [Parameter] public string? RoleNote { get; set; }
+
+    /// <summary>On-screen tour of this page (permissions already applied); no tour button when null or empty.</summary>
+    [Parameter] public IReadOnlyList<SoTourStep>? Tour { get; set; }
+
+    /// <summary>Id prefix of the tour, unique on the page.</summary>
+    [Parameter] public string TourId { get; set; } = "sa-tour";
 
     /// <summary>Start with the details open (e.g. while nothing has been set up yet).</summary>
     [Parameter] public bool StartOpen { get; set; }

@@ -1,0 +1,237 @@
+@* On-screen guided tour (docs/service-accounts/GUIDED-TOUR-DESIGN.md). The person starts it; it never opens on its own because
+   "already seen" cannot be stored in the browser (CLAUDE.md) and no server preference exists (gap G-41). Each step highlights the
+   element carrying data-tour="Target" and says what it is and why it matters. A step the caller may not take (server permissions) is
+   not shown; a step whose area is not on the screen is skipped and the box says so. The tour only points: it never clicks, opens or
+   writes anything. so-guided-tour.js only measures, places, scrolls and moves focus; every decision is GuidedTourState. *@
+@implements IAsyncDisposable
+@inject IJSRuntime Js
+
+@if (_allowed.Count > 0)
+{
+    <button type="button" id="@StartId" class="so-tour-start" data-tour-action="start" aria-haspopup="dialog"
+            aria-expanded="@(_state.IsOpen ? "true" : "false")" @onclick="StartAsync">
+        <span class="so-tour-start-icon" aria-hidden="true">▶</span> @StartLabel
+    </button>
+}
+@if (_state.IsOpen)
+{
+    SoTourStep? step = _state.Current;
+    <div class="so-tour-ring" @ref="_ring" aria-hidden="true" hidden="@(step is null)"></div>
+    <div class="so-tour-box" @ref="_box" role="dialog" aria-modal="false" aria-labelledby="@($"{Id}-title")" aria-describedby="@($"{Id}-body")"
+         data-tour-box @onkeydown="KeyDownAsync">
+        <p class="so-tour-count">
+            @if (step is not null) { <span>Adım @(_state.Index + 1) / @_state.Steps.Count</span> }
+            <span class="so-tour-name">@Title</span>
+        </p>
+        @if (step is null)
+        {
+            <h2 id="@($"{Id}-title")" class="so-tour-title" tabindex="-1" data-tour-focus>Gösterilecek alan yok</h2>
+            <div id="@($"{Id}-body")">
+                <p class="so-tour-text">Turdaki @_state.Steps.Count adımın alanı şu an ekranda değil. Bu, yetkiniz, boş bir liste veya sayfanın henüz yüklenmemesi yüzünden olabilir; sayfa yüklendikten sonra yeniden deneyin.</p>
+            </div>
+        }
+        else
+        {
+            <h2 id="@($"{Id}-title")" class="so-tour-title" tabindex="-1" data-tour-focus>@step.Title</h2>
+            <div id="@($"{Id}-body")">
+                <p class="so-tour-text"><strong>Ne:</strong> @step.What</p>
+                <p class="so-tour-text"><strong>Neden:</strong> @step.Why</p>
+            </div>
+        }
+        <p class="so-tour-skip" role="status" data-tour-skip>@SkipText</p>
+        <div class="so-tour-controls">
+            @if (step is not null)
+            {
+                <button type="button" class="so-tour-button" data-tour-action="back" disabled="@(!_state.HasPrevious || _busy)" @onclick="BackAsync">Geri</button>
+            }
+            <button type="button" class="so-tour-button" data-tour-action="close" @onclick="CloseAsync">Kapat</button>
+            @if (step is not null)
+            {
+                <button type="button" class="so-tour-button so-tour-button--primary" data-tour-action="next" disabled="@_busy" @onclick="NextAsync">@(_state.HasNext ? "İleri" : "Bitir")</button>
+            }
+        </div>
+        <p class="so-tour-hint">Esc turu kapatır. Vurgulanan alan kullanılabilir kalır; tur hiçbir şeye basmaz ve kayıt yapmaz.</p>
+    </div>
+}
+
+@code {
+    /// <summary>Path of the positioning module, relative to the app base.</summary>
+    public const string ModulePath = "./js/so-guided-tour.js";
+
+    private GuidedTourState _state = new([]);
+    private IReadOnlyList<SoTourStep> _allowed = [];
+    private ElementReference _box;
+    private ElementReference _ring;
+    private IJSObjectReference? _module;
+    private bool _show;
+    private bool _restoreFocus;
+    private bool _busy;
+
+    /// <summary>Unique id prefix on the page; the start button is "{Id}-start".</summary>
+    [Parameter, EditorRequired] public string Id { get; set; } = "so-tour";
+
+    /// <summary>Page or area name, shown in the box.</summary>
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+
+    /// <summary>The tour's steps, with Allowed already computed from the server's permissions.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<SoTourStep> Steps { get; set; } = [];
+
+    /// <summary>Label of the start button.</summary>
+    [Parameter] public string StartLabel { get; set; } = "Adım adım göster";
+
+    private string StartId => $"{Id}-start";
+
+    private string SkipText
+    {
+        get
+        {
+            List<string> parts = [];
+            if (_state.Skipped.Count > 0)
+            {
+                parts.Add($"Atlanan adım: {Names(_state.Skipped)} — bu alan şu an ekranda yok (yetki, boş liste veya önceki adım henüz yapılmadı).");
+            }
+
+            if (_state.Current is not null && _state.MissingAfter.Count > 0)
+            {
+                parts.Add($"Sonraki {Names(_state.MissingAfter)} adımının alanı şu an ekranda yok; tur burada biter.");
+            }
+
+            return string.Join(" ", parts);
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        _allowed = [.. Steps.Where(s => s.Allowed)];
+        if (!_state.IsOpen)
+        {
+            _state = new GuidedTourState(_allowed);
+        }
+    }
+
+    private static string Names(IEnumerable<SoTourStep> steps) => string.Join(", ", steps.Select(s => $"\"{s.Title}\""));
+
+    private async Task<IReadOnlyList<bool>> PresentAsync()
+    {
+        _module ??= await Js.InvokeAsync<IJSObjectReference>("import", ModulePath);
+        bool[]? present = await _module.InvokeAsync<bool[]?>("present", _state.Steps.Select(s => s.Target).ToArray());
+        return present ?? [];
+    }
+
+    private async Task StartAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            _state = new GuidedTourState(_allowed);
+            _state.Start(await PresentAsync());
+            _show = true;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task NextAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            if (_state.Next(await PresentAsync()))
+            {
+                _show = true;
+            }
+            else
+            {
+                _restoreFocus = true;
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task BackAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            if (_state.Back(await PresentAsync()))
+            {
+                _show = true;
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private Task CloseAsync()
+    {
+        _state.Close();
+        _show = false;
+        _restoreFocus = true;
+        return Task.CompletedTask;
+    }
+
+    private Task KeyDownAsync(KeyboardEventArgs args) => args.Key == "Escape" ? CloseAsync() : Task.CompletedTask;
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_module is null)
+        {
+            return;
+        }
+
+        if (_restoreFocus)
+        {
+            _restoreFocus = false;
+            await _module.InvokeVoidAsync("hide", StartId);
+        }
+
+        if (_show && _state.IsOpen)
+        {
+            _show = false;
+            await _module.InvokeAsync<bool>("show", _state.Current?.Target, _box, _ring);
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _module.InvokeVoidAsync("hide", null);
+            await _module.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+            // The circuit ended; there is no page to clean up and no focus to restore.
+        }
+    }
+}

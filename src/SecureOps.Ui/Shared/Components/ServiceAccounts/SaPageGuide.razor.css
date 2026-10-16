@@ -85,8 +85,11 @@
     }
 }
 
-/* MudButton renders its own element, so the isolated rule must reach it with ::deep. */
-.sa-guide-strip ::deep .sa-guide-toggle {
+.sa-guide-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--so-space-2);
     margin-left: auto;
 }
 
