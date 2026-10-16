@@ -159,7 +159,7 @@
 }
 
 /* Movement only for people who have not asked for less of it: a short fade when the tour opens. The frame follows the area
-   without a transition so it never trails behind while the page scrolls. */
+   at once (no animated move) so it never trails behind while the page scrolls. */
 @media (prefers-reduced-motion: no-preference) {
     .so-tour-ring,
     .so-tour-box {
