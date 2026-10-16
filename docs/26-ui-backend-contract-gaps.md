@@ -46,7 +46,7 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-37 — First TEST acceptance: no SID search, directory "not configured" vs "unreachable", free-text import row errors | Open (2026-10-13); the UI shows honest wording meanwhile |
 | G-38 — OR → Jira: no issue link, no persisted transfer key/time, no replay indicator, no reviewed draft for retry | ✅ **Resolved** by TH-8/9 (#51); UI states verified locally in TH-12 (2026-10-13); the corporate link remains unverified |
 | G-39 — Service Accounts event flow: close readiness read per request, no verification readiness, preview ids without names | Items 1–3 ✅ closed (2026-10-13, branch `feature/service-accounts-g39-readiness-20261013`); items 4–5 open (UI covers them honestly) |
-| G-? (id requested in `docs/team/WORK-LOG.md`) — `GET /access/users/page` and `/access/requests/page` answer 503 on the InMemory access repository (SQL only) | Open (2026-10-14, #67) — the Demo/InMemory host cannot show real user or request lists; the UI shows its error state, and its list screens are measured on a Mac only through a loopback test proxy with synthetic data |
+| G-40 — `GET /access/users/page` and `/access/requests/page` answer 503 on the InMemory access repository (SQL only) | Open (2026-10-14, #67) — the Demo/InMemory host cannot show real user or request lists; the UI shows its error state, and its list screens are measured on a Mac only through a loopback test proxy with synthetic data |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---

@@ -146,6 +146,29 @@ const probe = () => {
         assert.equal(await page.evaluate(() => document.activeElement.getAttribute('aria-selected')), 'true', 'focused tab is not selected');
         note('requests: ArrowRight moves focus and selection to the next tab');
 
+        // 4b. A visible focus ring, measured rather than assumed: every MudBlazor button, tab, row and link in the page that the
+        // keyboard reaches draws a solid outline of at least 2 px (MudBlazor 6 alone shows only a faint tint).
+        for (const screen of SCREENS) {
+            await open(screen);
+            await page.evaluate(() => { document.activeElement?.blur(); window.scrollTo(0, 0); });
+            const reached = [];
+            for (let stop = 0; stop < 30 && reached.length < 8; stop++) {
+                await page.keyboard.press('Tab');
+                await page.waitForTimeout(400); // the global button rule transitions `all`, so the outline grows from 0 px; read it settled
+                const focused = await page.evaluate(() => {
+                    const element = document.activeElement;
+                    if (!element || element === document.body || !element.closest('.so-page') || !element.matches('.mud-button-root, .so-tab, .so-request-row, a, summary')) return null;
+                    const style = getComputedStyle(element);
+                    return { name: (element.getAttribute('aria-label') || element.textContent || element.tagName).trim().replace(/\s+/g, ' ').slice(0, 28), style: style.outlineStyle, width: parseFloat(style.outlineWidth) };
+                });
+                if (focused) reached.push(focused);
+            }
+            assert.ok(reached.length >= 3, `${screen.key}: the keyboard reached only ${reached.length} controls`);
+            const weak = reached.filter(focused => focused.style === 'none' || focused.width < 2);
+            assert.deepEqual(weak, [], `${screen.key}: focus ring under 2 px or missing on ${JSON.stringify(weak)}`);
+            note(`${screen.key}: ${reached.length} keyboard-reached controls each draw an outline of at least 2 px (${reached.map(focused => `${focused.name}=${focused.width}px`).slice(0, 3).join(', ')} ...)`);
+        }
+
         // 5. Distinct loading / empty / error at 390.
         for (const screen of SCREENS) {
             await open(screen, [390, 844], 'empty');

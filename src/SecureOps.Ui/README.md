@@ -77,7 +77,7 @@ not SQL data.
   no page or inner horizontal scroll, revoke action in view, focus after paging, tab arrows, empty / error / loading at 390).
 - Not done / not verified: real browser zoom (640 px viewport used), screen reader, SQL data, `AccessActionDialog` at 390 px, Windows/IIS. Open, in the
   global theme and so outside this issue: `.so-badge` text is 3.41:1 in the light theme and a filled primary button label is 4.10:1 in the dark theme
-  (both under 4.5:1; the badge also carries a text label). Gap row for the SQL-only list endpoints: `docs/26`.
+  (both under 4.5:1; the badge also carries a text label). Gap for the SQL-only list endpoints: G-40 in `docs/26`.
 
 ## gMSA OR panel (OR-2, ADR-0030 Proposed, Fake only), 2026-10-13
 

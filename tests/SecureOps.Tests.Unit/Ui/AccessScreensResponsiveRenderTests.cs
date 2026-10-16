@@ -54,7 +54,8 @@ public sealed class AccessScreensResponsiveRenderTests
         // 30 users at the server's 10 per page is three pages; the page used to divide by a literal 25.
         html.Should().Contain("1 / 3");
         html.Should().Contain("aria-label=\"Kullanıcı sayfaları\"").And.Contain("aria-busy=\"false\"");
-        html.Should().Contain("tabindex=\"-1\"");
+        // The result count is the focus target after a page change, so it (not any element on the page) carries tabindex="-1".
+        Regex.IsMatch(html, "class=\"so-access-count\"[^>]*tabindex=\"-1\"").Should().BeTrue();
     }
 
     [Fact]
@@ -79,6 +80,7 @@ public sealed class AccessScreensResponsiveRenderTests
 
         string html = await RenderAsync<AccessRequests>(Capabilities.AccessApproveRequests, services => services.AddSingleton(admin));
 
+        // The attribute-order patterns below follow the markup (role, then tabindex); reordering the attributes in AccessRequests.razor needs the patterns updated.
         // Selected tab is the one tab stop; the others are reached with the arrow keys.
         Regex.Matches(html, "role=\"tab\"[^>]*tabindex=\"0\"").Count.Should().Be(1);
         Regex.Matches(html, "role=\"tab\"[^>]*tabindex=\"-1\"").Count.Should().Be(2);
