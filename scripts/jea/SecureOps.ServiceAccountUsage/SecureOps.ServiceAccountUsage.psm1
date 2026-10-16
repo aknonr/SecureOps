@@ -79,32 +79,52 @@ function Test-SoAccountMatch {
     return $true
 }
 
+function Get-SoInheritedAttribute {
+    # First explicit value along a most-specific-first node chain (a node that does not exist is skipped); $null when none sets it.
+    [CmdletBinding()]
+    param([AllowNull()][object[]]$Chain, [Parameter(Mandatory)][string]$Name)
+    foreach ($node in $Chain) {
+        if ($null -ne $node -and $node.HasAttribute($Name)) { return $node.GetAttribute($Name) }
+    }
+    return $null
+}
+
 function Read-SoIisIdentity {
     <#
-        Reads IIS identities from applicationHost.config content. Selects only names, identityType, userName and
-        physicalPath; never touches password attributes. Returns one object per configured identity.
+        Reads IIS identities from applicationHost.config content as the EFFECTIVE configuration: a pool or virtual directory that
+        sets nothing itself inherits the applicationPoolDefaults / virtualDirectoryDefaults value, so it is resolved here instead
+        of being skipped. An application pool identityType that is not one of the five IIS values throws (the source is then
+        reported Failed, never Success). Selects only names, identityType, userName and physicalPath; never touches password
+        attributes. Returns one object per configured identity.
     #>
     [CmdletBinding()]
     [OutputType([pscustomobject])]
     param([Parameter(Mandatory)][xml]$Configuration)
 
     $root = $Configuration.DocumentElement
+    $knownIdentityTypes = @('ApplicationPoolIdentity', 'LocalSystem', 'LocalService', 'NetworkService', 'SpecificUser')
+    $poolDefaults = $root.SelectSingleNode('system.applicationHost/applicationPools/applicationPoolDefaults/processModel')
     foreach ($pool in $root.SelectNodes('system.applicationHost/applicationPools/add')) {
-        $model = $pool.SelectSingleNode('processModel')
-        if ($null -eq $model) { continue }
-        $identityType = $model.GetAttribute('identityType')
-        $userName = $model.GetAttribute('userName')
+        $chain = @($pool.SelectSingleNode('processModel'), $poolDefaults)
+        $identityType = Get-SoInheritedAttribute -Chain $chain -Name 'identityType'
+        if ([string]::IsNullOrEmpty($identityType)) { $identityType = 'ApplicationPoolIdentity' }
+        if ($knownIdentityTypes -notcontains $identityType) { throw [System.FormatException]::new('Unknown IIS identityType.') }
+        $userName = Get-SoInheritedAttribute -Chain $chain -Name 'userName'
         if ($identityType -eq 'SpecificUser' -and $userName) {
             [pscustomobject]@{ ComponentType = 'IisAppPool'; ComponentName = $pool.GetAttribute('name'); Identity = $userName; Detail = $null }
         }
     }
 
+    $sites = $root.SelectSingleNode('system.applicationHost/sites')
+    $sitesDirectoryDefaults = if ($null -ne $sites) { $sites.SelectSingleNode('virtualDirectoryDefaults') } else { $null }
     foreach ($site in $root.SelectNodes('system.applicationHost/sites/site')) {
         $siteName = $site.GetAttribute('name')
+        $siteDirectoryDefaults = $site.SelectSingleNode('virtualDirectoryDefaults')
         foreach ($application in $site.SelectNodes('application')) {
             $applicationPath = $application.GetAttribute('path')
+            $applicationDirectoryDefaults = $application.SelectSingleNode('virtualDirectoryDefaults')
             foreach ($directory in $application.SelectNodes('virtualDirectory')) {
-                $userName = $directory.GetAttribute('userName')
+                $userName = Get-SoInheritedAttribute -Chain @($directory, $applicationDirectoryDefaults, $siteDirectoryDefaults, $sitesDirectoryDefaults) -Name 'userName'
                 if (-not $userName) { continue }
                 $directoryPath = $directory.GetAttribute('path')
                 $type = if ($directoryPath -ne '/') { 'IisVirtualDirectory' } elseif ($applicationPath -eq '/') { 'IisSite' } else { 'IisApplication' }
