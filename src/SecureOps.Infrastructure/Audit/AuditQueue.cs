@@ -8,8 +8,9 @@ namespace SecureOps.Infrastructure.Audit;
 /// </summary>
 public sealed class AuditQueue : IAuditQueueMetrics
 {
-    private readonly Channel<AuditEvent> _channel;
+    private readonly Channel<AuditQueueItem> _channel;
     private readonly int _capacity;
+    private readonly object _enqueueGate = new();
     private int _count;
 
     /// <summary>
@@ -19,10 +20,10 @@ public sealed class AuditQueue : IAuditQueueMetrics
     public AuditQueue(Microsoft.Extensions.Options.IOptions<AuditOptions> options)
     {
         _capacity = options.Value.Queue.Capacity;
-        _channel = Channel.CreateBounded<AuditEvent>(new BoundedChannelOptions(_capacity)
+        _channel = Channel.CreateBounded<AuditQueueItem>(new BoundedChannelOptions(_capacity)
         {
             FullMode = BoundedChannelFullMode.Wait,
-            SingleReader = true,
+            SingleReader = false,
             SingleWriter = false
         });
     }
@@ -39,27 +40,45 @@ public sealed class AuditQueue : IAuditQueueMetrics
     /// <summary>
     /// Gets the channel reader.
     /// </summary>
-    public ChannelReader<AuditEvent> Reader => _channel.Reader;
+    public ChannelReader<AuditQueueItem> Reader => _channel.Reader;
 
     /// <summary>
     /// Attempts to enqueue an event without blocking on persistence.
     /// </summary>
     /// <param name="auditEvent">Audit event.</param>
     /// <returns>True when queued; otherwise false.</returns>
-    public bool TryEnqueue(AuditEvent auditEvent)
+    public bool TryEnqueue(AuditEvent auditEvent) => TryEnqueue(new AuditQueueItem(auditEvent));
+
+    /// <summary>Attempts to enqueue an item awaiting durable acknowledgement.</summary>
+    public bool TryEnqueue(AuditQueueItem item)
     {
-        if (Volatile.Read(ref _count) >= _capacity)
+        lock (_enqueueGate)
         {
-            return false;
-        }
+            if (Volatile.Read(ref _count) >= _capacity)
+            {
+                return false;
+            }
 
-        if (!_channel.Writer.TryWrite(auditEvent))
+            Interlocked.Increment(ref _count);
+            if (!_channel.Writer.TryWrite(item))
+            {
+                Interlocked.Decrement(ref _count);
+                return false;
+            }
+
+            return true;
+        }
+    }
+
+    /// <summary>Stops acceptance and fails all items still awaiting processing.</summary>
+    public void FailPending()
+    {
+        _channel.Writer.TryComplete();
+        while (_channel.Reader.TryRead(out AuditQueueItem? item))
         {
-            return false;
+            MarkDequeued();
+            item.Fail();
         }
-
-        Interlocked.Increment(ref _count);
-        return true;
     }
 
     /// <summary>
@@ -68,6 +87,28 @@ public sealed class AuditQueue : IAuditQueueMetrics
     public void MarkDequeued()
     {
         Interlocked.Decrement(ref _count);
+    }
+}
+
+/// <summary>An audit event and its durable acknowledgement.</summary>
+public sealed class AuditQueueItem(AuditEvent auditEvent)
+{
+    private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>Gets the event to persist.</summary>
+    public AuditEvent Event { get; } = auditEvent;
+
+    /// <summary>Gets the durable acknowledgement task.</summary>
+    public Task Completion => _completion.Task;
+
+    /// <summary>Completes the durable acknowledgement after persistence succeeds.</summary>
+    public void Succeed() => _completion.TrySetResult();
+
+    /// <summary>Fails the durable acknowledgement when persistence is unavailable.</summary>
+    public void Fail()
+    {
+        _completion.TrySetException(new AuditWriteUnavailableException("Audit persistence was not acknowledged."));
+        _ = _completion.Task.Exception;
     }
 }
 

@@ -10,7 +10,7 @@ namespace SecureOps.Tests.Integration.Api;
 public sealed class AuditQueueHostedServiceTests
 {
     [Fact]
-    public async Task BackgroundSinkFailure_MarksAuditUnhealthyAndNewFailClosedWritesFail()
+    public async Task DurableAcknowledgement_SinkFailure_FailsBatchAndMarksUnhealthy()
     {
         IOptions<AuditOptions> options = Options.Create(new AuditOptions
         {
@@ -37,18 +37,100 @@ public sealed class AuditQueueHostedServiceTests
             healthState,
             new CapturingLogger<QueuedAuditWriter>());
 
-        await writer.WriteAsync(CreateEvent("trace-accepted"), CancellationToken.None);
+        Task[] writes = Enumerable.Range(0, 3)
+            .Select(index => writer.WriteAsync(CreateEvent($"trace-{index}"), CancellationToken.None)).ToArray();
         await service.StartAsync(CancellationToken.None);
 
-        await WaitUntilAsync(() => !healthState.IsHealthy);
+        foreach (Task write in writes)
+        {
+            Func<Task> pending = () => write.WaitAsync(TimeSpan.FromSeconds(3));
+            await pending.Should().ThrowAsync<AuditWriteUnavailableException>();
+        }
+
         Func<Task> act = () => writer.WriteAsync(CreateEvent("trace-after-failure"), CancellationToken.None);
 
         await act.Should().ThrowAsync<AuditWriteUnavailableException>()
             .WithMessage("*unhealthy*");
         healthState.LastErrorCode.Should().Be("AuditSinkUnavailable");
         logger.Entries.Should().Contain(entry => entry.Level == LogLevel.Critical);
+        queue.Count.Should().Be(0);
 
         await service.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task DurableAcknowledgement_SuccessfulFlush_CompletesAllCallers()
+    {
+        IOptions<AuditOptions> options = Options.Create(new AuditOptions());
+        AuditQueue queue = new(options);
+        AuditStoreHealthState health = new();
+        ControlledAuditEventSink sink = new();
+        using AuditQueueHostedService service = new(queue, sink, options, health, new CapturingLogger<AuditQueueHostedService>());
+        QueuedAuditWriter writer = new(queue, options, health, new CapturingLogger<QueuedAuditWriter>());
+        Task[] writes = Enumerable.Range(0, 3)
+            .Select(index => writer.WriteAsync(CreateEvent($"trace-{index}"), default)).ToArray();
+        try
+        {
+            await service.StartAsync(default);
+            await sink.Entered.Task.WaitAsync(TimeSpan.FromSeconds(3));
+
+            writes.Should().OnlyContain(write => !write.IsCompleted);
+            sink.Events.Should().HaveCount(3);
+            queue.Count.Should().Be(0);
+            sink.Release.SetResult();
+
+            await Task.WhenAll(writes).WaitAsync(TimeSpan.FromSeconds(3));
+            health.IsHealthy.Should().BeTrue();
+        }
+        finally
+        {
+            await service.StopAsync(default);
+        }
+    }
+
+    [Fact]
+    public async Task DurableAcknowledgement_Shutdown_FailsInFlightAndPendingItems()
+    {
+        IOptions<AuditOptions> options = Options.Create(new AuditOptions());
+        AuditQueue queue = new(options);
+        AuditStoreHealthState health = new();
+        ControlledAuditEventSink sink = new();
+        using AuditQueueHostedService service = new(queue, sink, options, health, new CapturingLogger<AuditQueueHostedService>());
+        QueuedAuditWriter writer = new(queue, options, health, new CapturingLogger<QueuedAuditWriter>());
+        Task inFlight = writer.WriteAsync(CreateEvent("trace-in-flight"), default);
+        await service.StartAsync(default);
+        await sink.Entered.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        Task pending = writer.WriteAsync(CreateEvent("trace-pending"), default);
+        queue.Count.Should().Be(1);
+
+        await service.StopAsync(default);
+
+        foreach (Task write in new[] { inFlight, pending })
+        {
+            Func<Task> act = () => write.WaitAsync(TimeSpan.FromSeconds(3));
+            await act.Should().ThrowAsync<AuditWriteUnavailableException>();
+        }
+
+        queue.Count.Should().Be(0);
+        Func<Task> afterStop = () => writer.WriteAsync(CreateEvent("trace-stopped"), default);
+        await afterStop.Should().ThrowAsync<AuditWriteUnavailableException>();
+    }
+
+    [Fact]
+    public async Task DurableAcknowledgement_ShutdownBeforeStart_FailsPendingItems()
+    {
+        IOptions<AuditOptions> options = Options.Create(new AuditOptions());
+        AuditQueue queue = new(options);
+        AuditStoreHealthState health = new();
+        using AuditQueueHostedService service = new(queue, new ControlledAuditEventSink(), options, health, new CapturingLogger<AuditQueueHostedService>());
+        QueuedAuditWriter writer = new(queue, options, health, new CapturingLogger<QueuedAuditWriter>());
+        Task pending = writer.WriteAsync(CreateEvent("trace-pending"), default);
+
+        await service.StopAsync(default);
+
+        Func<Task> act = () => pending.WaitAsync(TimeSpan.FromSeconds(3));
+        await act.Should().ThrowAsync<AuditWriteUnavailableException>();
+        queue.Count.Should().Be(0);
     }
 
     private static AuditEvent CreateEvent(string correlationId)
@@ -62,13 +144,17 @@ public sealed class AuditQueueHostedServiceTests
         };
     }
 
-    private static async Task WaitUntilAsync(Func<bool> condition)
+    private sealed class ControlledAuditEventSink : IAuditEventSink
     {
-        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(3));
-        while (!condition())
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public IReadOnlyCollection<AuditEvent> Events { get; private set; } = [];
+
+        public async Task WriteBatchAsync(IReadOnlyCollection<AuditEvent> events, CancellationToken cancellationToken)
         {
-            timeout.Token.ThrowIfCancellationRequested();
-            await Task.Delay(25, timeout.Token);
+            Events = events;
+            Entered.TrySetResult();
+            await Release.Task.WaitAsync(cancellationToken);
         }
     }
 
