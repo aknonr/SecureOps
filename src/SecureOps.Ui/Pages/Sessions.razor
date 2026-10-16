@@ -79,7 +79,7 @@
 
         <section class="so-panel">
             <div class="so-panel-head">
-                <h2 class="so-panel-title">
+                <h2 class="so-panel-title" tabindex="-1" @ref="_listHeading">
                     Açık oturumlar
                     @if (_page is not null)
                     {
@@ -98,6 +98,8 @@
                 </div>
             </div>
 
+            <p class="sr-only" role="status" aria-live="polite">@_announcement</p>
+
             @if (_listProblem is not null)
             {
                 <SoProblemPanel Problem="_listProblem" OnRetry="ReloadAsync" RetryLabel="Yeniden yükle" />
@@ -114,6 +116,7 @@
             }
             else
             {
+                <div class="so-session-list">
                 <div class="so-table-scroll">
                     <table class="so-plain-table so-session-table">
                         <thead>
@@ -130,26 +133,10 @@
                         <tbody>
                             @foreach (ApplicationSessionResponse session in Listed)
                             {
-                                ApplicationSessionResponse captured = session;
                                 bool mine = IsMine(session);
-                                string? account = SessionView.Account(session);
-                                string? uid = SessionView.Uid(session);
 
                                 <tr class="@(mine ? "so-row--self" : null)">
-                                    <th scope="row">
-                                        <span class="so-session-user">
-                                            <span class="so-session-name">@SessionView.Name(session)</span>
-                                            @* Only when it says something the name did not. *@
-                                            @if (account is not null)
-                                            {
-                                                <span class="so-session-account">@account</span>
-                                            }
-                                            @if (uid is not null)
-                                            {
-                                                <span class="so-session-account">Sicil No: @uid</span>
-                                            }
-                                        </span>
-                                    </th>
+                                    <th scope="row">@Identity(session)</th>
                                     <td>@SessionView.Authentication(session)</td>
                                     <td>@SessionView.Local(session.StartedAtUtc)</td>
                                     <td>@SessionView.Local(session.LastSeenAtUtc)</td>
@@ -157,40 +144,45 @@
                                         <span class="so-session-expiry">@SessionView.Local(session.AbsoluteExpiresAtUtc)</span>
                                         <span class="so-session-remaining">@SessionView.Remaining(session, Now)</span>
                                     </td>
-                                    <td>
-                                        @* isCurrent is server-authoritative. Marking the row the
-                                           administrator is sitting in prevents the single most
-                                           easily regretted click on this page. *@
-                                        @if (mine)
-                                        {
-                                            <SoStatusBadge Label="Bu oturum"
-                                                           Tone="SoStatusBadge.BadgeTone.Info"
-                                                           Icon="@Icons.Material.Filled.Person" />
-                                        }
-                                        else
-                                        {
-                                            <SoStatusBadge Label="Etkin"
-                                                           Tone="SoStatusBadge.BadgeTone.Positive" />
-                                        }
-                                    </td>
-                                    <td>
-                                        <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small"
-                                                   Disabled="@_loading"
-                                                   StartIcon="@Icons.Material.Filled.Logout"
-                                                   OnClick="@(() => ConfirmRevokeAsync(captured))">
-                                            Oturumu Sonlandır
-                                        </MudButton>
-                                    </td>
+                                    <td>@StatusBadge(session)</td>
+                                    <td>@RevokeButton(session)</td>
                                 </tr>
                             }
                         </tbody>
                     </table>
                 </div>
 
+                <ul class="so-session-cards" aria-label="Açık oturumlar">
+                    @foreach (ApplicationSessionResponse session in Listed)
+                    {
+                        <li class="so-session-card @(IsMine(session) ? "so-row--self" : null)">
+                            <div class="so-session-card-head">
+                                @Identity(session)
+                                @StatusBadge(session)
+                            </div>
+                            <dl class="so-session-facts">
+                                <div><dt>Kimlik Doğrulama</dt><dd>@SessionView.Authentication(session)</dd></div>
+                                <div><dt>Oturum Başlangıcı</dt><dd>@SessionView.Local(session.StartedAtUtc)</dd></div>
+                                <div><dt>Son Aktivite</dt><dd>@SessionView.Local(session.LastSeenAtUtc)</dd></div>
+                                <div>
+                                    <dt>Bitiş / Süre</dt>
+                                    <dd>
+                                        <span class="so-session-expiry">@SessionView.Local(session.AbsoluteExpiresAtUtc)</span>
+                                        <span class="so-session-remaining">@SessionView.Remaining(session, Now)</span>
+                                    </dd>
+                                </div>
+                            </dl>
+                            <div class="so-session-card-actions">@RevokeButton(session)</div>
+                        </li>
+                    }
+                </ul>
+                </div>
+
                 @* Internal identifiers do exactly one job here: letting support correlate a row with
                    an audit entry. They are kept, and kept out of the way. *@
                 <details class="so-technical">
                     <summary>Teknik ayrıntılar</summary>
+                    <div class="so-session-list so-session-list--tech">
                     <div class="so-table-scroll">
                         <table class="so-plain-table">
                             <thead>
@@ -216,23 +208,38 @@
                             </tbody>
                         </table>
                     </div>
+                    <ul class="so-session-cards so-session-cards--tech" aria-label="Teknik ayrıntılar">
+                        @foreach (ApplicationSessionResponse session in Listed)
+                        {
+                            <li class="so-session-card">
+                                <p class="so-session-name">@SessionView.Name(session)</p>
+                                <dl class="so-session-facts">
+                                    <div><dt>Kurumsal Teknik Kimlik</dt><dd><code class="so-code so-code--sm">@session.NormalizedPrincipal</code></dd></div>
+                                    <div><dt>Oturum kaydı</dt><dd><code class="so-code so-code--sm">@session.SessionId</code></dd></div>
+                                    <div><dt>Kullanıcı kaydı</dt><dd><code class="so-code so-code--sm">@session.UserId</code></dd></div>
+                                    <div><dt>Erişim sürümü</dt><dd>@session.AccessVersion</dd></div>
+                                </dl>
+                            </li>
+                        }
+                    </ul>
+                    </div>
                 </details>
 
                 <div class="so-pager">
                     <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
                                StartIcon="@Icons.Material.Filled.ChevronLeft"
-                               Disabled="@(_loading || _page.Page <= 1)"
+                               Disabled="@(_page.Page <= 1)"
                                OnClick="@(() => GoToPageAsync(_page.Page - 1))">
                         Önceki
                     </MudButton>
 
-                    <span class="so-pager-state">Sayfa @_page.Page</span>
+                    <span class="so-pager-state" aria-busy="@(_loading ? "true" : "false")">Sayfa @_page.Page</span>
 
                     @* The contract returns no total, so "there is a next page" can only be inferred
                        from a full page. An empty next page is preferable to hiding a real one. *@
                     <MudButton Variant="Variant.Text" Color="Color.Default" Size="Size.Small"
                                EndIcon="@Icons.Material.Filled.ChevronRight"
-                               Disabled="@(_loading || _page.Items.Count < _page.PageSize)"
+                               Disabled="@(_page.Items.Count < _page.PageSize)"
                                OnClick="@(() => GoToPageAsync(_page.Page + 1))">
                         Sonraki
                     </MudButton>
@@ -260,6 +267,59 @@
     private bool _loading;
     private int _pageNumber = 1;
     private int _pageSize = 50;
+    private ElementReference _listHeading;
+    private bool _focusHeading;
+    private string _announcement = string.Empty;
+
+    // The three renderings of a session (table row, card, details) share one definition of who it
+    // is, whether it is the administrator's own, and the one destructive action.
+    private RenderFragment Identity(ApplicationSessionResponse session) =>
+        @<span class="so-session-user">
+            <span class="so-session-name">@SessionView.Name(session)</span>
+            @* Only when it says something the name did not. *@
+            @if (SessionView.Account(session) is { } account)
+            {
+                <span class="so-session-account">@account</span>
+            }
+            @if (SessionView.Uid(session) is { } uid)
+            {
+                <span class="so-session-account">Sicil No: @uid</span>
+            }
+        </span>;
+
+    // isCurrent is server-authoritative. Marking the row the administrator is sitting in prevents
+    // the single most easily regretted click on this page.
+    private RenderFragment StatusBadge(ApplicationSessionResponse session) =>
+        @<text>
+            @if (IsMine(session))
+            {
+                <SoStatusBadge Label="Bu oturum" Tone="SoStatusBadge.BadgeTone.Info"
+                               Icon="@Icons.Material.Filled.Person" />
+            }
+            else
+            {
+                <SoStatusBadge Label="Etkin" Tone="SoStatusBadge.BadgeTone.Positive" />
+            }
+        </text>;
+
+    private RenderFragment RevokeButton(ApplicationSessionResponse session) =>
+        @<MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small"
+                    Disabled="@_loading"
+                    StartIcon="@Icons.Material.Filled.Logout"
+                    OnClick="@(() => ConfirmRevokeAsync(session))">
+            Oturumu Sonlandır
+        </MudButton>;
+
+    // After paging, focus belongs to the list the keyboard user just asked for, not to a pager
+    // button that may now be disabled (last page) or no longer relevant.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusHeading && !_loading && _page is not null)
+        {
+            _focusHeading = false;
+            await _listHeading.FocusAsync();
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -299,7 +359,13 @@
 
     private Task GoToPageAsync(int page)
     {
+        if (_loading)
+        {
+            return Task.CompletedTask;
+        }
+
         _pageNumber = Math.Max(1, page);
+        _focusHeading = true;
         return ReloadAsync();
     }
 
@@ -321,10 +387,12 @@
             _page = await SessionsClient.GetActiveAsync(_pageNumber, _pageSize, CancellationToken.None);
             _pageNumber = _page.Page;
             Now = DateTimeOffset.UtcNow;
+            _announcement = $"Sayfa {_page.Page}, {Listed.Count()} oturum listelendi.";
         }
         catch (SecureOpsApiException ex)
         {
             _page = null;
+            _announcement = string.Empty;
             _listProblem = ex.Problem;
             Logger.LogDebug("Active sessions unavailable. Code: {Code}.", ex.Problem.Code);
         }

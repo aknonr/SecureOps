@@ -6,7 +6,8 @@ Short claim register for collaborators. It does **not** replace the owner's coor
 
 | Date | Who (GitHub handle) | Branch | Issue | Files / area touched | Status |
 |---|---|---|---|---|---|
-| 2026-10-14 | nurseliii | docs/mac-first-verification-20261014 | #62 | docs/team/WORK-LOG.md (docs only, no code) | PR #65 open; waiting for windows-dogrulama |
+| 2026-10-14 | nurseliii | docs/mac-first-verification-20261014 | #62 | docs/team/WORK-LOG.md (docs only, no code) | bitti (#65) |
+| 2026-10-14 | nurseliii | fix/ui-access-screens-responsive-20261014 | #67 | src/SecureOps.Ui/Pages/{Sessions,AccessUsers,AccessRequests}.razor(.css), tests/SecureOps.Tests.Unit (UI), tests/browser/access-screens-responsive.cjs, src/SecureOps.Ui/README.md, docs/26-ui-backend-contract-gaps.md | bitti (#68) |
 
 ## Number requests
 
@@ -14,4 +15,4 @@ Ask here and wait for the owner to write the number back. Never use an unconfirm
 
 | Date | Kind (migration / ADR / gap id) | Requested by | Purpose | Number (owner fills) |
 |---|---|---|---|---|
-| | | | | |
+| 2026-10-14 | gap id | nurseliii | #67: paged access lists (`users/page`, `requests/page`) are SQL-only, 503 on InMemory; new row in `docs/26` | G-40 verildi |

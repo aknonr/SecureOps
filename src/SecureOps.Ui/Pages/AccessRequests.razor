@@ -64,13 +64,20 @@
         </form>
         <section class="so-panel so-panel--tabs">
             <div class="so-tabs" role="tablist" aria-label="Talep durumu">
-                @foreach ((string Value, string Label) tab in _tabs)
+                @for (int index = 0; index < _tabs.Length; index++)
                 {
+                    int tabIndex = index;
+                    (string Value, string Label) tab = _tabs[tabIndex];
+                    @* aria-disabled, not disabled: a disabled button under the keyboard user's focus
+                       drops focus to <body> while a list loads. *@
                     <button type="button"
                             role="tab"
                             class="so-tab @(tab.Value == _status ? "so-tab--active" : null)"
-                            aria-selected="@(tab.Value == _status)"
-                            disabled="@_busy"
+                            aria-selected="@(tab.Value == _status ? "true" : "false")"
+                            aria-disabled="@(_busy ? "true" : null)"
+                            tabindex="@(tab.Value == _status ? 0 : -1)"
+                            @ref="_tabElements[tabIndex]"
+                            @onkeydown="e => TabKeyAsync(e, tabIndex)"
                             @onclick="() => SelectStatusAsync(tab.Value)">
                         @tab.Label
                         @if (tab.Value == _status && _requests is not null)
@@ -175,13 +182,14 @@
         <div class="so-admin-grid">
             <section class="so-panel so-admin-list" aria-labelledby="request-list-title">
                 <div class="request-list-head">
-                    <h2 class="so-panel-title" id="request-list-title">@CurrentTabLabel</h2>
+                    <h2 class="so-panel-title" id="request-list-title" tabindex="-1" @ref="_listHeading">@CurrentTabLabel</h2>
+                    <p class="sr-only" role="status" aria-live="polite">@_announcement</p>
                     @if (_requests is not null && _total > 0)
                     {
                         <nav class="request-pagination" aria-label="Talep sayfaları">
-                            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" title="Önceki sayfa" aria-label="Önceki sayfa" Disabled="@(_busy || _loading || Page <= 1)" OnClick="() => NavigatePage(Page - 1)" />
+                            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" title="Önceki sayfa" aria-label="Önceki sayfa" Disabled="@(Page <= 1)" OnClick="() => NavigatePage(Page - 1)" />
                             <span>Sayfa @Page / @AccessRequestPresentation.PageCount(_total)</span>
-                            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" title="Sonraki sayfa" aria-label="Sonraki sayfa" Disabled="@(_busy || _loading || Page * (long)AccessRequestPresentation.PageSize >= _total)" OnClick="() => NavigatePage(Page + 1)" />
+                            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" title="Sonraki sayfa" aria-label="Sonraki sayfa" Disabled="@(Page * (long)AccessRequestPresentation.PageSize >= _total)" OnClick="() => NavigatePage(Page + 1)" />
                         </nav>
                     }
                 </div>
@@ -396,6 +404,10 @@
     private int LongWaitingOnPage => _requests?.Count(request => AccessRequestPresentation.IsLongWaiting(request, _now)) ?? 0;
     private int _generation;
     private ElementReference _detailElement;
+    private ElementReference _listHeading;
+    private readonly ElementReference[] _tabElements = new ElementReference[3];
+    private bool _focusHeading;
+    private string _announcement = string.Empty;
     private sealed record ActionResult(string Title, string Detail, CurrentAccessResponse? Access);
 
     private static readonly (string Value, string Label)[] _tabs =
@@ -469,7 +481,7 @@
 
     private Task SelectStatusAsync(string status)
     {
-        if (_status == status)
+        if (_status == status || _busy)
         {
             return Task.CompletedTask;
         }
@@ -482,7 +494,44 @@
     }
 
     private void SearchAsync() => Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?> { ["q"] = _search, ["page"] = 1, ["selected"] = null }));
-    private void NavigatePage(int page) => Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?> { ["page"] = page, ["selected"] = null }));
+    private void NavigatePage(int page)
+    {
+        if (_busy || _loading) { return; }
+
+        // The pager is the keyboard user's position; after the page changes it belongs on the list.
+        _focusHeading = true;
+        Navigation.NavigateTo(Navigation.GetUriWithQueryParameters(new Dictionary<string, object?> { ["page"] = page, ["selected"] = null }));
+    }
+
+    // Tabs follow the ARIA tabs pattern: arrows move between them, Tab leaves the group.
+    private async Task TabKeyAsync(KeyboardEventArgs e, int index)
+    {
+        int next = e.Key switch
+        {
+            "ArrowRight" => (index + 1) % _tabs.Length,
+            "ArrowLeft" => (index + _tabs.Length - 1) % _tabs.Length,
+            "Home" => 0,
+            "End" => _tabs.Length - 1,
+            _ => -1
+        };
+
+        if (next < 0 || _busy)
+        {
+            return;
+        }
+
+        await _tabElements[next].FocusAsync();
+        await SelectStatusAsync(_tabs[next].Value);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusHeading && !_loading && _requests is not null)
+        {
+            _focusHeading = false;
+            await _listHeading.FocusAsync();
+        }
+    }
 
     private async Task ReloadAsync(bool announce)
     {
@@ -508,6 +557,7 @@
             _requests = page.Items;
             _total = page.Total;
             _now = DateTimeOffset.Now;
+            _announcement = $"Sayfa {Page} / {AccessRequestPresentation.PageCount(_total)}, {_requests.Count} talep listelendi.";
 
             // Keep the selection pointing at authoritative state: after a write the row's status
             // has changed, and holding the pre-write copy would let a stale action be offered.
@@ -518,6 +568,7 @@
             if (generation != _generation) { return; }
             _listProblem = ex.Problem;
             _requests = null;
+            _announcement = string.Empty;
         }
         finally
         {
