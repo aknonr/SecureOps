@@ -1,0 +1,185 @@
+/* Guided tour: start button, highlight frame and step box. Theme tokens only, so light and dark follow the app theme.
+   The frame is a thick outline plus a dimmed page around it (shape, not colour alone); it never takes clicks.
+   Below 700 px (390 px phones, 200 % zoom on a 1280 px screen) the box docks to the bottom of the screen. */
+
+.so-tour-start {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 4px 12px;
+    border: 1px solid var(--so-accent-strong);
+    border-radius: var(--so-radius-sm, 6px);
+    background: var(--so-surface);
+    color: var(--so-accent-strong);
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.so-tour-start:hover {
+    background: color-mix(in srgb, var(--so-accent-strong) 10%, var(--so-surface));
+}
+
+.so-tour-start-icon {
+    font-size: 0.7rem;
+}
+
+.so-tour-start:focus-visible,
+.so-tour-button:focus-visible,
+.so-tour-title:focus-visible {
+    outline: 2px solid var(--so-accent-strong);
+    outline-offset: 2px;
+}
+
+.so-tour-ring {
+    position: fixed;
+    z-index: 1490;
+    pointer-events: none;
+    border-radius: 8px;
+    outline: 3px solid var(--so-accent-strong);
+    outline-offset: 3px;
+    box-shadow: 0 0 0 9999px color-mix(in srgb, var(--so-text) 22%, transparent);
+}
+
+.so-tour-ring[hidden] {
+    display: none;
+}
+
+.so-tour-box {
+    position: fixed;
+    z-index: 1500;
+    top: 12px;
+    right: 12px;
+    box-sizing: border-box;
+    width: min(380px, calc(100vw - 24px));
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+    padding: var(--so-space-3) var(--so-space-4);
+    border: 2px solid var(--so-accent-strong);
+    border-radius: 10px;
+    background: var(--so-surface);
+    color: var(--so-text);
+    box-shadow: var(--so-shadow);
+    overflow-wrap: anywhere;
+}
+
+.so-tour-count {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px var(--so-space-2);
+    margin: 0 0 var(--so-space-1);
+    color: var(--so-text-muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.so-tour-title {
+    margin: 0 0 var(--so-space-2);
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.so-tour-text {
+    margin: 0 0 var(--so-space-2);
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
+.so-tour-skip {
+    margin: 0 0 var(--so-space-2);
+    font-size: 0.85rem;
+}
+
+.so-tour-skip:empty {
+    display: none;
+}
+
+.so-tour-skip:not(:empty)::before {
+    content: "ⓘ ";
+    font-weight: 700;
+}
+
+.so-tour-controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--so-space-2);
+}
+
+.so-tour-button {
+    min-height: 36px;
+    min-width: 72px;
+    padding: 6px 14px;
+    border: 1px solid var(--so-border);
+    border-radius: var(--so-radius-sm, 6px);
+    background: var(--so-surface);
+    color: var(--so-text);
+    font: inherit;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.so-tour-button--primary {
+    border-color: var(--so-accent-strong);
+    background: var(--so-accent-strong);
+    color: var(--so-surface);
+}
+
+.so-tour-button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.so-tour-hint {
+    margin: var(--so-space-2) 0 0;
+    color: var(--so-text-muted);
+    font-size: 0.78rem;
+}
+
+@media (max-width: 700px) {
+    .so-tour-box {
+        top: auto !important;
+        right: 0 !important;
+        bottom: 0;
+        left: 0 !important;
+        width: auto;
+        max-height: 50vh;
+        border-width: 2px 0 0;
+        border-radius: 12px 12px 0 0;
+    }
+
+    .so-tour-button {
+        flex: 1 1 auto;
+    }
+}
+
+/* Movement only for people who have not asked for less of it: a short fade when the tour opens. The frame follows the area
+   at once (no animated move) so it never trails behind while the page scrolls. */
+@media (prefers-reduced-motion: no-preference) {
+    .so-tour-ring,
+    .so-tour-box {
+        animation: so-tour-in 0.15s ease-out;
+    }
+}
+
+@keyframes so-tour-in {
+    from {
+        opacity: 0;
+    }
+}
+
+@media (forced-colors: active) {
+    .so-tour-ring {
+        outline-color: Highlight;
+        box-shadow: none;
+    }
+
+    .so-tour-box {
+        border-color: CanvasText;
+    }
+}

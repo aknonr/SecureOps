@@ -17,6 +17,21 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
 - Push on the owner's workstation: Git Credential Manager holds two GitHub accounts, so name the owner's:
   `git -c credential.https://github.com.username=aknonr push origin <branch>`.
 
+## Guided tour, REHBER-UI (branch `feature/service-accounts-guided-tour-20261016`, from master `cf16a63`, not merged)
+
+- Owner feedback: "Nasıl kullanılır?" was a wall of text. Now an on-screen tour the person starts ("Adım adım göster" in `SaPageGuide`):
+  the area is framed, one sentence what + one sentence why, Geri / Kapat / İleri ("Bitir"), "Adım n / m", Esc closes, focus moves to the box
+  heading and back to the start button. Design: [GUIDED-TOUR-DESIGN.md](GUIDED-TOUR-DESIGN.md). Report page untouched (parallel RAPOR-2).
+- Shared `SoGuidedTour` + pure `GuidedTourState` (`Services/GuidedTour.cs`) + one ES module `wwwroot/js/so-guided-tour.js` (placement, scroll,
+  focus only). Targets are `data-tour="…"`; a step the server does not allow is not shown or counted; a step whose area is not on the screen is
+  skipped and named in a `role="status"` line. Below 700 px the box docks at the bottom. No browser storage, no automatic opening (server-side
+  "seen" preference: gap G-41). Tours: list, account detail (tab headers via `SaTabTitle Tour=`), imports, plans, plan detail
+  (`ServiceAccountTours.cs`); their guide texts are cut to 3–4 short items. No API, SQL or migration change.
+- Verified 2026-10-16 in the Linux cloud session (SDK 10.0.112 with a local, uncommitted `global.json` override; 9.0.317 could not be
+  downloaded there): solution build 0 warnings, unit 3021/3024 (the 3 failures reproduce on master in the same environment: toolchain pin,
+  audit path on Linux, PowerShell execution policy), `dotnet format --verify-no-changes` on a CRLF copy, the JS module and CSS in headless
+  Chromium on a staged page (1440 px, 390 px with reduced motion, 640×400). **Not verified:** the real pages in a browser, the
+  `tests/browser/service-accounts-guided-tour.cjs` journey (needs Demo API + SQL), screen reader, Windows/IIS, corporate TEST.
 ## Report first page, RAPOR-2 (branch `feature/service-accounts-report-actions-20261016`, from master `cf16a63`, not merged)
 
 - Owner's manager asked for a simpler summary and the team's operations on page 1. New first page "Dönem içinde yapılan işlemler" (screen, XLSX first sheet, PDF first page): deleted, handed

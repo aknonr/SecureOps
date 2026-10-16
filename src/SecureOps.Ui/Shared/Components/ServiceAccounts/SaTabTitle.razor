@@ -3,7 +3,7 @@
    header is a tab stop; Enter and Space click it and the click reaches the header, so MudTabs switches the panel as for a
    mouse click. The selected tab is announced with aria-current, not by colour alone. *@
 
-<button type="button" class="sa-tab-title" aria-current="@(Selected ? "true" : null)">@Text</button>
+<button type="button" class="sa-tab-title" aria-current="@(Selected ? "true" : null)" data-tour="@Tour">@Text</button>
 
 @code {
     /// <summary>Visible tab name.</summary>
@@ -11,4 +11,7 @@
 
     /// <summary>True for the tab whose panel is shown.</summary>
     [Parameter] public bool Selected { get; set; }
+
+    /// <summary>Guided-tour target name (data-tour); omitted when null.</summary>
+    [Parameter] public string? Tour { get; set; }
 }

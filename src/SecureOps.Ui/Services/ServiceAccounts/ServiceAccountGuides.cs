@@ -17,25 +17,22 @@ public static class ServiceAccountGuides
 
     /// <summary>Account list.</summary>
     public static Guide List { get; } = new("Servis Hesapları",
-        "Kapsamınızdaki bütün servis hesaplarını bulduğunuz ve açtığınız ana sayfa. Üstte size ve ekibinize düşen işler, altta filtrelenebilir liste vardır.",
+        "Kapsamınızdaki servis hesaplarını bulup açtığınız ana sayfa. Ekrandaki alanları tek tek görmek için \"Adım adım göster\"e basın.",
         [
-            ("Bul", "Hesap adı (bir parçası yeter; SID aranmaz), durum, kurum, ekip, domain veya vade ile süzün ve Listele'ye basın; \"Yalnız ekibimin işleri\" ile kendi işlerinizi ayırın. Üstteki özet düğmeleri kendi süzgeciyle listeyi hemen açar. Yetkiniz varsa dizinde ada göre arama kişiyi bulur; bu, hesap listesi aramasından ayrıdır."),
-            ("Aç", "Hesaba tıklayın: sahibi, kullanım yerleri, açık talepler ve geçmişi tek sayfada görünür."),
-            ("İşle", "Hesap sayfasında talep açın veya yapılan işlemi bildirin."),
-            ("Takip et", "Geciken ve tarih bekleyen işler listede ve \"Ekibimin işleri\"nde öne çıkar; raporlara otomatik yansır.")
+            ("Gör", "Üstte size ve ekibinize düşen işler."),
+            ("Bul", "Süzgeç seçip Listele'ye basın (SID aranmaz); özet düğmeleri listeyi hemen açar."),
+            ("Aç", "Hesaba tıklayın; iş hesap sayfasında yapılır.")
         ],
         "Kapsamınız dışındaki hesapları göstermez; " + _noServerChange);
 
     /// <summary>Account detail.</summary>
     public static Guide Detail { get; } = new("Servis hesabı",
-        "Bir servis hesabının bütün takibi: kimin sorumluluğunda olduğu, nerede kullanıldığı, hangi işin beklendiği (parola değişikliği, gMSA dönüşümü, silme, inceleme) ve yapılanların kanıtı.",
+        "Bir servis hesabının bütün takibi: sorumlusu, kullanım yeri, beklenen iş ve kanıtı. Alanları tek tek görmek için \"Adım adım göster\"e basın.",
         [
-            ("Sahipliği kontrol et", "\"Sahiplik\" sekmesinde sorumlu ekip ve kişi; eksikse öneri veya teyit talebi."),
-            ("Kullanım yerlerini gir", "\"Kullanım ve kural\" sekmesine veritabanı, IIS uygulama havuzu, Windows servisi gibi kullanım yerlerini ekleyin; bilgi bankası kuralı önerilen yolu (ör. gMSA) gerekçesiyle gösterir."),
-            ("Taramayı bağla", "Sunucularda kendi yetkinizle çalıştırdığınız taramanın dosyasını \"Kullanım taraması\" sekmesine yükleyin; bulunan bileşenleri tek tek kullanım kaydına alın veya gerekçeyle kayda almayın. gMSA dönüşümünden sonra yapılan kontrol taraması kanıttır, doğrulama değildir."),
-            ("Talep aç ve planla", "Beklenen işi talep olarak açın, muhatap ekibi ve plan tarihini girin."),
-            ("İşlemi bildir", "İş sunucuda yapıldıktan sonra (sistem dışında, değişiklik kaydıyla) burada \"gerçekleşti\" olarak bildirin ve kanıt ekleyin."),
-            ("Doğrula ve kapat", "Doğrulama yetkisi olan kişi kanıtı inceleyip onaylar; silme veya gMSA dönüşümü doğrulanınca hesap kapanır.")
+            ("Bak", "Özet ve Sıradaki adım ne beklendiğini söyler."),
+            ("Bildir", "Bir gelişme olduysa \"Bir gelişme mi oldu?\"ya basın."),
+            ("İşle", "Talep ve işlem bildirimi İşler sekmesinde."),
+            ("Doğrula", "Doğrulama yetkisi olan kişi kanıtla onaylar.")
         ],
         _noServerChange + " gMSA dönüşümünü sunucuda ekip yapar; sistem planı, kanıtı ve doğrulamayı tutar.");
 
@@ -74,13 +71,12 @@ public static class ServiceAccountGuides
 
     /// <summary>Imports.</summary>
     public static Guide Imports { get; } = new("İçe aktarım",
-        "Excel listelerini sisteme alır: ilk kurulumda mevcut takip çalışma kitabı, sonra her hafta gelen liste. Hiçbir satır siz onaylamadan yazılmaz.",
+        "Excel listelerini sisteme alır. Hiçbir satır siz onaylamadan yazılmaz. Alanları tek tek görmek için \"Adım adım göster\"e basın.",
         [
-            ("Dosya ve tür", "Aşağıdaki kartlardan doğru türü seçin, dosyayı ve rapor tarihini verin."),
-            ("Önizleme", "Sistem dosyayı güvenli okuyucuyla açar ve ne değişeceğini sınıflar: yeni, güncellenen, aynı, çakışan, geçersiz."),
-            ("Karar", "Çakışan satırlar için karar verin (ör. sahip ekip farklıysa hangisi geçerli)."),
-            ("Onay", "Tek işlemde yazılır; aynı dosya ikinci kez kopya oluşturmaz."),
-            ("Sonuç", "Raporlar ve hesap sayfaları güncellenir; aktarım geçmişte kalır.")
+            ("Dosya", "Türü, dosyayı ve rapor tarihini verin."),
+            ("Önizleme", "Ne değişeceğini yazmadan görün."),
+            ("Karar", "Çakışan satırlar için karar verin."),
+            ("Onay", "Tek işlemde yazılır; aynı dosya kopya oluşturmaz.")
         ],
         "Excel'deki formül veya makroları çalıştırmaz; listede olmayan hesabı silmez veya kapatmaz.");
 
@@ -138,25 +134,22 @@ public static class ServiceAccountGuides
 
     /// <summary>gMSA conversion plans (list).</summary>
     public static Guide Plans { get; } = new("Değişiklik planları",
-        "gMSA'ya geçiş için hazırlanan planlar. Plan; hesapları, her hesabın son keşif taramasından çıkan bileşenleri, onayı ve sizin işaretlediğiniz kontrol listesini tutar. Değişikliğin kendisini siz, kendi yetkinizle ve değişiklik kaydınızla sunucuda yaparsınız.",
+        "gMSA'ya geçiş planları: hesaplar, son taramadaki bileşenler, onay ve kontrol listesi. Değişikliği siz sunucuda kendi yetkinizle yaparsınız. Alanları tek tek görmek için \"Adım adım göster\"e basın.",
         [
-            ("Plan hazırla", "1–20 hesap seçin, her biri için hedef gMSA adını yazın."),
-            ("Önizle", "Sistem hesapların son taramasından bileşen satırlarını çıkarır; eski, eksik veya bilgi olmayan satırlar işaretlenir."),
-            ("Onayla", "Planı hazırlamayan bir doğrulama yetkilisi tam bu önizlemeyi OCO numarası ve bakım penceresiyle onaylar."),
-            ("Uygula ve işaretle", "Değişikliği sunucuda ekip yapar; kontrol listesi yaptığınız işi kayda alır."),
-            ("Doğrula", "Değişiklikten sonra gMSA kontrol taraması yüklenir; doğrulama ayrı bir adımdır.")
+            ("Hazırla", "Hesapları ve hedef gMSA adlarını seçin."),
+            ("Önizle ve onaylat", "Başka bir doğrulama yetkilisi onaylar."),
+            ("Uygula ve doğrula", "İşaretleyin, sonra kontrol taramasıyla doğrulayın.")
         ],
         "Yalnız tüm hesapları kapsamınızda olan planları listeler. " + _noServerChange + " Parola alanı yoktur; parola değişikliği PAM'ın işidir.");
 
     /// <summary>One gMSA conversion plan.</summary>
     public static Guide PlanDetail { get; } = new("Değişiklik planı",
-        "Planın hangi adımda olduğunu, o adımda neyin eksik olduğunu ve kimin ne yapabileceğini gösterir. Her adımın sonucu sunucunun kaydıdır; ekran sunucunun yapmadığı bir sonucu göstermez.",
+        "Planın hangi adımda olduğunu, neyin eksik olduğunu ve kimin ne yapabileceğini gösterir. Alanları tek tek görmek için \"Adım adım göster\"e basın.",
         [
-            ("Plan", "Hesaplar ve hedef gMSA adları. Önizlemeden sonra değiştirirseniz plan taslağa döner ve önizleme geçersiz olur."),
-            ("Önizleme", "Her hesabın son taramasındaki bileşenler. \"Bulunamadı\" kullanılmıyor demek değildir; \"bilgi yok\" taramanın o hesabı kapsamadığını söyler."),
-            ("Onay", "Belirli bir önizleme sürümüne ve özetine bağlıdır; planı hazırlayan, önizlemeyi üreten veya planı değiştiren onaylayamaz."),
-            ("Kontrol listesi", "Bileşenleri sunucuda ekip elle yapar. Yapıldı işareti kişinin beyanıdır, doğrulama değildir."),
-            ("Doğrulama", "gMSA kontrol taraması ve hesap sayfasındaki doğrulama ile ayrıca yapılır; plan kapanması hesabı doğrulanmış saymaz.")
+            ("Plan ve önizleme", "Hesaplar, hedef adlar ve son taramadaki bileşenler."),
+            ("Onay", "Planı hazırlamayan bir doğrulama yetkilisi onaylar."),
+            ("Kontrol listesi", "Yapıldı işareti beyandır, doğrulama değildir."),
+            ("Doğrulama", "Kontrol taraması ve hesap sayfasında ayrıca yapılır.")
         ],
         _noServerChange + " Planı kapatmak bağlı talebi kapatmaz.");
 }
