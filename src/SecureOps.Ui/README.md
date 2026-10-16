@@ -70,9 +70,8 @@ not SQL data.
 - Erişim Talepleri: focus moves to the list heading after paging and the page is announced; tabs follow the arrow-key pattern, stay focusable while
   busy (`aria-disabled`), and `aria-selected` is now `"true"/"false"` (Blazor wrote an empty attribute).
 - MudBlazor 6 buttons now draw a 2 px `--so-accent` focus ring on these pages (same fix as TH-12).
-- Aktif Oturumlar now opens with a page size of 100 (was 50; the selector still offers 25 / 50 / 100). Reason: owner decision, so an operator sees more
-  sessions on one page; the server's default `MaxAdminPageSize` is 100, so 100 is accepted. If a deployment sets `MaxAdminPageSize` below 100 the first
-  load would be rejected as a validation error, which Windows verification should check.
+- Aktif Oturumlar keeps its default page size of 50 (the selector offers 25 / 50 / 100). A default of 100 is a proposal awaiting owner approval, not
+  a decision: no recorded owner decision exists, and a deployment with `MaxAdminPageSize` below 100 would reject the first load (PR #68 review).
 - Tests: `AccessScreensResponsiveRenderTests` (4, server markup); `tests/browser/access-screens-responsive.cjs` (1280 / 640 = 200 % / 390 px, light and dark:
   no page or inner horizontal scroll, revoke action in view, focus after paging, tab arrows, empty / error / loading at 390).
 - Not done / not verified: real browser zoom (640 px viewport used), screen reader, SQL data, `AccessActionDialog` at 390 px, Windows/IIS. Open, in the
