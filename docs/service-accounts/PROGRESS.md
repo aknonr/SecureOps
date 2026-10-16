@@ -17,6 +17,29 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
 - Push on the owner's workstation: Git Credential Manager holds two GitHub accounts, so name the owner's:
   `git -c credential.https://github.com.username=aknonr push origin <branch>`.
 
+## Where used, KULLANIM-1 (branch `feature/service-accounts-where-used-20261015`, from master `8939fa0`, not merged)
+
+- Owner question: on which servers (service / scheduled task / IIS pool) is an account used, without choosing an RFS first. Stage 1 of 4: join what
+  the module already holds into one view per account; later stages (DNA report import, gMSA AD attributes, nightly inventory) add evidence producers
+  to the same view (`WhereUsedBuilder`), no new row logic.
+- `GET /api/v1/service-accounts/accounts/{id}/where-used?source=&foundOnly=&page=&pageSize=` (View; scope on the server, out of scope = 404; 50 per
+  page, at most 100). One row per server; every source keeps its own evidence line (Scan with `Tool` Combined/Jea and the server result, Excel
+  finding, manual record, SPN host) and nothing overwrites another. Row status: Conflict / Found / DefinedOnly / NotFoundInScanned / NoInformation; a
+  conflict (one source found, another complete read did not) is named, not resolved. No text says "not used". SPN is a definition only.
+- Server names: case, trailing dot and a UNC prefix are folded; a short name joins an FQDN only when exactly one FQDN carries that label, else
+  separate rows (`WhereUsedServerNames`, Domain). No migration: three reads (scan tables when 030 is installed, findings + usages), no per-row query;
+  newest 20 scans, at most 3 000 component rows (per-server match counts stay exact), 5 000 findings and usages.
+- SPN through the existing `IDirectoryEnrichmentQueryService.GetServiceEvidenceAsync` (module View + `Identity.Groups.View`; no Directory change).
+  Denied / not configured / account not in the directory / directory down are separate source states and never hide the stored sources. Known cost:
+  that call also walks group membership and writes its own Directory Explorer audit rows; an SPN-only read would be cheaper (a Directory-side change,
+  not requested here).
+- UI: `SaWhereUsedPanel` at the top of the usage tab (read once when the tab opens), source badges, filters (native select and checkbox), pager,
+  source-state list, "bulunamadı ≠ kullanılmıyor" text; scan panel shows the `Tool` badge. OpenAPI: 1 path + 6 schemas added only.
+- Verified 2026-10-15 on Windows (SDK 9.0.317, LocalDB): unit tests (`WhereUsedTests`, `ServiceAccountWhereUsedUiTests`), SA SQL integration
+  (`ServiceAccountWhereUsedSqlTests`, 5 tests), local Demo API+UI against a disposable database in the built-in browser (dark theme, 375 px: no
+  horizontal overflow). **Not verified:** light theme by eye, 200 % zoom by eye, screen reader, `tests/browser` journey (no Playwright installed
+  here), a database without migration 030 (covered by a unit test of the state only), real AD SPNs, Windows/IIS, corporate TEST.
+
 ## OR creation OR-2, Fake only (branch `feature/service-accounts-or-creation-20261013`, from master `e79ac0b` + ADR-0030 branch merged in, not merged)
 
 - ADR-0030 stays **Proposed**; owner asked for OR-2 with a Fake adapter only (AGENTS rule 8). Migration **035** (SA-008): per plan account OR

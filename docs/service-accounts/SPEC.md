@@ -263,6 +263,28 @@ endpoint (rule 10). Operator guide: [USAGE-SCAN-TR.md](USAGE-SCAN-TR.md).
     (starter or administrator) keeps the finished servers; retry repeats only servers not read completely. Off by default:
     without a configured collector the feature says so and the upload path stays. The person-run upload is unchanged.
 
+## Where used (2026-10-15, no migration)
+
+"Hangi sunucularda?" answers, per account, on which servers the stored sources place it, without choosing an RFS first.
+`GET accounts/{id}/where-used` (View; same scope rule as the detail, out of scope = missing).
+
+1. **Evidence per source, never merged away.** A server row lists one evidence line per source: `Scan` (date, `Tool` Combined = uploaded script
+   output or Jea = web scan, the server's result, components), `Finding` (Excel technical finding), `Manual` (a person's usage record), `Spn`
+   (Active Directory service principal name host). Each line says what that source said: Found, NotFound (only after a complete read), NoInformation
+   (partial, failed, unreachable, uncertain) or Defined (SPN).
+2. **Nothing says "not used".** A row is Found if any source found it; Conflict if one source found it and another complete read did not (named, not
+   resolved, with both dates); DefinedOnly if only an SPN names the host; NotFoundInScanned ("not found in the scanned sources", never "unused") or
+   NoInformation otherwise. An SPN is a definition, not a use, and never creates a conflict.
+3. **Names.** Case, trailing dot and a UNC prefix are ignored. A short name joins an FQDN only when exactly one FQDN in the data carries that label
+   (rule: exact one-to-one); two FQDNs with the same label, IP addresses and free text stay separate rows.
+4. **Honest sources.** `Sources` states each source: Available, Empty, Partial (older scans or components omitted, SPN list cut), NotInstalled (030
+   missing), Denied (no `Identity.Groups.View`), NotConfigured (no directory), Unknown (directory down or account not in the directory). A source that
+   cannot be read never hides the others and never makes the list look complete.
+5. **Bounds.** Newest 20 scans, 3 000 component rows (per-server match counts exact), 5 000 findings/usages, 50 rows per page (max 100); filters
+   `source` (Scan, Finding, Manual, Spn) and `foundOnly` apply to the rows, the summary counts the whole account.
+6. **No reverse direction.** There is no "which accounts run on this server" route or view (AGENTS rule 5, ADR-0008). Read only: nothing is written,
+   no history or audit row except the Directory Explorer's own for the SPN read.
+
 ## Requested gMSA name (migration 031, 2026-10-05)
 
 The gMSA name a conversion will use is recorded where the work is requested (`GmsaHandover`, `GmsaConversion` requests) and

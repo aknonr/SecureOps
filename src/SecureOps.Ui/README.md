@@ -39,6 +39,21 @@ Open UI ↔ API contract gaps: [`docs/26-ui-backend-contract-gaps.md`](../../doc
 Below this point: reference sections (Layout to Testing) and dated handoff logs, kept with their source SHAs and
 evidence paths. Search for the feature or date you need rather than reading top to bottom.
 
+## Service accounts: "Hangi sunucularda?" (KULLANIM-1), 2026-10-15
+
+`SaWhereUsedPanel` at the top of the account page's usage tab (`/service-accounts/{id}`), read once when the tab first opens (the directory is asked
+then, not on every page open). One card per server (list, not table, for 390 px): name, status badge with icon and text, "aynı sunucu olarak
+birleştirildi" for joined short names, last seen / last looked / source count, the server's conflict text, one badge per source ("Tarama-Betik",
+"Tarama-Web", "Excel", "Elle", "SPN" with what it said and when) and a native `details` with the evidence text and components. Above the list:
+the headline ("N sunucu · M sunucuda görüldü · K çelişki · son tarama tarihi"), one badge and text per source state (Okundu / Kayıt yok / Kısmen
+okundu / Kurulu değil / Yetki yok / Yapılandırılmamış / Bilinmiyor) and a warning naming every source that could not be read; filters are a native
+`select` and checkbox; `SaPager` pages. Loading, empty ("sunucu bilgisi yok", not "kullanılmıyor"), filter-empty and error (`SaProblem`, retry) are
+distinct. The scan panel now shows the scan's `Tool` as a badge ("Betik çıktısı (yükleme)" / "Web taraması (JEA)"). Wording and tone live in
+`WhereUsedPresentation`; labels shared with the server texts in `WhereUsedLabels` (Shared). Tests: `ServiceAccountWhereUsedUiTests` (14, static
+renderer, canned API). Checked in the built-in browser against a local Demo API+UI on a disposable database (dark theme; 375 px without horizontal
+overflow after letting badges wrap). Not verified: light theme by eye, 200 % zoom by eye, screen reader, `tests/browser` journey (no Playwright here),
+Windows/IIS, corporate TEST.
+
 ## Access screens at 390 px, 200 % and by keyboard (#67), 2026-10-14
 
 Branch `fix/ui-access-screens-responsive-20261014`. Local run only (macOS, SDK 9.0.317 from `global.json`, Playwright Chromium 156 headless):
@@ -55,6 +70,9 @@ not SQL data.
 - Erişim Talepleri: focus moves to the list heading after paging and the page is announced; tabs follow the arrow-key pattern, stay focusable while
   busy (`aria-disabled`), and `aria-selected` is now `"true"/"false"` (Blazor wrote an empty attribute).
 - MudBlazor 6 buttons now draw a 2 px `--so-accent` focus ring on these pages (same fix as TH-12).
+- Aktif Oturumlar now opens with a page size of 100 (was 50; the selector still offers 25 / 50 / 100). Reason: owner decision, so an operator sees more
+  sessions on one page; the server's default `MaxAdminPageSize` is 100, so 100 is accepted. If a deployment sets `MaxAdminPageSize` below 100 the first
+  load would be rejected as a validation error, which Windows verification should check.
 - Tests: `AccessScreensResponsiveRenderTests` (4, server markup); `tests/browser/access-screens-responsive.cjs` (1280 / 640 = 200 % / 390 px, light and dark:
   no page or inner horizontal scroll, revoke action in view, focus after paging, tab arrows, empty / error / loading at 390).
 - Not done / not verified: real browser zoom (640 px viewport used), screen reader, SQL data, `AccessActionDialog` at 390 px, Windows/IIS. Open, in the
@@ -107,6 +125,41 @@ Chromium 1194 headless): Demo API with Simulation source/Jira and InMemory persi
     (`AccessBundles_PreserveRights_PageDecisions_ImpactAndConcurrentGuards`) failed during seeding; its cause was not investigated.
   - LocalDB note: the shared `SecureOpsResourcesV1` instance repeatedly stopped answering (orphaned `sqlservr` shown as Stopped) during the run;
     killing that instance's own process and restarting it restored it.
+
+## TH-13 MudSelect accessibility and stale journey, 2026-10-14
+
+Branch `claude/fix-th13-mudselect-a11y-da19d3` from master `5f22a69`. Local only: Windows 11, SDK 9.0.317, Chrome headless, Debug build, Demo API
+(Simulation source and Jira, InMemory persistence) on a free loopback port, UI on HTTPS. Not IIS, not corporate TEST, no SQL.
+
+- Root cause (read from the running Demo, not guessed): MudBlazor 6.16 `MudSelect` renders a hidden `<input>` that receives the page's
+  attributes, a `div.mud-input-slot[tabindex=0]` as the keyboard target, a `label[for]` pointing at an id nobody owns, and role-less
+  `div.mud-list-item` options in a popover outside the control. When no registered item matches the value it instead shows a visible
+  read-only `<input type=text>` and hides that div. No upgrade or JS interop was needed.
+- Fix, one place: `wwwroot/js/so-select-a11y.js` (loaded from `_Host.cshtml`, attribute-only, no key handling) gives every
+  `.mud-input-control.mud-select` `role=combobox`, a name (the input's `aria-label`, else `aria-labelledby` the visible label),
+  `aria-haspopup`, `aria-expanded`, `aria-controls`, `aria-activedescendant` (focus stays on the combobox; arrows move
+  `mud-selected-item`), `aria-disabled`, and the popover list `role=listbox` / items `role=option` + `aria-selected`. It replaces the two
+  page-specific `role=button` patches in `_Host` (Service Accounts pages and resource dialogs), so those selects are now `combobox` too.
+- Inventory: 76 `<MudSelect>` tags in 27 `.razor` files: 7 outside Service Accounts (`InUseReports`, `OperatorReport`, `Sessions`,
+  `InUseAssignmentDialog`, `ResourceLinkDialog`, `SoGroupAnalysisSection`, `SoGroupDirectMembers`) and 69 in 20 Service Accounts
+  pages/components; all are covered by the bridge and every one has a `Label` or `aria-label` (unit-tested). No Service Accounts file was edited.
+- Dialog defects found while doing this, fixed in `InUseAssignmentDialog` only: the select was drawn before the reviewer search returned,
+  so a current reviewer showed as a raw id in a text box (now the select appears after the options load); and the label overlapped the
+  "Atanmamış" value (empty-string value does not shrink the MudBlazor 6 label; `ShrinkLabel`).
+- `tests/browser/sdm-journey.cjs`: selectors only. The submission panel is under "Önizleme ve işlem" (TH-9); the stale text
+  "SDM kategori politikası onaylanmadı." is replaced by the "Uygun değil" badge plus the record's own `eligibilityReason` from the API.
+  `resource-ui.cjs` and `service-accounts.cjs` looked for `role=button` on selects and now look for `combobox`.
+- Tests: `SelectAccessibilityTests` (5 render/source tests: real MudSelect markup the bridge depends on, bridge contract, `_Host` wiring,
+  every select named, dialog load order) and the new journey `tests/browser/select-a11y.cjs`.
+- Ran, passed: `select-a11y.cjs` (in-use reports, admin sessions, Service Accounts work: 1440 and 390 px, light and dark, no horizontal scroll;
+  Enter opens, ArrowDown moves the selection and `aria-activedescendant`, Escape closes the list and keeps focus, Space reopens, option click
+  closes; reviewer assignment dialog by keyboard, value shows the label, Escape closes the list not the dialog).
+  `inuse-rc626-repair.cjs` with real `playwright` 1.56.1 (`playwright/test`, no shim): every step up to and including the reviewer
+  assignment dialog (answers, assignment to a reviewer and back to none, themes, 1366 and 390 px) passes.
+- Not run: `inuse-rc626-repair` after the report-archive step (the Demo API's report index answers 503 `PersistenceUnavailable` without SQL),
+  `sdm-journey` (needs the SQL evaluation rows; an isolated `th13` LocalDB database was created and dropped, but migrations 025–037, the
+  integration tests and a Worker were not set up), native 200 % zoom (`WASAS_NATIVE_ZOOM`), a real screen reader, IIS, corporate TEST.
+  The second reviewer came from the access API (`InUseReviewer` role on a demo actor), not a fixture.
 
 ## gMSA change plan UI (d, PR 3), 2026-10-12
 
