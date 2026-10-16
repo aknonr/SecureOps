@@ -52,6 +52,7 @@
     z-index: 1500;
     top: 12px;
     right: 12px;
+    box-sizing: border-box;
     width: min(380px, calc(100vw - 24px));
     max-height: calc(100vh - 24px);
     overflow-y: auto;
@@ -157,10 +158,18 @@
     }
 }
 
-/* Movement only for people who have not asked for less of it. */
+/* Movement only for people who have not asked for less of it: a short fade when the tour opens. The frame follows the area
+   without a transition so it never trails behind while the page scrolls. */
 @media (prefers-reduced-motion: no-preference) {
-    .so-tour-ring {
-        transition: top 0.18s ease, left 0.18s ease, width 0.18s ease, height 0.18s ease;
+    .so-tour-ring,
+    .so-tour-box {
+        animation: so-tour-in 0.15s ease-out;
+    }
+}
+
+@keyframes so-tour-in {
+    from {
+        opacity: 0;
     }
 }
 

@@ -68,6 +68,7 @@ function stop() {
     current.resize?.disconnect();
     if (current.frame) cancelAnimationFrame(current.frame);
     if (current.target) current.target.style.scrollMarginTop = current.margin ?? '';
+    if (current.padded) document.body.style.paddingBottom = current.padding;
     current = null;
 }
 
@@ -78,8 +79,14 @@ export function show(name, box, ring) {
     current = { target, box, ring, frame: 0, margin: target?.style.scrollMarginTop };
     if (target) {
         const narrow = matchMedia(narrowQuery).matches;
-        // Docked box covers the bottom half: keep the area near the top, below the app bar.
-        if (narrow) target.style.scrollMarginTop = '80px';
+        if (narrow && box) {
+            // Docked box covers the bottom of the screen: keep the area near the top, below the app bar, and give the page room
+            // to scroll so an area at the very end can still rise above the box. Restored when the tour moves on or closes.
+            target.style.scrollMarginTop = '80px';
+            current.padded = true;
+            current.padding = document.body.style.paddingBottom;
+            document.body.style.paddingBottom = `${Math.ceil(box.getBoundingClientRect().height) + 16}px`;
+        }
         target.scrollIntoView({ block: narrow ? 'start' : 'center', inline: 'nearest', behavior: reducedMotion() ? 'instant' : 'smooth' });
     }
     place();

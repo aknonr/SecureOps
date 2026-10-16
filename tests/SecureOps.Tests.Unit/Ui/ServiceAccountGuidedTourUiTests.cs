@@ -117,8 +117,9 @@ public sealed partial class ServiceAccountGuidedTourUiTests
         module.Should().Contain("prefers-reduced-motion: reduce").And.Contain("'instant'").And.Contain("(max-width: 700px)");
         css.Should().Contain("@media (prefers-reduced-motion: no-preference)").And.Contain("@media (max-width: 700px)")
             .And.Contain("pointer-events: none").And.Contain("forced-colors");
-        Regex.Matches(css, "transition").Should().ContainSingle("movement exists only for people who did not ask for less of it");
-        css.IndexOf("transition", StringComparison.Ordinal).Should().BeGreaterThan(css.IndexOf("prefers-reduced-motion: no-preference", StringComparison.Ordinal));
+        css.Should().NotContain("transition", "the frame follows the area without trailing");
+        Regex.Matches(css, "animation:").Should().ContainSingle("movement exists only for people who did not ask for less of it");
+        css.IndexOf("animation:", StringComparison.Ordinal).Should().BeGreaterThan(css.IndexOf("prefers-reduced-motion: no-preference", StringComparison.Ordinal));
     }
 
     private static string Ui(params string[] path) => File.ReadAllText(Path.Combine([Root(), "src", "SecureOps.Ui", .. path]));
