@@ -198,12 +198,14 @@ Identity and directory audit details must not store returned personal detail fie
 | Provider | Persistence | Environment guidance |
 |---|---|---|
 | `InMemory` | Process memory only | Development only; never Production |
-| `File` | JSONL files | Development/Test/UAT; configurable folder such as `D:\SecureOps\Audit` |
+| `File` | JSONL files | Development/test only; never Production |
 | `SqlServer` | `audit.AuditLog` table | Production target |
 
-The publish folder is only for application files. File audit writes must go to `Audit:File:Directory`, not the publish directory. Persistent providers use a bounded queue and background worker so request threads do not wait on file IO. When `Audit.FailClosed=true`, failure to accept a required audit event blocks privileged lookup before AD/PAM access.
+The publish folder is only for application files. File audit writes must go to `Audit:File:Directory`, not the publish directory. Files roll by date and size; the application never deletes them. `Audit:File:RetainedFileCountLimit` remains for configuration compatibility but is obsolete and ignored. File is for Development/test only and is rejected in Production because the retention floor is not enforced. Production requires `SqlServer`, fail-closed operation, and retention of at least 36 months under the organization's storage policy.
 
-If a queued persistent write is accepted but the background sink later fails, the audit-store health state becomes `Unhealthy` with a safe code such as `AuditSinkUnavailable`. With fail-closed enabled, later privileged identity lookups are rejected before AD/PAM access until a subsequent audit write succeeds and marks the store healthy again. The Critical technical log entry must contain safe operational data only, such as batch count and exception type, and must not include account input or returned identity fields.
+Persistent providers use a bounded queue with group commit. Each caller awaits durable acknowledgement, which succeeds only after the sink writes its batch. Sink failure fails every waiting item with `AuditWriteUnavailableException`, marks the store `Unhealthy` with `AuditSinkUnavailable`, and emits a Critical technical log. Shutdown fails pending items; cancellation after enqueue or a 30-second acknowledgement timeout also fails the caller. An event whose caller timed out or cancelled may still be persisted; an unavailable acknowledgement never authorizes the caller to proceed. Full queues follow fail-closed behavior unless explicitly configured with the non-production `DropAndCriticalLog` option. With fail-closed enabled, unhealthy stores reject new writes before enqueue. Critical logs must not include account input or returned identity fields.
+
+SQL session terminal transitions with `Audit:Provider=SqlServer` insert the terminal audit in the same transaction as the conditional update; both commit or neither does. Only the winning transition appends audit, and losing callers return the persisted end reason. InMemory sessions and SQL sessions with a different audit provider keep update-then-audit ordering with a single winner; audit failure reports audit unavailable, but cannot roll back that non-atomic transition.
 
 ## Writing Audit
 

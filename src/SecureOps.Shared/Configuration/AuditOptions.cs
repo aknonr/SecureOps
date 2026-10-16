@@ -67,7 +67,7 @@ public sealed class AuditFileOptions
     public int MaxFileSizeMB { get; set; } = 50;
 
     /// <summary>
-    /// Number of audit files retained in the file directory.
+    /// Obsolete compatibility setting. Ignored; the application never deletes audit files.
     /// </summary>
     public int RetainedFileCountLimit { get; set; } = 31;
 }

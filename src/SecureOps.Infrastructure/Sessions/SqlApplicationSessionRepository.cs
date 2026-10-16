@@ -16,9 +16,13 @@ public sealed class SqlApplicationSessionRepository : IApplicationSessionReposit
     /// <summary>Initializes SQL session persistence.</summary>
     public SqlApplicationSessionRepository(IConfiguration configuration)
     {
+        WritesAuditAtomically = string.Equals(configuration["Audit:Provider"], "SqlServer", StringComparison.OrdinalIgnoreCase);
         _connectionString = configuration.GetConnectionString(AuditConnectionStrings.SecureOpsDb)
             ?? throw new InvalidOperationException("ConnectionStrings:SecureOpsDb is required for SQL session persistence.");
     }
+
+    /// <inheritdoc />
+    public bool WritesAuditAtomically { get; }
 
     /// <inheritdoc />
     public async Task InsertAsync(ApplicationSession session, CancellationToken cancellationToken)
@@ -58,20 +62,31 @@ public sealed class SqlApplicationSessionRepository : IApplicationSessionReposit
     }
 
     /// <inheritdoc />
-    public async Task<bool> EndAsync(Guid sessionId, DateTimeOffset endedAtUtc, SessionEndReason reason, CancellationToken cancellationToken)
+    public async Task<bool> EndAsync(Guid sessionId, DateTimeOffset endedAtUtc, SessionEndReason reason, CancellationToken cancellationToken, Func<ApplicationSession, AuditEvent>? auditFactory = null)
     {
         const string sql = """
             UPDATE security.ApplicationSessions
             SET EndedAtUtc = @EndedAtUtc, EndReason = @EndReason
+            OUTPUT inserted.SessionId, inserted.UserId, inserted.StartedAtUtc, inserted.LastSeenAtUtc,
+                inserted.AbsoluteExpiresAtUtc, inserted.EndedAtUtc, inserted.EndReason,
+                inserted.AuthenticationMethod, inserted.AccessVersion
             WHERE SessionId = @SessionId AND EndedAtUtc IS NULL;
             """;
         await using SqlConnection connection = new(_connectionString);
-        int affected = await connection.ExecuteAsync(Command(sql, new { SessionId = sessionId, EndedAtUtc = endedAtUtc, EndReason = reason.ToString() }, null, cancellationToken));
-        return affected == 1;
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
+        SessionRow? row = await connection.QuerySingleOrDefaultAsync<SessionRow>(Command(sql, new { SessionId = sessionId, EndedAtUtc = endedAtUtc, EndReason = reason.ToString() }, transaction, cancellationToken));
+        if (row is not null)
+        {
+            await WriteTerminalAuditAsync(connection, transaction, Map(row), auditFactory, cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return row is not null;
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<ApplicationSession>> EndActiveForUserAsync(Guid userId, DateTimeOffset endedAtUtc, SessionEndReason reason, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ApplicationSession>> EndActiveForUserAsync(Guid userId, DateTimeOffset endedAtUtc, SessionEndReason reason, CancellationToken cancellationToken, Func<ApplicationSession, AuditEvent>? auditFactory = null)
     {
         const string select = $"{_readSql} WITH (UPDLOCK, HOLDLOCK) WHERE UserId = @UserId AND EndedAtUtc IS NULL;";
         const string update = "UPDATE security.ApplicationSessions SET EndedAtUtc = @EndedAtUtc, EndReason = @EndReason WHERE UserId = @UserId AND EndedAtUtc IS NULL;";
@@ -82,6 +97,10 @@ public sealed class SqlApplicationSessionRepository : IApplicationSessionReposit
         if (affected.Length > 0)
         {
             await connection.ExecuteAsync(Command(update, new { UserId = userId, EndedAtUtc = endedAtUtc, EndReason = reason.ToString() }, transaction, cancellationToken));
+            foreach (ApplicationSession session in affected)
+            {
+                await WriteTerminalAuditAsync(connection, transaction, session with { EndedAtUtc = endedAtUtc, EndReason = reason }, auditFactory, cancellationToken);
+            }
         }
 
         await transaction.CommitAsync(cancellationToken);
@@ -93,7 +112,8 @@ public sealed class SqlApplicationSessionRepository : IApplicationSessionReposit
         DateTimeOffset nowUtc,
         DateTimeOffset idleCutoffUtc,
         int maximumCount,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<ApplicationSession, AuditEvent>? auditFactory = null)
     {
         const string sql = """
             UPDATE TOP (@MaximumCount) security.ApplicationSessions
@@ -109,9 +129,18 @@ public sealed class SqlApplicationSessionRepository : IApplicationSessionReposit
               AND (AbsoluteExpiresAtUtc <= @NowUtc OR LastSeenAtUtc <= @IdleCutoffUtc);
             """;
         await using SqlConnection connection = new(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
         IEnumerable<SessionRow> rows = await connection.QueryAsync<SessionRow>(
-            Command(sql, new { NowUtc = nowUtc, IdleCutoffUtc = idleCutoffUtc, MaximumCount = maximumCount }, null, cancellationToken));
-        return rows.Select(Map).ToArray();
+            Command(sql, new { NowUtc = nowUtc, IdleCutoffUtc = idleCutoffUtc, MaximumCount = maximumCount }, transaction, cancellationToken));
+        ApplicationSession[] ended = rows.Select(Map).ToArray();
+        foreach (ApplicationSession session in ended)
+        {
+            await WriteTerminalAuditAsync(connection, transaction, session, auditFactory, cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return ended;
     }
 
     /// <inheritdoc />
@@ -129,6 +158,11 @@ public sealed class SqlApplicationSessionRepository : IApplicationSessionReposit
         IEnumerable<SessionRow> rows = await connection.QueryAsync<SessionRow>(Command(sql, new { AbsoluteCutoffUtc = absoluteCutoffUtc, IdleCutoffUtc = idleCutoffUtc, Skip = skip, Take = take }, null, cancellationToken));
         return rows.Select(Map).ToArray();
     }
+
+    private Task WriteTerminalAuditAsync(SqlConnection connection, SqlTransaction transaction, ApplicationSession session, Func<ApplicationSession, AuditEvent>? auditFactory, CancellationToken cancellationToken) =>
+        WritesAuditAtomically && auditFactory is not null
+            ? SqlAuditRow.InsertAsync(connection, transaction, auditFactory(session), cancellationToken)
+            : Task.CompletedTask;
 
     private static ApplicationSession Map(SessionRow row) => new(
         row.SessionId,

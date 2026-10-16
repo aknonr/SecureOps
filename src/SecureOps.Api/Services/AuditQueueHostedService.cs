@@ -42,43 +42,69 @@ public sealed class AuditQueueHostedService : BackgroundService
     {
         var flushInterval = TimeSpan.FromSeconds(_options.FlushIntervalSeconds);
 
-        while (!stoppingToken.IsCancellationRequested)
+        try
         {
-            AuditEvent first;
-            try
+            while (!stoppingToken.IsCancellationRequested)
             {
-                first = await _queue.Reader.ReadAsync(stoppingToken);
-                _queue.MarkDequeued();
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
+                AuditQueueItem first;
+                try
+                {
+                    first = await _queue.Reader.ReadAsync(stoppingToken);
+                    _queue.MarkDequeued();
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (System.Threading.Channels.ChannelClosedException)
+                {
+                    break;
+                }
 
-            List<AuditEvent> batch = [first];
-            DateTimeOffset deadline = DateTimeOffset.UtcNow.Add(flushInterval);
+                List<AuditQueueItem> batch = [first];
+                DateTimeOffset deadline = DateTimeOffset.UtcNow.Add(flushInterval);
 
-            while (batch.Count < _maxBatchSize
-                   && DateTimeOffset.UtcNow < deadline
-                   && _queue.Reader.TryRead(out AuditEvent? next))
-            {
-                _queue.MarkDequeued();
-                batch.Add(next);
-            }
+                while (batch.Count < _maxBatchSize
+                       && DateTimeOffset.UtcNow < deadline
+                       && _queue.Reader.TryRead(out AuditQueueItem? next))
+                {
+                    _queue.MarkDequeued();
+                    batch.Add(next);
+                }
 
-            try
-            {
-                await _sink.WriteBatchAsync(batch, stoppingToken);
-                _healthState.MarkHealthy();
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                _healthState.MarkUnhealthy("AuditSinkUnavailable");
-                _logger.LogCritical(
-                    ex,
-                    "Audit background persistence failed for {AuditEventCount} event(s).",
-                    batch.Count);
+                try
+                {
+                    await _sink.WriteBatchAsync(batch.Select(item => item.Event).ToArray(), stoppingToken);
+                    _healthState.MarkHealthy();
+                    foreach (AuditQueueItem item in batch)
+                    {
+                        item.Succeed();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _healthState.MarkUnhealthy("AuditSinkUnavailable");
+                    _logger.LogCritical(
+                        ex,
+                        "Audit background persistence failed for {AuditEventCount} event(s).",
+                        batch.Count);
+                    foreach (AuditQueueItem item in batch)
+                    {
+                        item.Fail();
+                    }
+                }
             }
         }
+        finally
+        {
+            _queue.FailPending();
+        }
+    }
+
+    /// <inheritdoc />
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        _queue.FailPending();
+        await base.StopAsync(cancellationToken);
     }
 }

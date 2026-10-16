@@ -38,7 +38,6 @@ public sealed class FileAuditEventSink : IAuditEventSink
             .ToArray();
 
         await File.AppendAllLinesAsync(path, lines, Encoding.UTF8, cancellationToken);
-        EnforceRetention();
     }
 
     private string GetWritablePath()
@@ -59,22 +58,6 @@ public sealed class FileAuditEventSink : IAuditEventSink
             }
 
             sequence++;
-        }
-    }
-
-    private void EnforceRetention()
-    {
-        DirectoryInfo directory = new(_options.File.Directory);
-        string prefix = string.IsNullOrWhiteSpace(_options.File.FilePrefix)
-            ? "secureops-audit"
-            : _options.File.FilePrefix;
-
-        foreach (FileInfo file in directory
-                     .GetFiles($"{prefix}-*.jsonl")
-                     .OrderByDescending(file => file.LastWriteTimeUtc)
-                     .Skip(_options.File.RetainedFileCountLimit))
-        {
-            file.Delete();
         }
     }
 }
