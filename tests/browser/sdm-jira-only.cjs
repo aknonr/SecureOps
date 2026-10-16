@@ -64,7 +64,7 @@ const out = path.resolve(process.argv[6]);
     try {
         const records = process.argv[7] === '--verify-presentation'
             ? (await json(admin, '/api/v1/operational-records/stored?pageSize=100')).items
-            : await json(admin, '/api/v1/operational-records');
+            : await json(admin, '/api/v1/operational-records/refresh', { method: 'POST' });
         if (process.argv[7] === '--prepare-walkthrough') {
             const ready = records.find(r => r.orCode === 'SIM-OR-100');
             assert.ok(ready?.simulationMode && ready.classification === 0 && !ready.jiraIssueKey);

@@ -44,7 +44,19 @@ public sealed class OperationalRecordService : IOperationalRecordService
     }
 
     /// <inheritdoc />
-    public async Task<OperationalRecordResult<IReadOnlyList<OperationalRecord>>> ListAsync(OperationalRecordCommandContext context, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<OperationalRecord>> ListAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<OperationalRecord> records = await _repository.ListAsync(cancellationToken);
+        if (string.Equals(_options.SourceProvider, "TuruncuHat", StringComparison.OrdinalIgnoreCase))
+        {
+            records = records.Where(record => !IsSynthetic(record.SourceRecordId, record.OrCode)).ToArray();
+        }
+
+        return records.Select(SdmEvaluationEvidence.Project).ToArray();
+    }
+
+    /// <inheritdoc />
+    public async Task<OperationalRecordResult<IReadOnlyList<OperationalRecord>>> RefreshAsync(OperationalRecordCommandContext context, CancellationToken cancellationToken)
     {
         IReadOnlyList<OperationalRecordSourceItem> sourceItems;
         try

@@ -21,7 +21,7 @@ const out = path.resolve(process.argv[5]);
     const heading = () => panel().locator('h3');
     const button = name => page.getByRole('button', { name, exact: true });
     try {
-        const records = await json(admin, '/api/v1/operational-records');
+        const records = await json(admin, '/api/v1/operational-records/refresh', { method: 'POST' });
         const fixture = code => {
             const record = records.find(r => r.orCode === code);
             assert.ok(record?.simulationMode && !record.jiraIssueKey && !record.reconciliationRequired, code + ' must be a fresh synthetic fixture');

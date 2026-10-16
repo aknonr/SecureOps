@@ -198,7 +198,7 @@ public sealed class SdmEvaluationTests
     }
 
     [Fact]
-    public async Task ListAsync_FourCorporateShapedRows_OnlySourceListCalledAndAllRemainManual()
+    public async Task RefreshAsync_FourCorporateShapedRows_OnlySourceListCalledAndAllRemainManual()
     {
         IOperationalRecordClient client = Substitute.For<IOperationalRecordClient>();
         client.GetActiveAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(
@@ -208,10 +208,10 @@ public sealed class SdmEvaluationTests
         OperationalRecordService service = new(client, classifier, new InMemoryOperationalRecordRepository(), audit,
             Options.Create(new OperationalRecordsOptions { SourceProvider = "TuruncuHat", ReadOnlyIntegrationMode = true }),
             NullLogger<OperationalRecordService>.Instance);
-        OperationalRecordResult<IReadOnlyList<OperationalRecord>> result = await service.ListAsync(_context, default);
+        OperationalRecordResult<IReadOnlyList<OperationalRecord>> result = await service.RefreshAsync(_context, default);
         result.Value.Should().HaveCount(4).And.OnlyContain(r => !r.JiraEligible
             && r.Classification == OperationalRecordClassification.NeedsManualReview && !r.SdmEvaluation!.Result.SdmCandidateRecommended);
-        await service.ListAsync(_context, default);
+        await service.RefreshAsync(_context, default);
         audit.Events.Should().HaveCount(4);
         client.ReceivedCalls().Should().OnlyContain(c => c.GetMethodInfo().Name == nameof(IOperationalRecordClient.GetActiveAsync));
         classifier.ReceivedCalls().Should().BeEmpty();

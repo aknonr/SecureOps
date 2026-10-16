@@ -237,7 +237,7 @@ Rules specific to this screen:
 - **Idempotency is the backend's.** No `Idempotency-Key` is sent, so the API's deterministic
   actor+command+record key applies and a repeat after refresh collapses onto the same command.
 - **Retry follows authoritative state, not HTTP status.**
-- **No polling.** The list endpoint is a rate-limited source refresh; refresh is deliberate, plus an
+- **No polling.** `POST /api/v1/operational-records/refresh` is the rate-limited source refresh (the list `GET` is read-only); refresh is deliberate, plus an
   automatic re-read after every write.
 
 Red stays reserved for genuinely critical conditions. Stale, claimed, pending, and reconciliation
