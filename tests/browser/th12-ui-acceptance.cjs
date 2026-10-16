@@ -84,7 +84,7 @@ async function themeApplied(page, theme) {
     const browser = await chromium.launch({ executablePath: chrome, headless: true });
     let page;
     try {
-        const records = await json(admin, '/api/v1/operational-records');
+        const records = await json(admin, '/api/v1/operational-records/refresh', { method: 'POST' });
         const fixture = code => records.find(r => r.orCode === code) ?? assert.fail(code + ' missing');
         const [happy, sent, failing] = ['SIM-OR-100', 'SIM-OR-200', 'SIM-OR-300'].map(fixture);
         assert.ok(!happy.jiraIssueKey && !failing.jiraIssueKey, 'Fresh in-memory fixtures required');

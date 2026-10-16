@@ -65,7 +65,7 @@ const checks = [];
         return latest;
     }
     try {
-        const records = await json(admin, '/api/v1/operational-records');
+        const records = await json(admin, '/api/v1/operational-records/refresh', { method: 'POST' });
         const fixture = code => {
             const record = records.find(item => item.orCode === code);
             assert.ok(record?.simulationMode, 'Existing Simulation fixture required');

@@ -39,6 +39,31 @@ public sealed class WorkspaceGuidanceTests
         Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(handler.Uri.Query)["search"].ToString().Should().Be("A&B %");
     }
 
+    [Fact]
+    public async Task RefreshClient_UsesPostToTheRefreshRoute()
+    {
+        using var handler = new RefreshHandler();
+        using var http = new HttpClient(handler) { BaseAddress = new Uri("https://example.invalid/") };
+        var client = new OperationalRecordApiClient(http, new FakeApiSessionContext());
+
+        (await client.RefreshAsync(default)).Should().BeEmpty();
+
+        handler.Method.Should().Be(HttpMethod.Post);
+        handler.Uri!.AbsolutePath.Should().Be("/api/v1/operational-records/refresh");
+    }
+
+    private sealed class RefreshHandler : HttpMessageHandler
+    {
+        internal HttpMethod? Method { get; private set; }
+        internal Uri? Uri { get; private set; }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Method = request.Method;
+            Uri = request.RequestUri;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(Array.Empty<OperationalRecordResponse>()) });
+        }
+    }
+
     private sealed class ReadHandler : HttpMessageHandler
     {
         internal int Calls { get; private set; }

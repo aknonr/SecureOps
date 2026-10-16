@@ -327,6 +327,18 @@ public sealed class OperationalRecordsControllerTests
         response.JiraExists.Should().Be(jiraExists);
     }
 
+    [Fact]
+    public void ListAndRefresh_AreSeparateOperations_OnlyRefreshIsRateLimitedPost()
+    {
+        System.Reflection.MethodInfo list = typeof(OperationalRecordsController).GetMethod(nameof(OperationalRecordsController.ListAsync))!;
+        System.Reflection.MethodInfo refresh = typeof(OperationalRecordsController).GetMethod(nameof(OperationalRecordsController.RefreshAsync))!;
+
+        list.GetCustomAttributes(typeof(Microsoft.AspNetCore.Mvc.HttpGetAttribute), true).Should().ContainSingle();
+        list.GetCustomAttributes(typeof(Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute), true).Should().BeEmpty();
+        refresh.GetCustomAttributes(typeof(Microsoft.AspNetCore.Mvc.HttpPostAttribute), true).Should().ContainSingle();
+        refresh.GetCustomAttributes(typeof(Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute), true).Should().ContainSingle();
+    }
+
     private static OperationalRecordsController CreateController(
         OperationalRecordResult<JiraIssueDraft> previewResult,
         bool readOnlyIntegrationMode = false)
@@ -387,7 +399,8 @@ public sealed class OperationalRecordsControllerTests
     private sealed class EmptyRecordService : IOperationalRecordService
     {
         public Task<OperationalRecordPage> BrowseAsync(OperationalRecordQuery query, CancellationToken cancellationToken) => Task.FromResult(new OperationalRecordPage([], 0));
-        public Task<OperationalRecordResult<IReadOnlyList<OperationalRecord>>> ListAsync(OperationalRecordCommandContext context, CancellationToken cancellationToken) =>
+        public Task<IReadOnlyList<OperationalRecord>> ListAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<OperationalRecord>>(Array.Empty<OperationalRecord>());
+        public Task<OperationalRecordResult<IReadOnlyList<OperationalRecord>>> RefreshAsync(OperationalRecordCommandContext context, CancellationToken cancellationToken) =>
             Task.FromResult(OperationalRecordResult<IReadOnlyList<OperationalRecord>>.Success(Array.Empty<OperationalRecord>()));
 
         public Task<OperationalRecordResult<OperationalRecord>> GetAsync(Guid id, CancellationToken cancellationToken) =>
@@ -397,7 +410,8 @@ public sealed class OperationalRecordsControllerTests
     private sealed class StubRecordService(OperationalRecord record) : IOperationalRecordService
     {
         public Task<OperationalRecordPage> BrowseAsync(OperationalRecordQuery query, CancellationToken cancellationToken) => Task.FromResult(new OperationalRecordPage([record], 1));
-        public Task<OperationalRecordResult<IReadOnlyList<OperationalRecord>>> ListAsync(OperationalRecordCommandContext context, CancellationToken cancellationToken) =>
+        public Task<IReadOnlyList<OperationalRecord>> ListAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<OperationalRecord>>([record]);
+        public Task<OperationalRecordResult<IReadOnlyList<OperationalRecord>>> RefreshAsync(OperationalRecordCommandContext context, CancellationToken cancellationToken) =>
             Task.FromResult(OperationalRecordResult<IReadOnlyList<OperationalRecord>>.Success([record]));
 
         public Task<OperationalRecordResult<OperationalRecord>> GetAsync(Guid id, CancellationToken cancellationToken) =>

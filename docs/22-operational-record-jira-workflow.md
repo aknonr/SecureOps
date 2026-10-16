@@ -178,7 +178,7 @@ Before create/retry, the API atomically acquires a bounded actor claim (`Claimed
 
 The Jira key is committed before the source close/update starts. A close failure therefore retries only the source stage. Concurrent, repeated, or completed create requests cannot call Jira twice. If a Jira call has an uncertain outcome, `ReconciliationRequired` blocks automatic retry. If the process stops while `CreatingJira` has no persisted key, retry also fails closed for manual reconciliation because remote Jira idempotency has not been proven.
 
-A source refresh may update bounded source fields, but classification is reapplied only while the workflow remains in `Imported`, `Classified`, `NeedsManualReview`, or `Eligible`. Refresh cannot regress `Previewed`, create/close transition states, failures, completion, or reconciliation-required state.
+Source refresh is `POST /api/v1/operational-records/refresh`; `GET /api/v1/operational-records` returns persisted records only and never imports (breaking change for clients that used GET to refresh). A source refresh may update bounded source fields, but classification is reapplied only while the workflow remains in `Imported`, `Classified`, `NeedsManualReview`, or `Eligible`. Refresh cannot regress `Previewed`, create/close transition states, failures, completion, or reconciliation-required state.
 
 Interactive UI verification also requires the list and detail state labels to
 honour reconciliation-required evidence above a persisted create-failed state.

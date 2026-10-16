@@ -57,15 +57,25 @@ public sealed class OperationalRecordsController : ControllerBase
             && string.Equals(jiraOptions.Value.Provider, "Simulation", StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>Refreshes and returns a bounded list of active operational records.</summary>
+    /// <summary>Returns persisted operational records; read-only, no source call.</summary>
     [HttpGet]
+    [Authorize(Policy = Policies.CanViewOperationalRecords)]
+    [ProducesResponseType(typeof(IReadOnlyList<OperationalRecordResponse>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<OperationalRecordResponse>>> ListAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<OperationalRecord> records = await _recordService.ListAsync(cancellationToken);
+        return Ok(records.Select(ToResponse).ToArray());
+    }
+
+    /// <summary>Refreshes the bounded active list from the source, then returns persisted records.</summary>
+    [HttpPost("refresh")]
     [Authorize(Policy = Policies.CanViewOperationalRecords)]
     [EnableRateLimiting(ApiRateLimits.OperationalRecordRefresh)]
     [ProducesResponseType(typeof(IReadOnlyList<OperationalRecordResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status503ServiceUnavailable)]
-    public async Task<ActionResult<IReadOnlyList<OperationalRecordResponse>>> ListAsync(CancellationToken cancellationToken)
+    public async Task<ActionResult<IReadOnlyList<OperationalRecordResponse>>> RefreshAsync(CancellationToken cancellationToken)
     {
-        OperationalRecordResult<IReadOnlyList<OperationalRecord>> result = await _recordService.ListAsync(Context(), cancellationToken);
+        OperationalRecordResult<IReadOnlyList<OperationalRecord>> result = await _recordService.RefreshAsync(Context(), cancellationToken);
         return result.IsSuccess
             ? Ok(result.Value!.Select(ToResponse).ToArray())
             : Failure<IReadOnlyList<OperationalRecordResponse>>(result.Failure!);

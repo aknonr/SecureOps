@@ -81,7 +81,7 @@ The API release gate verifies Active Directory runtime assemblies, dependency-ma
 
 The complete TEST deployment configuration, first-admin bootstrap, migration order, runtime permissions, web.config delta, and rollback constraints are documented in `docs/24-api-test-deployment-readiness.md`. The generated OpenAPI snapshot and `docs/contracts/secureops-api-v1-ui-integration.md` are the frontend contract; UI agents must not infer routes or response models.
 
-Operational Record endpoints live under `/api/v1/operational-records`. Controllers are thin and use capability policies; Jira preview performs no external write. External providers remain fake-only until approved contracts exist. See `docs/22-operational-record-jira-workflow.md`.
+Operational Record endpoints live under `/api/v1/operational-records`. Controllers are thin and use capability policies; Jira preview performs no external write. External providers remain fake-only until approved contracts exist. See `docs/22-operational-record-jira-workflow.md`. `GET /api/v1/operational-records` returns stored records only (no source call, no writes); the source refresh is `POST /api/v1/operational-records/refresh` (same capability and `OperationalRecordRefresh` rate limit, ADR-0029 intent header required). Breaking change: an older client that refreshed through the GET route no longer refreshes.
 # Integrated workflow reporting continuation
 
 Post-rc6.26 local recovery adds POST `/api/v1/in-use/{id}/draft-lifecycle`
