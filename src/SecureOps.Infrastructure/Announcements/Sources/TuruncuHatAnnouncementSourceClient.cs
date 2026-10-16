@@ -117,7 +117,7 @@ public sealed class TuruncuHatAnnouncementSourceClient(
                         ? "AnnouncementSourceUnavailable" : "AnnouncementSourceRejected", (int)response.StatusCode >= 500);
                 }
                 using JsonDocument document = await BoundedJsonHttpContent.ReadAsync(response.Content,
-                    wire.MaxResponseBytes, timeout.Token);
+                    wire.MaxResponseBytes, timeout.Token, TimeSpan.FromSeconds(wire.RequestTimeoutSeconds));
                 return AnnouncementSourceQueryParser.Parse(document.RootElement, selects);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)

@@ -1,5 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using SecureOps.Infrastructure;
 using SecureOps.Infrastructure.OperationalRecords;
 using SecureOps.Shared.Configuration;
 
@@ -7,6 +9,59 @@ namespace SecureOps.Tests.Unit.OperationalRecords;
 
 public sealed class OperationalRecordConfigurationValidatorTests
 {
+    [Theory]
+    [InlineData("http://source.invalid/")]
+    [InlineData("https://user@source.invalid/")]
+    [InlineData("https://source.invalid/?query=value")]
+    [InlineData("https://source.invalid/#fragment")]
+    public void AddInfrastructure_EnabledTuruncuHatAnnouncementWithInvalidUrl_Throws(string baseUrl)
+    {
+        IConfiguration configuration = AnnouncementConfiguration(true, "TuruncuHat", baseUrl);
+
+        Action act = () => new ServiceCollection().AddSecureOpsInfrastructure(configuration, "Test");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*TuruncuHat:BaseUrl*HTTPS*")
+            .Which.Message.Should().NotContain(baseUrl);
+    }
+
+    [Theory]
+    [InlineData(true, "TuruncuHat", "https://source.invalid/")]
+    [InlineData(false, "TuruncuHat", "http://source.invalid/")]
+    [InlineData(true, "Fixture", "http://source.invalid/")]
+    [InlineData(true, "Disabled", "http://source.invalid/")]
+    public void AddInfrastructure_AnnouncementWithSupportedConfiguration_Succeeds(bool enabled, string provider, string baseUrl)
+    {
+        IConfiguration configuration = AnnouncementConfiguration(enabled, provider, baseUrl);
+
+        Action act = () => new ServiceCollection().AddSecureOpsInfrastructure(configuration, "Test");
+
+        act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData("ConnectTimeoutSeconds", "0")]
+    [InlineData("RequestTimeoutSeconds", "121")]
+    [InlineData("MaxResponseBytes", "1023")]
+    public void AddInfrastructure_EnabledTuruncuHatAnnouncementWithInvalidHttpBounds_Throws(string option, string value)
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddConfiguration(AnnouncementConfiguration(true, "TuruncuHat", "https://source.invalid/"))
+            .AddInMemoryCollection(new Dictionary<string, string?> { [$"TuruncuHat:{option}"] = value }).Build();
+
+        Action act = () => new ServiceCollection().AddSecureOpsInfrastructure(configuration, "Test");
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*HTTP bounds*");
+    }
+
+    private static IConfiguration AnnouncementConfiguration(bool enabled, string provider, string baseUrl) =>
+        Configuration(new Dictionary<string, string?>
+        {
+            ["AnnouncementSource:Enabled"] = enabled.ToString(),
+            ["AnnouncementSource:ServiceProvider"] = provider,
+            ["OperationalRecords:SourceProvider"] = "Disabled",
+            ["TuruncuHat:BaseUrl"] = baseUrl
+        });
+
     [Fact]
     public void Validate_WithContractDiagnosticInTest_Succeeds()
     {
