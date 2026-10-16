@@ -52,7 +52,30 @@ public static class ReportPdfWriter
     public static byte[] Write(ReportDocument document)
     {
         List<Line> lines = [.. document.Header.Select(h => new Line(LineKind.Meta, $"{h.Label}: {h.Value}"))];
-        IReadOnlyList<ReportTile> tiles = document.Dashboard?.Tiles ?? [];
+        // With the activity page the simplified summary is a plain table after it (one sentence per card), not drawn tiles.
+        bool activity = document.ActivityPage is { Count: > 0 };
+        IReadOnlyList<ReportTile> tiles = activity ? [] : document.Dashboard?.Tiles ?? [];
+        List<Line> front = [.. lines];
+        if (activity)
+        {
+            foreach (ReportSection section in document.ActivityPage!)
+            {
+                front.Add(new Line(LineKind.Blank, string.Empty));
+                front.Add(new Line(LineKind.Section, section.Title.ToUpper(CultureInfo.GetCultureInfo("tr-TR"))));
+                front.AddRange(Table(section, fitPage: true));
+            }
+
+            if (document.Dashboard is { Tiles.Count: > 0 } summary)
+            {
+                front.Add(new Line(LineKind.Blank, string.Empty));
+                front.Add(new Line(LineKind.Section, "YÖNETİCİ ÖZETİ"));
+                front.AddRange(Table(new ReportSection("Yönetici özeti", ["Gösterge", "Değer", "Ne sayar"],
+                    [.. summary.Tiles.Select(t => (IReadOnlyList<ReportCell>)[t.Label, new ReportCell(Number: t.Value), t.Note ?? string.Empty])]), fitPage: true));
+            }
+
+            lines = [];
+        }
+
         foreach (ReportSection block in document.Dashboard?.Blocks ?? [])
         {
             lines.Add(new Line(LineKind.Blank, string.Empty));
@@ -68,11 +91,19 @@ public static class ReportPdfWriter
         }
 
         List<Line> wrapped = [.. lines.SelectMany(Wrap)];
+        List<Line> frontWrapped = [.. front.SelectMany(Wrap)];
         int firstPage = (int)((_pageHeight - 2 * _margin - _titleBand - TilesHeight(tiles.Count) - _footerSpace) / _lineHeight);
         int otherPages = (int)((_pageHeight - 2 * _margin - _footerSpace) / _lineHeight);
-        List<List<Line>> pages = Paginate(wrapped, firstPage, otherPages);
+        // Activity page: the front pages (header, activity, summary) come first, then the charts page, then the detail pages on fresh pages.
+        List<List<Line>> pages = activity ? Paginate(frontWrapped, firstPage, otherPages) : Paginate(wrapped, firstPage, otherPages);
+        int chartPage = activity ? pages.Count : 1;
+        if (activity)
+        {
+            pages.AddRange(Paginate(wrapped, otherPages, otherPages));
+        }
+
         ReportChart[] charts = [.. (document.Dashboard?.Charts ?? []).Where(c => !c.IsEmpty).Take(ReportPdfCharts.Slots)];
-        return Build(document.Title, tiles, pages, charts);
+        return Build(document.Title, tiles, pages, charts, chartPage);
     }
 
     /// <summary>Fills pages in order; a section heading, its table header or a blank line is never left alone at a page bottom.</summary>
@@ -142,11 +173,17 @@ public static class ReportPdfWriter
         return lines;
     }
 
-    private static IEnumerable<Line> Table(ReportSection section)
+    private static IEnumerable<Line> Table(ReportSection section, bool fitPage = false)
     {
         int count = section.Headers.Count;
-        int[] widths = [.. Enumerable.Range(0, count).Select(i => Math.Min(48, Math.Max(section.Headers[i].Length,
+        int[] widths = [.. Enumerable.Range(0, count).Select(i => Math.Min(fitPage ? _columns : 48, Math.Max(section.Headers[i].Length,
             section.Rows.Select(r => i < r.Count ? r[i].Display.Length : 0).DefaultIfEmpty(0).Max())))];
+        // Page-fitting tables (the first pages) shrink their widest column until the line fits the page, so a team pair or a sentence is not cut mid-table.
+        while (fitPage && widths.Sum() + 3 * (count - 1) > _columns && widths.Max() > 8)
+        {
+            widths[Array.IndexOf(widths, widths.Max())]--;
+        }
+
         string Text(IEnumerable<string> cells) => string.Join(" | ", cells.Select((c, i) => Fit(c, widths[Math.Min(i, count - 1)])));
         yield return new Line(LineKind.TableHeader, Text(section.Headers));
         for (int r = 0; r < section.Rows.Count; r++)
@@ -176,7 +213,7 @@ public static class ReportPdfWriter
         }
     }
 
-    private static byte[] Build(string title, IReadOnlyList<ReportTile> tiles, List<List<Line>> pages, IReadOnlyList<ReportChart> charts)
+    private static byte[] Build(string title, IReadOnlyList<ReportTile> tiles, List<List<Line>> pages, IReadOnlyList<ReportChart> charts, int chartPage)
     {
         List<byte[]> objects = [];
         const int pagesId = 2, fontId = 3, boldId = 4, firstPage = 5;
@@ -191,9 +228,9 @@ public static class ReportPdfWriter
         objects.Add([]);
         for (int i = 0; i < total; i++)
         {
-            string content = charts.Count > 0 && i == 1
+            string content = charts.Count > 0 && i == chartPage
                 ? ReportPdfCharts.Page(charts, _pageWidth, _pageHeight, _margin, _footerSpace, text) + Footer(i, total, text)
-                : Page(title, i == 0 ? tiles : [], pages[charts.Count > 0 && i > 1 ? i - 1 : i], i, total, text);
+                : Page(title, i == 0 ? tiles : [], pages[charts.Count > 0 && i > chartPage ? i - 1 : i], i, total, text);
             byte[] stream = Encoding.Latin1.GetBytes(content);
             objects.Add(Ascii($"<< /Type /Page /Parent {pagesId} 0 R /MediaBox [0 0 {N(_pageWidth)} {N(_pageHeight)}] "
                 + $"/Resources << /Font << /F1 {fontId} 0 R /F2 {boldId} 0 R >> >> /Contents {firstPage + i * 2 + 1} 0 R >>"));

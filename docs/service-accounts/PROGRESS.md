@@ -17,6 +17,18 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
 - Push on the owner's workstation: Git Credential Manager holds two GitHub accounts, so name the owner's:
   `git -c credential.https://github.com.username=aknonr push origin <branch>`.
 
+## Report first page, RAPOR-2 (branch `feature/service-accounts-report-actions-20261016`, from master `cf16a63`, not merged)
+
+- Owner's manager asked for a simpler summary and the team's operations on page 1. New first page "Dönem içinde yapılan işlemler" (screen, XLSX first sheet, PDF first page): deleted, handed
+  over (old → new team), moved to gMSA, changed, and reported-but-not-verified (all time); rules in SPEC "Report first page". Team/account level only — no person column or count (AGENTS rule 5).
+  "Son 7 gün" / "Son 30 gün" buttons on the report page set an explicit date range. Executive summary cut to five cards with one sentence each.
+- No migration: facts come from `ActionEvents`, `Handovers`, `History` ("OwnershipConfirmed") and, when readable, `ChangePlanEvents`/`ChangePlanAccounts`, read as three extra result sets in the existing
+  report query. OpenAPI changed additively (`ServiceAccountActivity`, `ActivityGroup`, `ActivityLine`, `ReportCard`, `activity` on `ServiceAccountReport`).
+- Verified locally (Windows, SDK 9.0.317, LocalDB disposable database): build 0/0, full unit suite, `dotnet format --verify-no-changes`, 166 SA SQL integration tests incl. 2 new
+  (`ServiceAccountActivitySqlTests`: synthetic work → expected page, snapshot equals live, XLSX/PDF carry it), 15 new unit tests + 2 render tests. Not verified: visual check at 390 px / 200 % / both themes
+  (no Demo run in this session; layout uses the existing responsive `MudTable` + CSS grid), PDF page rendering by eye (text extraction only), Excel opening by hand (schema-validator only), IIS/TEST.
+- Open: bulk-imported ownership is not counted (no history row); a "Devir" of an account via GmsaHandover action only shows when no handover decision exists.
+
 ## Where used, KULLANIM-1 (branch `feature/service-accounts-where-used-20261015`, from master `8939fa0`, not merged)
 
 - Owner question: on which servers (service / scheduled task / IIS pool) is an account used, without choosing an RFS first. Stage 1 of 4: join what

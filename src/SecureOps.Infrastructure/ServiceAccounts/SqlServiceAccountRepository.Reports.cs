@@ -32,6 +32,7 @@ public sealed partial class SqlServiceAccountRepository
             """;
         await using SqlConnection connection = await OpenAsync(cancellationToken);
         bool names = await GmsaNameColumnsAsync(connection, null, cancellationToken);
+        bool plans = await ChangePlanEventsReadableAsync(connection, cancellationToken);
         using SqlMapper.GridReader grid = await connection.QueryMultipleAsync(Cmd($"""
             SELECT Id INTO #scoped FROM ({accounts}) s;
             SELECT a.Id, CASE WHEN a.Domain IS NULL THEN a.AccountName ELSE a.Domain + N'\' + a.AccountName END AS Label, a.CurrentOwnerTeamId AS OwnerTeamId, a.CurrentOwnerPersonId AS ConfirmedPersonId,
@@ -81,6 +82,16 @@ public sealed partial class SqlServiceAccountRepository
             WHERE o.n = 1;
             SELECT a.Id FROM svcacct.Accounts a JOIN #scoped s ON s.Id = a.Id WHERE a.LifecycleState = 'ClosureVerified';
             SELECT t.Id, o.Name FROM svcacct.Teams t JOIN svcacct.Organizations o ON o.Id = t.OrganizationId;
+            SELECT h.AccountId, n.TeamId, (SELECT TOP (1) p.TeamId FROM svcacct.History hp JOIN svcacct.OwnershipAssignments p ON p.Id = hp.EntityId
+                    WHERE hp.AccountId = h.AccountId AND hp.EntityType = 'Ownership' AND hp.Action = 'OwnershipConfirmed'
+                      AND (hp.OccurredAt < h.OccurredAt OR hp.OccurredAt = h.OccurredAt AND hp.Id < h.Id) ORDER BY hp.OccurredAt DESC, hp.Id DESC) AS PreviousTeamId,
+                h.OccurredAt, CAST(CASE WHEN NULLIF(n.EvidenceNote, N'') IS NOT NULL OR NULLIF(n.DecisionReason, N'') IS NOT NULL THEN 1 ELSE 0 END AS bit)
+            FROM svcacct.History h JOIN #scoped s ON s.Id = h.AccountId JOIN svcacct.OwnershipAssignments n ON n.Id = h.EntityId
+            WHERE h.EntityType = 'Ownership' AND h.Action = 'OwnershipConfirmed';
+            SELECT d.AccountId, d.SourceTeamId, d.TargetTeamId, d.DecidedOn,
+                CAST(CASE WHEN d.DecidedBy IS NOT NULL AND NULLIF(d.DecisionNote, N'') IS NOT NULL THEN 1 ELSE 0 END AS bit)
+            FROM svcacct.Handovers d JOIN #scoped s ON s.Id = d.AccountId WHERE d.Status = 'Accepted' AND d.DecidedOn IS NOT NULL;
+            {PlanCompletionSql(plans)}
             DROP TABLE #scoped;
             """, parameters, null, cancellationToken, _commitTimeoutSeconds));
         AccountFact[] accountFacts = [.. await grid.ReadAsync<AccountFact>()];
@@ -111,8 +122,37 @@ public sealed partial class SqlServiceAccountRepository
         HashSet<Guid> closed = [.. await grid.ReadAsync<Guid>()];
         var organizations = (await grid.ReadAsync<(Guid Id, string Name)>()).ToDictionary(t => t.Id, t => t.Name);
         InsightFacts insight = new(usages, sqlTeamAccounts, executor, observations, closed, organizations, thresholds);
-        return (new ReportFacts(accountFacts, requests, actions, communications, handovers, transitions, findings, teams, insight, names), watermark);
+        ActivityOwnershipFact[] ownership = [.. (await grid.ReadAsync<(Guid AccountId, Guid? TeamId, Guid? PreviousTeamId, DateTimeOffset At, bool Evidence)>())
+            .Select(o => new ActivityOwnershipFact(o.AccountId, o.TeamId, o.PreviousTeamId, o.At, o.Evidence))];
+        ActivityHandoverFact[] acceptedHandovers = [.. (await grid.ReadAsync<(Guid AccountId, Guid? Source, Guid Target, DateOnly DecidedOn, bool Evidence)>())
+            .Select(h => new ActivityHandoverFact(h.AccountId, h.Source, h.Target, h.DecidedOn, h.Evidence))];
+        ActivityPlanFact[] completedPlans = plans
+            ? [.. (await grid.ReadAsync<(Guid AccountId, DateTimeOffset At)>()).Select(p => new ActivityPlanFact(p.AccountId, p.At))]
+            : [];
+        ActivityFacts activity = new(ownership, acceptedHandovers, completedPlans, plans);
+        return (new ReportFacts(accountFacts, requests, actions, communications, handovers, transitions, findings, teams, insight, names, activity), watermark);
     }
+
+    /// <summary>
+    /// True when the change-plan tables (migration 033) exist and the runtime login may read them; the report then counts completed plans.
+    /// Otherwise the activity page still renders and says plans were not counted.
+    /// </summary>
+    private async Task<bool> ChangePlanEventsReadableAsync(SqlConnection connection, CancellationToken cancellationToken) =>
+        await connection.ExecuteScalarAsync<bool>(Cmd("""
+            SELECT CAST(CASE WHEN OBJECT_ID(N'svcacct.ChangePlanEvents', N'U') IS NOT NULL AND OBJECT_ID(N'svcacct.ChangePlanAccounts', N'U') IS NOT NULL
+                AND HAS_PERMS_BY_NAME(N'svcacct.ChangePlanEvents', N'OBJECT', N'SELECT') = 1
+                AND HAS_PERMS_BY_NAME(N'svcacct.ChangePlanAccounts', N'OBJECT', N'SELECT') = 1 THEN 1 ELSE 0 END AS bit);
+            """, null, null, cancellationToken));
+
+    /// <summary>Accounts of plans completed (one row per plan and account, removed accounts excluded); empty batch when plans are unavailable.</summary>
+    private static string PlanCompletionSql(bool available) => available
+        ? """
+            SELECT ca.AccountId, e.At FROM svcacct.ChangePlanEvents e
+            JOIN svcacct.ChangePlanAccounts ca ON ca.PlanId = e.PlanId JOIN #scoped s ON s.Id = ca.AccountId
+            WHERE e.Event = 'Completed' AND ca.Action <> 'Removed'
+              AND ca.Id = (SELECT MAX(c2.Id) FROM svcacct.ChangePlanAccounts c2 WHERE c2.PlanId = ca.PlanId AND c2.AccountId = ca.AccountId);
+            """
+        : string.Empty;
 
     private sealed record RequestFactRow(Guid Id, Guid AccountId, string ActionType, string Status, Guid? TargetTeamId, DateOnly? PlanStart, DateOnly? PlanEnd,
         Guid? FollowupPersonId, string OrderKey, DateTimeOffset CreatedAt, DateTimeOffset? ClosedAt, string? RequestedGmsaName);

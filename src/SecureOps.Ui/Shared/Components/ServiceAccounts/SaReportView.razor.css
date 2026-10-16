@@ -33,3 +33,24 @@
 /* At 390 px the trend table is wider than the page; it scrolls inside a focusable region instead of being clipped. */
 .sa-table-scroll { max-width: 100%; overflow-x: auto; }
 .sa-table-scroll:focus-visible { outline: 2px solid var(--mud-palette-primary); outline-offset: 2px; }
+
+/* Simplified executive summary: at most five cards, each with a one-sentence definition. Wraps to one column on a phone. */
+.sa-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+    gap: 0.75rem;
+}
+
+.sa-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--mud-palette-lines-default);
+    border-radius: 0.5rem;
+    background: var(--mud-palette-surface);
+}
+
+.sa-card-label { font-weight: 600; }
+.sa-card-value { font-size: 1.75rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.sa-card-text { color: var(--mud-palette-text-secondary); font-size: 0.875rem; overflow-wrap: anywhere; }

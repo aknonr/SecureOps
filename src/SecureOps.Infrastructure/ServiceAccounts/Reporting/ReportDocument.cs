@@ -30,12 +30,13 @@ public sealed record ReportTile(string Label, long Value, string? Note = null);
 /// <param name="Tiles">Headline figures, rendered four per row.</param>
 /// <param name="Blocks">Short tables (gMSA transition, teams, upcoming plans), each limited to a few rows.</param>
 /// <param name="Charts">Charts drawn from the same payload (<see cref="ReportCharts"/>); renderers skip all-zero charts.</param>
+/// <param name="TilesPerRow">Tiles per row (3 for the simplified five-card summary).</param>
 public sealed record ReportDashboard(string Subtitle, IReadOnlyList<ReportTile> Tiles, IReadOnlyList<ReportSection> Blocks,
-    IReadOnlyList<ReportChart>? Charts = null);
+    IReadOnlyList<ReportChart>? Charts = null, int TilesPerRow = 4);
 
 /// <summary>Render-neutral report built only from an immutable snapshot payload; XLSX and PDF render the same document.</summary>
 public sealed record ReportDocument(string Title, IReadOnlyList<(string Label, string Value)> Header, IReadOnlyList<ReportSection> Sections, DateTimeOffset CreatedAt,
-    ReportDashboard? Dashboard = null)
+    ReportDashboard? Dashboard = null, IReadOnlyList<ReportSection>? ActivityPage = null)
 {
     /// <summary>Rows shown in each executive-summary table (the full lists stay in the detail sections).</summary>
     public const int DashboardRows = 10;
@@ -107,9 +108,9 @@ public sealed record ReportDocument(string Title, IReadOnlyList<(string Label, s
                 [.. names.Select(n => Row(n.Account, n.Source, n.RequestedName, n.Length, n.Status))]));
         }
 
-        sections.Add(new("Tanımlar ve notlar", ["Not"], [.. report.Notes.Select(n => Row(n))]));
+        sections.Add(new("Tanımlar ve notlar", ["Not"], [.. report.Notes.Concat(report.Activity?.Notes ?? []).Select(n => Row(n))]));
         string period = $"{report.WeekStart:dd.MM.yyyy} – {report.WeekEndExclusive.AddDays(-1):dd.MM.yyyy}";
-        ReportDashboard dashboard = new($"{report.ScopeLabel} · {period}",
+        ReportDashboard legacyDashboard = new($"{report.ScopeLabel} · {period}",
         [
             new("Tekil hesap", s.UniqueAccounts),
             new("Sorumlusu atanmış hesap", s.AccountsWithAssignedPerson),
@@ -137,6 +138,10 @@ public sealed record ReportDocument(string Title, IReadOnlyList<(string Label, s
                 [.. report.DatedPlans.OrderBy(p => p.End).ThenBy(p => p.Account, StringComparer.Ordinal).Take(DashboardRows)
                     .Select(p => Row(p.Account, p.Action, new ReportCell(Date: p.End), p.TargetTeam ?? "—", p.Overdue ? "Evet" : "Hayır"))])
         ], ReportCharts.Build(report));
+        // The simplified summary (at most five cards, one sentence each) replaces the long tile list; the tables move to the detail sections.
+        ReportDashboard dashboard = report.Activity is { } activity
+            ? new ReportDashboard(legacyDashboard.Subtitle, [.. activity.Cards.Select(c => new ReportTile(c.Label, c.Value, c.Sentence))], [], legacyDashboard.Charts, 3)
+            : legacyDashboard;
         return new ReportDocument(report.Period switch
         {
             ReportPeriods.Month => "Servis Hesapları Aylık Rapor",
@@ -152,7 +157,45 @@ public sealed record ReportDocument(string Title, IReadOnlyList<(string Label, s
             ("Metrik tanımı", report.MetricDefinitionVersion),
             ("Oluşturan / zaman", createdBy + " / " + createdAt.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture)),
             ("Yük özeti (SHA-256)", payloadSha256)
-        ], sections, createdAt, dashboard);
+        ], sections, createdAt, dashboard, ActivitySections(report.Activity));
+    }
+
+    /// <summary>Title of the first-page counts table (also the heading of the activity page in every format).</summary>
+    public const string ActivityTitle = "Dönem içinde yapılan işlemler";
+
+    /// <summary>
+    /// First page: counts per group, then one list per group (deleted, handed over, moved to gMSA, changed, reported but not verified).
+    /// A report stored before this page existed has none and renders as before.
+    /// </summary>
+    private static IReadOnlyList<ReportSection>? ActivitySections(ServiceAccountActivity? activity)
+    {
+        if (activity is null)
+        {
+            return null;
+        }
+
+        static IReadOnlyList<ReportCell> Row(params ReportCell[] cells) => cells;
+        List<ReportSection> page =
+        [
+            new(ActivityTitle, ["İşlem", "Hesap", "Satır"],
+            [
+                .. activity.Groups.Select(g => Row(g.Title, g.Accounts, g.Lines)),
+                Row("Dönemde işlem gören tekil hesap (bekleyenler hariç)", activity.AccountsActed, "")
+            ])
+        ];
+        foreach (ActivityGroup group in activity.Groups)
+        {
+            IEnumerable<IReadOnlyList<ReportCell>> rows = group.Items.Select(l => Row(l.Account, l.Operation,
+                l.Date is { } d ? new ReportCell(Date: d) : "Bilinmiyor", l.Teams, l.Status, l.Evidence));
+            if (group.NotShown > 0)
+            {
+                rows = rows.Append(Row($"… +{group.NotShown} satır (sayıya dahil)", "", "", "", "", ""));
+            }
+
+            page.Add(new(group.Title, ["Hesap", "İşlem", "Tarih", "Ekip (eski → yeni / yapan)", "Durum", "Kanıt"], [.. rows]));
+        }
+
+        return page;
     }
 
     /// <summary>Metric version 2 sections; a version 1 snapshot has none and renders exactly as before.</summary>

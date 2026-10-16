@@ -55,7 +55,13 @@ public static class ServiceAccountMetrics
                 "Geciken iş: açık talebin plan bitişi rapor tarihinden önce (takvim günü).",
                 "Bulgular ve başarısız taramalar tamamlanan iş sayılmaz."
             ], period);
-        report = report with { GmsaNames = facts.RequestedGmsaNames ? GmsaNames(facts, accounts) : null };
+        report = report with
+        {
+            GmsaNames = facts.RequestedGmsaNames ? GmsaNames(facts, accounts) : null,
+            Activity = facts.Activity is { } activity
+                ? ServiceAccountActivityRules.Build(facts, activity, summary, report.Handover, monday, endExclusive, asOf)
+                : null
+        };
         if (facts.Insights is not { } insight)
         {
             return report;
