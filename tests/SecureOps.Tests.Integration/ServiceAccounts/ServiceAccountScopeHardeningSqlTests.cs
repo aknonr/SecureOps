@@ -121,6 +121,40 @@ public sealed class ServiceAccountScopeHardeningSqlTests
     }
 
     [ServiceAccountSqlFact]
+    public async Task ImportBatches_ReplayAndListAreFilteredByScope()
+    {
+        ServiceAccountSqlFixture fx = new();
+        string nameA = "SYN IMP A " + fx.Suffix, nameB = "SYN IMP B " + fx.Suffix;
+        Guid orgA = await fx.OrganizationAsync(nameA), orgB = await fx.OrganizationAsync(nameB);
+        SynUser importerA = await fx.UserAsync(_importer), importerB = await fx.UserAsync(_importer);
+        await fx.GrantAsync(importerA, ScopeKind.Organization, orgA);
+        await fx.GrantAsync(importerB, ScopeKind.Organization, orgB);
+        StageImportRequest request = new(ServiceAccountImportProfiles.CoordinationList, new DateOnly(2026, 9, 14), "Sentetik beyan: kaynak rapor tarihi test verisidir");
+        byte[] file = List(nameB, $"SYN{fx.Suffix}_REPLAY");
+
+        ImportBatchView committed = Ok(await fx.Service.StageImportAsync(importerB.Principal, fx.Context, request, "liste.xlsx", "application/octet-stream", file, _token));
+        Ok(await fx.Service.CommitImportAsync(importerB.Principal, fx.Context, committed.Id, new ImportCommitRequest(committed.PreviewVersion, committed.DecisionVersion),
+            "k-" + Guid.NewGuid().ToString("N"), _token));
+
+        // The same file and parameters from another scope is not answered with the committed batch of the first scope.
+        ImportBatchView other = Ok(await fx.Service.StageImportAsync(importerA.Principal, fx.Context, request, "baska.xlsx", "application/octet-stream", file, _token));
+        other.Id.Should().NotBe(committed.Id);
+        other.Replay.Should().BeFalse();
+        other.FileName.Should().Be("baska.xlsx");
+
+        // The same scope still gets its replay.
+        Ok(await fx.Service.StageImportAsync(importerB.Principal, fx.Context, request, "liste.xlsx", "application/octet-stream", file, _token))
+            .Id.Should().Be(committed.Id);
+
+        // The list is filtered before the limit: a newer batch of another scope cannot push this scope's batch out of a one-row page.
+        ImportBatchView newer = Ok(await fx.Service.StageImportAsync(importerA.Principal, fx.Context, request with { SourceReportDate = new DateOnly(2026, 9, 15) },
+            "yeni.xlsx", "application/octet-stream", List(nameA, $"SYN{fx.Suffix}_NEWER"), _token));
+        IReadOnlyList<ImportBatchRecord> page = await fx.Repository.ListBatchesAsync(1, false, [orgB], importerB.User.Id, _token);
+        page.Should().ContainSingle().Which.Id.Should().Be(committed.Id);
+        page.Should().NotContain(b => b.Id == newer.Id);
+    }
+
+    [ServiceAccountSqlFact]
     public async Task Mutation_UsesTheGrantsThatAreCurrentInsideTheTransaction()
     {
         ServiceAccountSqlFixture fx = new();

@@ -124,7 +124,7 @@ public sealed partial class ServiceAccountService
                 return SaResult<IReadOnlyList<ImportHistoryItem>>.Fail(SaErrors.Forbidden, "scope");
             }
 
-            IReadOnlyList<ImportBatchRecord> batches = await repository!.ListBatchesAsync(500, cancellationToken);
+            IReadOnlyList<ImportBatchRecord> batches = await repository!.ListBatchesAsync(100, caller.Scope.All, [.. caller.Scope.Organizations], caller.User.Id, cancellationToken);
             return new SaResult<IReadOnlyList<ImportHistoryItem>>([.. batches.Where(b => BatchReachable(caller, b)).Take(100).Select(b => new ImportHistoryItem(b.Id, b.Profile, b.FileName, b.SourceReportDate,
                 b.Status, b.UploadedAt, b.CommittedAt, b.SummaryJson is null ? 0 : JsonSerializer.Deserialize<ImportSummary>(b.SummaryJson)!.TotalRows))]);
         }, cancellationToken);
