@@ -567,7 +567,7 @@ have to be invented.
 | `/reporting/operators` | Management reporting view | `Reporting.ManagementView` |
 | `/audit-compliance`, `/diagnostics-readonly` | Future-phase placeholders | authenticated |
 
-Interim auth endpoints: `POST /auth/sign-in`, `GET /auth/sign-out`. They establish identity only.
+Interim auth endpoints: `POST /auth/sign-in`, `POST /auth/sign-out` (antiforgery; the `/sign-out` page confirms, GET changes nothing). They establish identity only.
 When an identity provider is approved they become a challenge/callback pair and `/login` is unchanged.
 
 **Do not add a nav entry before its route exists** — the menu must never offer a dead link.

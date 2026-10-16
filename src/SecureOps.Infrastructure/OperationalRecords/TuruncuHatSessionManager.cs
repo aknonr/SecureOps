@@ -125,7 +125,8 @@ public sealed class TuruncuHatSessionManager : ITuruncuHatSessionManager
             using JsonDocument document = await BoundedJsonHttpContent.ReadAsync(
                 response.Content,
                 _options.MaxResponseBytes,
-                cancellationToken);
+                cancellationToken,
+                TimeSpan.FromSeconds(_options.RequestTimeoutSeconds));
             if (!document.RootElement.TryGetProperty("LoginResult", out JsonElement resultElement)
                 || resultElement.ValueKind != JsonValueKind.String)
             {

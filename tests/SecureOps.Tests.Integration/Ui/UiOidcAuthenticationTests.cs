@@ -251,7 +251,7 @@ public sealed partial class UiOidcAuthenticationTests
         factory.Provider.Nonce = query["nonce"];
         _ = await client.GetAsync($"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}");
 
-        HttpResponseMessage logout = await client.GetAsync("/auth/sign-out");
+        HttpResponseMessage logout = await SignOutAsync(client);
 
         accessApi.LogoutCalls.Should().Be(1);
         logout.StatusCode.Should().Be(HttpStatusCode.Redirect);
@@ -276,6 +276,16 @@ public sealed partial class UiOidcAuthenticationTests
         {
             ["__RequestVerificationToken"] = token,
             ["returnUrl"] = string.Empty
+        }));
+    }
+
+    private static async Task<HttpResponseMessage> SignOutAsync(HttpClient client)
+    {
+        string html = await client.GetStringAsync("/sign-out");
+        string token = WebUtility.HtmlDecode(AntiforgeryTokenRegex().Match(html).Groups[1].Value);
+        return await client.PostAsync("/auth/sign-out", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token
         }));
     }
 

@@ -57,6 +57,7 @@ explicitly. A pending user sees why they are waiting, not an empty dashboard.
 | Route | Purpose | Auth |
 |---|---|---|
 | `/login` | Single-action sign-in, `returnUrl` preserved | Anonymous |
+| `/sign-out` | Sign-out confirmation; the sign-out itself is an antiforgery-protected POST | Anonymous |
 | `/signed-out` | Confirms a completed sign-out | Anonymous |
 | `/session-expired` | Session lapsed; returns to where the operator was | Anonymous |
 | `/access-denied` | Authorization refusal, with a route to request access | Anonymous |
@@ -76,7 +77,7 @@ explicitly. A pending user sees why they are waiting, not an empty dashboard.
 | `/reporting/operators` | Operatör Raporu: paginated per-operator usage | Authenticated + `Reporting.ManagementView` |
 | `/audit-compliance`, `/diagnostics-readonly` | Truthful future-phase placeholders | Authenticated |
 
-Interim endpoints `POST /auth/sign-in` and `GET /auth/sign-out` replace the former `/demo-auth/*`
+Interim endpoints `POST /auth/sign-in` and `POST /auth/sign-out` (antiforgery-protected; `GET /auth/sign-out` only forwards to the `/sign-out` confirmation page) replace the former `/demo-auth/*`
 pair. They establish identity only and grant no application authority. When an identity provider is
 approved they become a challenge/callback pair; the login page keeps its shape.
 
@@ -725,7 +726,7 @@ takes `IApiSessionContext`, because a client that skipped it would fail silently
 
 ### Sign-out ends the API session
 
-`GET /auth/sign-out` calls `POST /api/v1/access/logout` **before** the UI authentication sign-out,
+`POST /auth/sign-out` calls `POST /api/v1/access/logout` **before** the UI authentication sign-out,
 then drops the browser session's cookie jar. If the API call fails the operator is still signed out
 and the failure is logged with its safe code and correlation ID only; refusing to sign someone out
 because the API was unreachable would strand them signed in. The jar is dropped either way.

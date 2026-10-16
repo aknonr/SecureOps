@@ -16,6 +16,9 @@ from the browser. See ADR-0020 and `docs/post-rc626-continuation-tr.md`.
 
 ASP.NET Core Web API. Hosted on IIS in-process.
 
+Normalized 401/403 ProblemDetails responses preserve existing `WWW-Authenticate`
+values and `X-Correlation-ID` headers.
+
 Unsafe requests require `X-SecureOps-Csrf: 1` after authorization and before body
 binding. Browser Origin (or Referer fallback) must match `ApiCsrf:AllowedOrigins`;
 cross-site Fetch Metadata is always denied. Empty configuration denies browser

@@ -43,7 +43,7 @@ internal static class LocalReturnUrl
     /// </remarks>
     private static bool IsAuthenticationPath(string relativePath)
     {
-        string[] blockedPrefixes = ["auth/", "auth", "demo-auth", "login", "signed-out", "session-expired"];
+        string[] blockedPrefixes = ["auth/", "auth", "demo-auth", "login", "signed-out", "sign-out", "session-expired"];
 
         return blockedPrefixes.Any(prefix =>
             relativePath.Equals(prefix, StringComparison.OrdinalIgnoreCase)

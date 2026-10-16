@@ -97,7 +97,8 @@ public sealed class CorporateJiraClient : IJiraClient
             using JsonDocument document = await BoundedJsonHttpContent.ReadAsync(
                 response.Content,
                 _options.MaxResponseBytes,
-                cancellationToken);
+                cancellationToken,
+                TimeSpan.FromSeconds(_options.RequestTimeoutSeconds));
             if (document.RootElement.ValueKind != JsonValueKind.Object
                 || !document.RootElement.TryGetProperty("key", out JsonElement keyElement)
                 || keyElement.ValueKind != JsonValueKind.String

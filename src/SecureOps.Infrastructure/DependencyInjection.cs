@@ -346,6 +346,12 @@ public static class DependencyInjection
         string? serviceProviderName = configuration[$"{AnnouncementSourceOptions.SectionName}:ServiceProvider"];
         if (string.Equals(serviceProviderName, "TuruncuHat", StringComparison.OrdinalIgnoreCase))
         {
+            if (configuration.GetValue<bool>($"{AnnouncementSourceOptions.SectionName}:Enabled"))
+            {
+                OperationalRecordConfigurationValidator.ValidateTuruncuHatHttpConfiguration(
+                    configuration.GetSection(TuruncuHatOptions.SectionName).Get<TuruncuHatOptions>() ?? new());
+            }
+
             // The Operational Record provider may be selected independently; the session manager is shared, not duplicated.
             services.TryAddSingleton<ITuruncuHatSessionManager>(serviceProvider => new TuruncuHatSessionManager(
                 serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("TuruncuHat"),

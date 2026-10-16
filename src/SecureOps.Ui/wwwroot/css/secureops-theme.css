@@ -4563,6 +4563,20 @@ html[data-so-appearance="light"] .so-auth-card {
     color: var(--so-auth-muted);
 }
 
+.so-auth-lead + .so-auth-form {
+    margin-top: 20px;
+}
+
+.so-auth-foot-link {
+    margin: 16px 0 0;
+    text-align: center;
+}
+
+.so-auth-foot-link a {
+    color: inherit;
+    text-decoration: underline;
+}
+
 .so-auth-lockup {
     top: clamp(24px, 4vh, 48px);
     left: clamp(24px, 3.5vw, 58px);
