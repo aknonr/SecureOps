@@ -13,7 +13,7 @@ public static class OperationalProblemDetails
         {
             Status = status,
             Title = title,
-            Type = $"https://secureops.internal/errors/{code}",
+            Type = $"https://secureops.example.test/errors/{code}",
             Instance = correlationId
         };
         details.Extensions["code"] = code;

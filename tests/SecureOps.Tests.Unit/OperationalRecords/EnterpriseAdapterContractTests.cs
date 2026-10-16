@@ -116,8 +116,8 @@ public sealed class EnterpriseAdapterContractTests
     {
         const string response = """
             {"QueryResult":{"Items":[[
-              {"Key":"SET.id","Value":"1683742"},
-              {"Key":"SET.p_code","Value":"OR-00668218"},
+              {"Key":"SET.id","Value":"1000001"},
+              {"Key":"SET.p_code","Value":"OR-00000001"},
               {"Key":"SET.p_name","Value":"safe title"},
               {"Key":"SET.p_description","Value":"safe description"},
               {"Key":"KEY.p_rel_requester","Value":"SAFE USER DISPLAY NAME"},
@@ -132,8 +132,8 @@ public sealed class EnterpriseAdapterContractTests
             logger: logger).GetActiveAsync(10, CancellationToken.None);
 
         OperationalRecordSourceItem record = records.Should().ContainSingle().Which;
-        record.SourceRecordId.Should().Be("1683742");
-        record.OrCode.Should().Be("OR-00668218");
+        record.SourceRecordId.Should().Be("1000001");
+        record.OrCode.Should().Be("OR-00000001");
         record.Title.Should().Be("safe title");
         record.Description.Should().Be("safe description");
         record.Requester.Should().Be("SAFE USER DISPLAY NAME");
@@ -147,10 +147,10 @@ public sealed class EnterpriseAdapterContractTests
     {
         const string response = """
             {"QueryResult":{"ErrorDescription":null,"ErrorDetails":null,"ErrorNo":0,"TenantId":0,"MaxPages":0,"PageNO":0,"RecordCount":4,"Items":[
-              [{"Key":"SET.id","Value":"1683742"},{"Key":"SET.p_code","Value":"OR-00668218"},{"Key":"SET.p_name","Value":"safe title 1"},{"Key":"SET.p_description","Value":"safe description 1"},{"Key":"KEY.p_rel_requester","Value":"safe requester 1"},{"Key":"SET.p_rel_requester","Value":"12345"},{"Key":"num","Value":"1"}],
-              [{"Key":"SET.id","Value":"1682619"},{"Key":"SET.p_code","Value":"OR-00667092"},{"Key":"SET.p_name","Value":"safe title 2"},{"Key":"SET.p_description","Value":"safe description 2"},{"Key":"KEY.p_rel_requester","Value":"safe requester 2"},{"Key":"SET.p_rel_requester","Value":"23456"},{"Key":"num","Value":"2"}],
-              [{"Key":"SET.id","Value":"1676990"},{"Key":"SET.p_code","Value":"OR-00661461"},{"Key":"SET.p_name","Value":"safe title 3"},{"Key":"SET.p_description","Value":"safe description 3"},{"Key":"KEY.p_rel_requester","Value":"safe requester 3"},{"Key":"SET.p_rel_requester","Value":"34567"},{"Key":"num","Value":"3"}],
-              [{"Key":"SET.id","Value":"1668538"},{"Key":"SET.p_code","Value":"OR-00653003"},{"Key":"SET.p_name","Value":"safe title 4"},{"Key":"SET.p_description","Value":"safe description 4"},{"Key":"KEY.p_rel_requester","Value":"safe requester 4"},{"Key":"SET.p_rel_requester","Value":"45678"},{"Key":"num","Value":"4"}]
+              [{"Key":"SET.id","Value":"1000001"},{"Key":"SET.p_code","Value":"OR-00000001"},{"Key":"SET.p_name","Value":"safe title 1"},{"Key":"SET.p_description","Value":"safe description 1"},{"Key":"KEY.p_rel_requester","Value":"safe requester 1"},{"Key":"SET.p_rel_requester","Value":"12345"},{"Key":"num","Value":"1"}],
+              [{"Key":"SET.id","Value":"1000002"},{"Key":"SET.p_code","Value":"OR-00000002"},{"Key":"SET.p_name","Value":"safe title 2"},{"Key":"SET.p_description","Value":"safe description 2"},{"Key":"KEY.p_rel_requester","Value":"safe requester 2"},{"Key":"SET.p_rel_requester","Value":"23456"},{"Key":"num","Value":"2"}],
+              [{"Key":"SET.id","Value":"1000003"},{"Key":"SET.p_code","Value":"OR-00000003"},{"Key":"SET.p_name","Value":"safe title 3"},{"Key":"SET.p_description","Value":"safe description 3"},{"Key":"KEY.p_rel_requester","Value":"safe requester 3"},{"Key":"SET.p_rel_requester","Value":"34567"},{"Key":"num","Value":"3"}],
+              [{"Key":"SET.id","Value":"1000004"},{"Key":"SET.p_code","Value":"OR-00000004"},{"Key":"SET.p_name","Value":"safe title 4"},{"Key":"SET.p_description","Value":"safe description 4"},{"Key":"KEY.p_rel_requester","Value":"safe requester 4"},{"Key":"SET.p_rel_requester","Value":"45678"},{"Key":"num","Value":"4"}]
             ]}}
             """;
         CapturingLogger<TuruncuHatOperationalRecordClient> logger = new();
@@ -160,8 +160,8 @@ public sealed class EnterpriseAdapterContractTests
             logger: logger).GetActiveAsync(10, CancellationToken.None);
 
         records.Should().HaveCount(4);
-        records.Select(record => record.SourceRecordId).Should().Equal("1683742", "1682619", "1676990", "1668538");
-        records.Select(record => record.OrCode).Should().Equal("OR-00668218", "OR-00667092", "OR-00661461", "OR-00653003");
+        records.Select(record => record.SourceRecordId).Should().Equal("1000001", "1000002", "1000003", "1000004");
+        records.Select(record => record.OrCode).Should().Equal("OR-00000001", "OR-00000002", "OR-00000003", "OR-00000004");
         records[0].Title.Should().Be("safe title 1");
         records[0].Description.Should().Be("safe description 1");
         records[0].Requester.Should().Be("safe requester 1");

@@ -37,7 +37,7 @@ public sealed partial class InUseTests
             Fields = s.Fields.Concat(new Dictionary<string, InUseEvidence>
             {
                 ["NETWORK SEGMENT"] = new("synthetic-network", "fixture"),
-                ["ITMC_Service_ID"] = new("0002915", "fixture")
+                ["ITMC_Service_ID"] = new("0001234", "fixture")
             }).ToDictionary(p => p.Key, p => p.Value)
         }).ToArray();
         InUseSource source = record.Source with { Servers = servers };

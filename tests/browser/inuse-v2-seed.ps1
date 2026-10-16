@@ -18,18 +18,18 @@ try {
         $record.Id = $query.ExecuteScalar().ToString()
         $record.Source.Id = "90000$number"
         $record.Source.Code = "OR-90000$number"
-        $record.Source.Title = if ($number -eq 1) { 'EBYS - sentetik DEV sunuculari' } else { 'Ayni sunucu - sonraki sentetik inceleme' }
+        $record.Source.Title = if ($number -eq 1) { 'Example service - sentetik DEV sunuculari' } else { 'Ayni sunucu - sonraki sentetik inceleme' }
         $record.Source.Servers = @(foreach ($index in @(1,2)) {
             $id = if ($index -eq 1 -or $number -eq 1) { "120000$index" } else { '1200003' }
             $fields = [ordered]@{}
             $values = [ordered]@{HOSTNAME="review-server-$id";ENVANTER_ID="00012345678901234567890$index";SI_ENVIRONMENT='DEV';
-                'SERVER TYPE'='VM';'SERVICE NAME (ÜRÜN/UYGULAMA)'='Elektronik Belge Yonetim Sistemi (EBYS)';
-                ITMC_Service_ID='0002915';ITMC_Servis_Unsuru_ID='00112';'SERVICE ASPECT (Servis Unsuru)'='[Genel]';
+                'SERVER TYPE'='VM';'SERVICE NAME (ÜRÜN/UYGULAMA)'='Example Document Management Service';
+                ITMC_Service_ID='0001234';ITMC_Servis_Unsuru_ID='00112';'SERVICE ASPECT (Servis Unsuru)'='[Genel]';
                 'NETWORK SEGMENT'='internal-synthetic';'IP ADDRESS'="192.0.2.$index";'OS NAME'='Windows Server';OS_VERSION='2022';
-                CITY='Istanbul';BUILDING='FLORYA BINASI';'RFC Kaydı'='OR-800001'}
+                CITY='City-A';BUILDING='Building-A';'RFC Kaydı'='OR-000801'}
             foreach ($entry in $values.GetEnumerator()) { $fields[$entry.Key] = @{Value=$entry.Value;Source='Synthetic bounded browser fixture'} }
-            @{Id=$id;Fields=$fields;RelatedRequestReporter=@{ParentId=$record.Source.Id;ServiceItemId=$id;RfcReference='OR-800001';
-                ReferenceKind='OrCode';TargetId='800001';OrCode='OR-800001';Display='Deniz Ornek';UserReference='synthetic.reporter';
+            @{Id=$id;Fields=$fields;RelatedRequestReporter=@{ParentId=$record.Source.Id;ServiceItemId=$id;RfcReference='OR-000801';
+                ReferenceKind='OrCode';TargetId='000801';OrCode='OR-000801';Display='Deniz Ornek';UserReference='synthetic.reporter';
                 State='ExactMatch';DisplayState='Returned';ReferenceState='Returned';LastVerifiedAt=[DateTimeOffset]::UtcNow.ToString('O')}}
         })
         $record.LastSeenAt = [DateTimeOffset]::UtcNow.ToString('O')

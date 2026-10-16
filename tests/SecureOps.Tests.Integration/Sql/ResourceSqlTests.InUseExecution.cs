@@ -234,7 +234,7 @@ public sealed partial class ResourceSqlTests
                 Fields = new Dictionary<string, InUseEvidence>(s.Fields)
                 {
                     ["SI_ENVIRONMENT"] = new("DEV", "fixture"),
-                    ["ITMC_Service_ID"] = new("0002915", "fixture"),
+                    ["ITMC_Service_ID"] = new("0001234", "fixture"),
                     ["ITMC_Servis_Unsuru_ID"] = new("00112", "fixture")
                 }
             }).ToArray()

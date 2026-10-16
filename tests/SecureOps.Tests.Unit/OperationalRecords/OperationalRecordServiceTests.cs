@@ -79,7 +79,7 @@ public sealed class OperationalRecordServiceTests
             TestRecord.SourceItem("synthetic-old-record", "SYN-OR-OLD"),
             "correlation-old",
             CancellationToken.None);
-        OperationalRecordSourceItem corporateRecord = TestRecord.SourceItem("1683742", "OR-00668218") with
+        OperationalRecordSourceItem corporateRecord = TestRecord.SourceItem("1000001", "OR-00000001") with
         {
             Title = "Safe corporate title",
             Description = "Safe corporate description"
@@ -98,7 +98,7 @@ public sealed class OperationalRecordServiceTests
 
         result.IsSuccess.Should().BeTrue();
         OperationalRecord record = result.Value!.Should().ContainSingle().Which;
-        record.SourceRecordId.Should().Be("1683742");
+        record.SourceRecordId.Should().Be("1000001");
         record.WorkflowState.Should().Be(OperationalRecordWorkflowState.NeedsManualReview);
         record.JiraEligible.Should().BeFalse();
     }

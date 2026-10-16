@@ -337,7 +337,7 @@ public sealed class DirectoryEnrichmentQueryServiceTests
     private const string _purpose = "Approved synthetic directory verification";
     private static readonly DateTimeOffset _now = new(2026, 8, 23, 12, 0, 0, TimeSpan.Zero);
     private static readonly DirectoryQueryExecutionContext _context = new(
-        "CONTOSO\\lead.user", "10.0.0.5", "phase2-test");
+        "CONTOSO\\lead.user", "192.0.2.5", "phase2-test");
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {

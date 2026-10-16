@@ -141,9 +141,9 @@ public sealed class InUseExecutionContractTests
     }
 
     [Theory]
-    [InlineData("0002915", "00112", true)]
+    [InlineData("0001234", "00112", true)]
     [InlineData("2916", "00112", false)]
-    [InlineData("0002915", "1E+06", false)]
+    [InlineData("0001234", "1E+06", false)]
     public void Aspect_RequiresExactPerServiceRelationship_PreservesText(string service, string id, bool expected)
     {
         using var json = JsonDocument.Parse(JsonSerializer.Serialize(new
@@ -155,7 +155,7 @@ public sealed class InUseExecutionContractTests
             new { Key = "SET.p_rel_service_id", Value = service } } }
             }
         }));
-        IReadOnlyDictionary<string, InUseEvidence> result = InUseAspectParser.Parse(json.RootElement, "0002915");
+        IReadOnlyDictionary<string, InUseEvidence> result = InUseAspectParser.Parse(json.RootElement, "0001234");
         result["ITMC_Servis_Unsuru_ID"].Value.Should().Be(expected ? id : null);
     }
 
