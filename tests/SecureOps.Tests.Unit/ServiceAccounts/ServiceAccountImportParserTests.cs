@@ -140,6 +140,31 @@ public sealed class ServiceAccountImportParserTests
     private static byte[] Book1(string[] headers, SynCell?[] row) =>
         SyntheticWorkbook.Create([("Sheet2", [(1, headers.Select(h => (SynCell?)h).ToArray()), (2, row)])]);
 
+    [Theory]
+    [InlineData("rows", "TooManyRows")]
+    [InlineData("columns", "TooManyColumns")]
+    [InlineData("cell", "CellTooLong")]
+    [InlineData("sourceRows", "TooManyRows")]
+    [InlineData("aliases", "TooManyRows")]
+    [InlineData("links", "TooManyRows")]
+    public void LegacyPackage_AppliesTheSameStructuralLimitsAsSpreadsheets(string shape, string code)
+    {
+        SpreadsheetLimits small = new(MaxRowsPerSheet: 5, MaxColumns: 4, MaxCellChars: 20);
+        string body = shape switch
+        {
+            "rows" => $"\"records\":{{\"Hesap_Bilgileri\":[{string.Join(',', Enumerable.Range(1, 6).Select(i => $"{{\"legacySourceRow\":{i},\"fields\":{{}}}}"))}]}}",
+            "columns" => "\"records\":{\"Hesap_Bilgileri\":[{\"legacySourceRow\":1,\"fields\":{\"a\":\"1\",\"b\":\"2\",\"c\":\"3\",\"d\":\"4\",\"e\":\"5\"}}]}",
+            "cell" => $"\"records\":{{\"Hesap_Bilgileri\":[{{\"legacySourceRow\":1,\"fields\":{{\"a\":\"{new string('x', 21)}\"}}}}]}}",
+            "sourceRows" => $"\"records\":{{}},\"sourceRows\":{{\"Book1\":[{string.Join(',', Enumerable.Range(1, 6).Select(_ => "[\"a\"]"))}]}}",
+            "aliases" => $"\"records\":{{}},\"personAliases\":[{string.Join(',', Enumerable.Range(1, 6).Select(_ => "[\"a\",\"b\"]"))}]",
+            _ => $"\"records\":{{}},\"communicationLinks\":[{string.Join(',', Enumerable.Range(1, 6).Select(_ => "{\"communicationMigrationKey\":\"k\",\"accounts\":[]}"))}]"
+        };
+        string json = $$"""{"schemaVersion":"wasas.service-account-migration.v1","reportWorkbookSha256":"{{new string('b', 64)}}",{{body}}}""";
+        Action parse = () => ImportParser.Parse(ServiceAccountImportProfiles.LegacyPackage, Encoding.UTF8.GetBytes(json),
+            new StageImportRequest(ServiceAccountImportProfiles.LegacyPackage, new DateOnly(2026, 9, 14), "test"), new string('0', 64), small);
+        parse.Should().Throw<ImportFileException>().Which.Code.Should().Be(code);
+    }
+
     private static StagedFile Parse(string profile, byte[] bytes) =>
         ImportParser.Parse(profile, bytes, new StageImportRequest(profile, new DateOnly(2026, 9, 14), "test"), new string('0', 64), _limits);
 }

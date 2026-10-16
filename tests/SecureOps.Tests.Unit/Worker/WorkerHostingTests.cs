@@ -5,7 +5,9 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Hosting.Internal;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
+using SecureOps.Infrastructure;
 using SecureOps.Infrastructure.Announcements.Sources;
+using SecureOps.Infrastructure.Audit;
 using SecureOps.Worker;
 using Xunit;
 
@@ -159,6 +161,52 @@ public sealed class WorkerHostingTests : IDisposable
     private static IConfiguration Config(string? directory, string? environment) =>
         new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         { ["WorkerHosting:DataDirectory"] = directory, [HostDefaults.EnvironmentKey] = environment }).Build();
+
+    private static ServiceProvider AuditComposition(bool directWriter, IAuditEventSink sink)
+    {
+        IConfigurationBuilder builder = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Audit:Provider"] = "SqlServer",
+            ["Audit:Queue:Enabled"] = "true",
+            ["ConnectionStrings:SecureOpsDb"] = "Server=.;Database=x;Integrated Security=true"
+        });
+        if (directWriter)
+        { WorkerHosting.UseDirectAuditWriter(builder); }
+        IConfiguration configuration = builder.Build();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSecureOpsInfrastructure(configuration, "Test");
+        services.AddSingleton(sink);
+        return services.BuildServiceProvider();
+    }
+
+    [Fact]
+    public void WorkerAuditComposition_WithoutOverrideUsesQueueNothingDrains()
+    {
+        using ServiceProvider provider = AuditComposition(false, Substitute.For<IAuditEventSink>());
+        provider.GetRequiredService<IAuditWriter>().Should().BeOfType<QueuedAuditWriter>();
+        typeof(WorkerHosting).Assembly.GetTypes().Should().NotContain(type => typeof(IHostedService).IsAssignableFrom(type)
+            && type.GetConstructors().Any(c => c.GetParameters().Any(p => p.ParameterType == typeof(AuditQueue))));
+    }
+
+    [Fact]
+    public void WorkerAuditComposition_UsesDirectWriterEvenWhenQueueConfigured()
+    {
+        using ServiceProvider provider = AuditComposition(true, Substitute.For<IAuditEventSink>());
+        provider.GetRequiredService<IAuditWriter>().Should().BeOfType<DirectAuditWriter>();
+    }
+
+    [Fact]
+    public async Task WorkerAuditComposition_SinkFailureFailsTheWriteInsteadOfWaiting()
+    {
+        IAuditEventSink sink = Substitute.For<IAuditEventSink>();
+        sink.WriteBatchAsync(Arg.Any<IReadOnlyCollection<AuditEvent>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new InvalidOperationException("sink down")));
+        using ServiceProvider provider = AuditComposition(true, sink);
+        var auditEvent = new AuditEvent { Actor = "system:worker", Action = "worker.test" };
+        Func<Task> write = () => provider.GetRequiredService<IAuditWriter>().WriteAsync(auditEvent, CancellationToken.None);
+        await write.Should().ThrowAsync<InvalidOperationException>();
+    }
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
 }

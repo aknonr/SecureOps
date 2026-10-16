@@ -64,7 +64,7 @@ Siber Güvenlik ön incelemesinde ayrıca veri akışının anlaşılması için
 | Phase 7 yaklaşımı | Self-hosted LLM, masking zorunlu, izole subnet, no outbound internet |
 | Olay müdahalesi | Worker kill switch, webhook disable flag, audit preserve, Bilgi Güv + Siber Güv bildirimi |
 
-Bu modelde SolarWinds alarmı üretir, monthly.thy.com / HPE OpsBridge event-detail katmanı olur ve Turuncuhat EVT akışını sahiplenir. SecureOps, onaylanan Turuncuhat inbound modeli üzerinden EVT bağlamını alır; API doğrular, normalleştirir ve job kuyruğa alır; Worker zorunlu JEA sınırı içinde read-only tanılama çalıştırır; sonuçlar SQL ve audit kayıtlarına yazılır; UI yalnızca API üzerinden veri okur. MVP'de target server üzerinde write operation yoktur, public ingress yoktur ve mevcut PAM/SolarWinds/Ansible altyapıları değiştirilmez.
+Bu modelde SolarWinds alarmı üretir, kurumsal izleme portalı (HPE OpsBridge) event-detail katmanı olur ve Turuncuhat EVT akışını sahiplenir. SecureOps, onaylanan Turuncuhat inbound modeli üzerinden EVT bağlamını alır; API doğrular, normalleştirir ve job kuyruğa alır; Worker zorunlu JEA sınırı içinde read-only tanılama çalıştırır; sonuçlar SQL ve audit kayıtlarına yazılır; UI yalnızca API üzerinden veri okur. MVP'de target server üzerinde write operation yoktur, public ingress yoktur ve mevcut PAM/SolarWinds/Ansible altyapıları değiştirilmez.
 
 ## 3. Karar gerektiren başlıklar
 
@@ -104,7 +104,7 @@ Bu modelde SolarWinds alarmı üretir, monthly.thy.com / HPE OpsBridge event-det
 ### 4.4 Veri akışı ve sızıntı yolları
 
 **Referans:** `docs/05-security-model.md` → `Network Boundaries`; yardımcı referans: `docs/03-architecture.md` → `Data Flow: Receive EVT → Diagnose → Update Turuncuhat`  
-**Karar sorusu:** Alarm payload, tanılama sonucu ve audit kaydının SolarWinds → monthly.thy.com / HPE OpsBridge → Turuncuhat → SecureOps API → SQL/Hangfire → Worker → hedef sunucu → SQL/UI hattındaki hareketi kabul ediliyor mu; Siber Güvenlik açısından Phase 1 öncesi kapatılması gereken ek sızıntı yolu var mı?  
+**Karar sorusu:** Alarm payload, tanılama sonucu ve audit kaydının SolarWinds → kurumsal izleme portalı (HPE OpsBridge) → Turuncuhat → SecureOps API → SQL/Hangfire → Worker → hedef sunucu → SQL/UI hattındaki hareketi kabul ediliyor mu; Siber Güvenlik açısından Phase 1 öncesi kapatılması gereken ek sızıntı yolu var mı?  
 **Beklenen çıktı:** `Onay / Revizyon gerekli / Reddedildi / Ek kanıt gerekli`
 
 ### 4.5 Servis hesabı ele geçirilmesi senaryosu
@@ -197,11 +197,11 @@ Bir karar `Reddedildi` olarak kaydedilirse, kararın gerekçesi yazılı biçimd
 
 ## 7. Toplantı öncesi bağlam özeti
 
-SecureOps, Windows ağırlıklı operasyon ortamında gelen alarmlar için yapılan manuel tanılama adımlarını standartlaştırmak üzere tasarlanmış bir platformdur. Gerçek akışta SolarWinds alarmı üretir, monthly.thy.com / HPE OpsBridge event-detail katmanıdır, Turuncuhat ise EVT akışının merkezidir. SecureOps, onaylanacak Turuncuhat inbound modeli üzerinden alarm bağlamını alır, normalize eder, read-only tanılama işi olarak kuyruğa alır ve hedef sunucuda JEA constrained endpoint üzerinden çalıştırır. Sonuçlar SQL Server'da saklanır ve operasyon ekiplerine yapılandırılmış görünürlük sağlanır.
+SecureOps, Windows ağırlıklı operasyon ortamında gelen alarmlar için yapılan manuel tanılama adımlarını standartlaştırmak üzere tasarlanmış bir platformdur. Gerçek akışta SolarWinds alarmı üretir, kurumsal izleme portalı (HPE OpsBridge) event-detail katmanıdır, Turuncuhat ise EVT akışının merkezidir. SecureOps, onaylanacak Turuncuhat inbound modeli üzerinden alarm bağlamını alır, normalize eder, read-only tanılama işi olarak kuyruğa alır ve hedef sunucuda JEA constrained endpoint üzerinden çalıştırır. Sonuçlar SQL Server'da saklanır ve operasyon ekiplerine yapılandırılmış görünürlük sağlanır.
 
 MVP sınırı kasıtlı olarak dardır. Phase 1-6 boyunca hedef sunucularda write operation yapılmayacak, tüm uzak PowerShell erişimi JEA üzerinden geçecek, public ingress olmayacak ve public AI kullanılmayacaktır. Bu nedenle Siber Güvenlik ön incelemesinin ana sorusu yalnızca "hangi kontroller var" değil; "hangi saldırı yolları kalıyor, bunlar nasıl tespit edilecek ve bir kompromizasyon halinde blast radius ne kadar sınırlı kalacak" olmalıdır.
 
-Veri akışı SolarWinds, monthly.thy.com / HPE OpsBridge, Turuncuhat, SecureOps API, SQL/Hangfire, Worker, hedef sunucular ve UI arasında gerçekleşir. Potansiyel risk alanları; seçilen inbound modele bağlı webhook veya API kötüye kullanımı, compromised service account, audit log'a yetkisiz erişim, yanlış yapılandırılmış outbound erişim, ileride Phase 7 AI katmanında maskeleme boşluğu ve yeterli tespit sinyali olmamasıdır. `docs/05-security-model.md` içindeki `Threat Model (Summary)` ve `Incident Response` bölümleri bu risklere karşı mevcut başlangıç yaklaşımını tanımlar.
+Veri akışı SolarWinds, kurumsal izleme portalı (HPE OpsBridge), Turuncuhat, SecureOps API, SQL/Hangfire, Worker, hedef sunucular ve UI arasında gerçekleşir. Potansiyel risk alanları; seçilen inbound modele bağlı webhook veya API kötüye kullanımı, compromised service account, audit log'a yetkisiz erişim, yanlış yapılandırılmış outbound erişim, ileride Phase 7 AI katmanında maskeleme boşluğu ve yeterli tespit sinyali olmamasıdır. `docs/05-security-model.md` içindeki `Threat Model (Summary)` ve `Incident Response` bölümleri bu risklere karşı mevcut başlangıç yaklaşımını tanımlar.
 
 Bu toplantıdan beklenen, mimarinin genel olarak beğenilip beğenilmediği değil; Phase 1 başlamadan önce Siber Güvenlik açısından hangi saldırı senaryolarının kapatılmış sayılacağı, hangilerinin ek kanıt gerektirdiği, hangi olayların izlenmesi gerektiği ve SIEM aktarımının zorunlu olup olmadığı konusunda yazılı karar çıkmasıdır. Ayrıca Phase 7 AI aşaması henüz başlamayacak olsa da self-hosted LLM, masking ve isolated subnet yaklaşımının ilerideki Siber Güvenlik incelemesi için doğru temel olup olmadığı bu toplantıda kayda geçirilmelidir.
 

@@ -37,9 +37,9 @@ public sealed class OperationalRecordApiClient : IOperationalRecordApiClient
     }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<OperationalRecordResponse>> ListAsync(CancellationToken cancellationToken) =>
+    public Task<IReadOnlyList<OperationalRecordResponse>> RefreshAsync(CancellationToken cancellationToken) =>
         SendAsync<IReadOnlyList<OperationalRecordResponse>>(
-            () => _httpClient.GetAsync(_root, cancellationToken),
+            () => _httpClient.PostAsync($"{_root}/refresh", content: null, cancellationToken),
             cancellationToken);
 
     /// <inheritdoc />

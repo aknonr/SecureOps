@@ -23,6 +23,13 @@ internal static class WorkerHosting
         });
     }
 
+    /// <summary>
+    /// The audit queue drain only runs in the API host. The Worker therefore always writes audit events
+    /// directly to the configured sink, so a write either persists or throws (fail closed) instead of
+    /// waiting on a queue nothing drains. Added last so it wins over files, environment and command line.
+    /// </summary>
+    internal static void UseDirectAuditWriter(IConfigurationBuilder configuration) =>
+        configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Audit:Queue:Enabled"] = "false" });
     internal static string? Validate(IConfiguration configuration, bool service)
     {
         if (service && string.IsNullOrWhiteSpace(configuration[HostDefaults.EnvironmentKey]))

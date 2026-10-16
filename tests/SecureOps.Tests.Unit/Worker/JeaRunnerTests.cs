@@ -169,6 +169,28 @@ public sealed class JeaRunnerTests
         await WaitUntilAsync(() => transport.Disposed == 1);
     }
 
+    [Fact]
+    public async Task TimeoutWithASessionThatBlocksWhileClosing_StillReturnsWithinTheOperationTimeout()
+    {
+        using ManualResetEventSlim release = new();
+        FakeTransport transport = new() { InvokeGate = new TaskCompletionSource<IReadOnlyList<object?>>().Task, DisposeBlock = release };
+
+        Task<JeaInvocationResult> call = Runner(transport).InvokeAsync("syn-app-01", Command(), _limits, CancellationToken.None);
+        Task finished = await Task.WhenAny(call, Task.Delay(TimeSpan.FromSeconds(5)));
+
+        try
+        {
+            finished.Should().BeSameAs(call, "a blocking close must not hold the caller past the timeout");
+            (await call).Status.Should().Be(JeaInvocationStatus.Timeout);
+        }
+        finally
+        {
+            release.Set();
+        }
+
+        await WaitUntilAsync(() => transport.Disposed == 1);
+    }
+
     public static TheoryData<object?[]> BadOutputs => new()
     {
         Array.Empty<object?>(),
@@ -324,6 +346,8 @@ public sealed class JeaRunnerTests
 
         public Task<IReadOnlyList<object?>>? InvokeGate { get; init; }
 
+        public ManualResetEventSlim? DisposeBlock { get; init; }
+
         public int Disposed => Volatile.Read(ref _disposed);
 
         public void MarkDisposed() => Interlocked.Increment(ref _disposed);
@@ -360,6 +384,7 @@ public sealed class JeaRunnerTests
 
         public ValueTask DisposeAsync()
         {
+            transport.DisposeBlock?.Wait();
             transport.MarkDisposed();
             return ValueTask.CompletedTask;
         }

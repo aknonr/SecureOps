@@ -76,6 +76,8 @@ public interface IJeaSession : IAsyncDisposable
 /// </summary>
 public sealed class JeaRunner(IJeaTransport transport, ILogger<JeaRunner> logger) : IJeaRunner
 {
+    private static readonly TimeSpan _closeTimeout = TimeSpan.FromSeconds(10);
+
     /// <inheritdoc />
     public async Task<JeaInvocationResult> InvokeAsync(string computerName, JeaCommand command, JeaInvocationLimits limits, CancellationToken cancellationToken)
     {
@@ -195,7 +197,13 @@ public sealed class JeaRunner(IJeaTransport transport, ILogger<JeaRunner> logger
     {
         try
         {
-            await session.DisposeAsync();
+            // Closing a real session can block its calling thread (synchronous runspace disposal), so it always runs on a pool thread and
+            // a waiting caller is released after the close timeout; the close itself is left to finish or fail on its own.
+            await Task.Run(async () => await session.DisposeAsync()).WaitAsync(_closeTimeout);
+        }
+        catch (TimeoutException)
+        {
+            logger.LogDebug("JEA session close did not finish within the close timeout.");
         }
         catch (Exception exception)
         {

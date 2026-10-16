@@ -69,7 +69,8 @@ public sealed class CorporateJiraRequesterResolver : IRequesterResolver
                 using JsonDocument document = await BoundedJsonHttpContent.ReadAsync(
                     response.Content,
                     _options.MaxResponseBytes,
-                    cancellationToken);
+                    cancellationToken,
+                    TimeSpan.FromSeconds(_options.RequestTimeoutSeconds));
                 RequesterResolutionResult result = ParseExact(document.RootElement, identity);
                 _health.MarkAvailable(_provider);
                 _telemetry.RecordOperation(_provider, "user-search", result.Status.ToString(), stopwatch.Elapsed);

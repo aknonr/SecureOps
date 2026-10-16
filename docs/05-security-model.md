@@ -376,7 +376,7 @@ Before any data reaches the AI layer:
 |---|---|---|
 | Hostname | `APPSRV-12.contoso.com` | `SRV-A1B2C3` (consistent hash) |
 | Username | `CONTOSO\jane.doe` | `<user-role>` (e.g., `<admin-user>`) |
-| IP address | `10.4.51.22` | `10.4.x.x` |
+| IP address | `198.51.100.22` | `198.51.x.x` |
 | User path | `C:\Users\jane.doe\...` | `C:\Users\<masked>\...` |
 | Connection string | `Server=...;Pwd=...` | `<connection-string>` |
 | Customer ID | (any pattern) | `<customer-id>` |

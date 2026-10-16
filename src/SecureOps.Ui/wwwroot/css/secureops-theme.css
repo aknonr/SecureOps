@@ -3019,10 +3019,6 @@ html[data-so-input-modality="pointer"] [tabindex="-1"]:focus {
     font-variant-numeric: tabular-nums;
 }
 
-.so-plain-table .so-num--lead {
-    font-weight: 700;
-}
-
 .so-cell-unavailable {
     font-size: 0.78rem;
     font-style: italic;
@@ -4561,6 +4557,20 @@ html[data-so-appearance="light"] .so-auth-card {
 .so-auth-foot {
     margin-top: 32px;
     color: var(--so-auth-muted);
+}
+
+.so-auth-lead + .so-auth-form {
+    margin-top: 20px;
+}
+
+.so-auth-foot-link {
+    margin: 16px 0 0;
+    text-align: center;
+}
+
+.so-auth-foot-link a {
+    color: inherit;
+    text-decoration: underline;
 }
 
 .so-auth-lockup {

@@ -5,7 +5,7 @@ procedure, acceptance gates and upgrade/rollback: `docs/worker-service-operation
 
 | Script | What it does |
 |---|---|
-| `Install-SecureOpsWorkerService.ps1` | Creates `SecureOps.Worker` (Manual start, `"<exe>" --environment Test`), sets the log-on account to the gMSA with `sc.exe config obj=` (no password exists), checks `Test-ADServiceAccount` when the AD module is present, creates the Application event log source `SecureOps.Worker`. Refuses the placeholder `CONTOSO\gmsa-placeholder$`, a non-gMSA account, an existing service or a missing data directory. Does not start the service, set recovery/delayed start, grant rights or change ACLs. |
+| `Install-SecureOpsWorkerService.ps1` | Creates `SecureOps.Worker` Disabled (`"<exe>" --environment Test`), sets the log-on account to the gMSA with `sc.exe config obj=` (no password exists) and only then Manual start; if that fails the new registration is deleted, checks `Test-ADServiceAccount` when the AD module is present, creates the Application event log source `SecureOps.Worker`. Refuses the placeholder `CONTOSO\gmsa-placeholder$`, a non-gMSA account, an existing service or a missing data directory. Does not start the service, set recovery/delayed start, grant rights or change ACLs. |
 | `Uninstall-SecureOpsWorkerService.ps1` | Stops the service (120 s wait) and `sc.exe delete`s the registration; keeps files, data directory, logs, SQL and audit. `-RemoveEventLogSource` also removes the source. |
 
 Both support `-WhatIf` / `-Confirm` and need an elevated Windows PowerShell 5.1 or later.

@@ -415,16 +415,41 @@ public sealed partial class SqlServiceAccountRepository
         return (Enum.Parse<ServiceAccountRequestStatus>(r.Status), Enum.Parse<ServiceAccountActionType>(r.Type), actions, r.Owned);
     }
 
-    /// <summary>Closes exactly one request; other requests of the account are untouched.</summary>
-    public Task<SaResult<Guid>> CloseRequestAsync(Guid accountId, Guid requestId, string expectedVersion, ServiceAccountCloseOutcome outcome, string? reason,
-        SaActor actor, CancellationToken cancellationToken) =>
-        MutateAsync(accountId, "Request", requestId, "RequestClosed", new { Outcome = outcome.ToString() }, reason, actor, (connection, transaction, now) =>
-            connection.ExecuteAsync(Cmd("""
+    /// <summary>
+    /// Closes exactly one request; other requests of the account are untouched. When <paramref name="closeRule"/> is given it is evaluated inside the
+    /// transaction on the supporting actions as locked there, so an action voided meanwhile blocks or refuses the close.
+    /// </summary>
+    public async Task<SaResult<Guid>> CloseRequestAsync(Guid accountId, Guid requestId, string expectedVersion, ServiceAccountCloseOutcome outcome, string? reason,
+        SaActor actor, CancellationToken cancellationToken,
+        Func<ServiceAccountRequestStatus, ServiceAccountActionType, IReadOnlyList<ActionFacts>, bool, string?>? closeRule = null)
+    {
+        string? refused = null;
+        SaResult<Guid> result = await MutateAsync(accountId, "Request", requestId, "RequestClosed", new { Outcome = outcome.ToString() }, reason, actor, async (connection, transaction, now) =>
+        {
+            if (closeRule is not null)
+            {
+                await connection.ExecuteAsync(Cmd("SELECT Id FROM svcacct.ActionEvents WITH (UPDLOCK, HOLDLOCK) WHERE RequestId = @requestId;",
+                    new { requestId }, transaction, cancellationToken));
+                if (await RequestCloseFactsAsync(connection, transaction, requestId, cancellationToken) is not { } facts)
+                {
+                    return 0;
+                }
+
+                refused = closeRule(facts.Status, facts.Type, facts.Actions, facts.OwnershipConfirmed);
+                if (refused is not null)
+                {
+                    return 0;
+                }
+            }
+
+            return await connection.ExecuteAsync(Cmd("""
                 UPDATE svcacct.WorkRequests SET Status = 'Closed', CloseOutcome = @Outcome, CloseReason = @reason, ClosedAt = @now, ClosedBy = @UserId,
                     UpdatedAt = @now, UpdatedBy = @UserId
                 WHERE Id = @requestId AND AccountId = @accountId AND Status = 'Open' AND RowVer = @RowVer;
-                """, new { Outcome = outcome.ToString(), reason, now, actor.UserId, requestId, accountId, RowVer = Version(expectedVersion) }, transaction, cancellationToken)),
-            cancellationToken);
+                """, new { Outcome = outcome.ToString(), reason, now, actor.UserId, requestId, accountId, RowVer = Version(expectedVersion) }, transaction, cancellationToken));
+        }, cancellationToken);
+        return refused is null ? result : SaResult<Guid>.Fail(SaErrors.Invalid, refused);
+    }
 
     /// <summary>Records a planned or performed action; never closes a request.</summary>
     public Task<SaResult<Guid>> ReportActionAsync(Guid accountId, ReportActionRequest request, ServiceAccountActionType type, ServiceAccountActionResult result,
@@ -559,6 +584,13 @@ public sealed partial class SqlServiceAccountRepository
         DateTimeOffset now = DateTimeOffset.UtcNow;
         await using SqlConnection connection = await OpenAsync(cancellationToken);
         await using SqlTransaction transaction = await BeginWriteAsync(connection, cancellationToken, IsolationLevel.ReadCommitted);
+        if (accountId is { } scoped && await AnchorAsync(connection, transaction, scoped, cancellationToken) is { } current
+            && !(await LockedScopeAsync(connection, transaction, actor.UserId, cancellationToken)).Covers(current.Anchor))
+        {
+            // The grants are read again inside the write transaction: a scope revoked after the service check no longer authorizes the write.
+            return SaResult<Guid>.Fail(SaErrors.NotFound);
+        }
+
         int affected;
         try
         {

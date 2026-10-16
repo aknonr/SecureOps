@@ -54,7 +54,7 @@ System architecture for SecureOps. This document is the canonical source for com
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-The diagram above captures the original generic inbound-monitoring shape. In the real CONTOSO environment, the operational alarm chain is **SolarWinds → monthly.thy.com / HPE OpsBridge → Turuncuhat**, and the intended SecureOps boundary with Turuncuhat is **bidirectional**. Exact webhook/API details are pending stakeholder input.
+The diagram above captures the original generic inbound-monitoring shape. In the real CONTOSO environment, the operational alarm chain is **SolarWinds → the corporate monitoring portal (HPE OpsBridge) → Turuncuhat**, and the intended SecureOps boundary with Turuncuhat is **bidirectional**. Exact webhook/API details are pending stakeholder input.
 
 ## Components
 
@@ -152,7 +152,7 @@ Does NOT contain:
 
 ```
 1. SolarWinds fires an alarm.
-2. monthly.thy.com / HPE OpsBridge exposes event-detail context.
+2. the corporate monitoring portal (HPE OpsBridge) exposes event-detail context.
 3. Turuncuhat receives the alarm, creates the EVT record, and remains the operational system of record for acknowledgment and closure.
 4. SecureOps receives or fetches EVT context from Turuncuhat. Exact inbound method is pending stakeholder input (webhook vs. API).
 5. API verifies the inbound request if webhook-based, or authenticates the outbound request if API-pull-based.
