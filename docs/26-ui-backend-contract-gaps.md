@@ -1303,6 +1303,17 @@ Items 4 and 5 stay open as written.
 5. **No `DateAssumed` warning from the server.** A year-less mail date is marked `AssumedYear` by mail-hints; the preview does not
    know a date came from a hint, so the UI keeps its own "year assumed" note under the date field until the person changes the date.
 
+## G-41 — No server-side "tour seen" preference for the Service Accounts guided tour
+
+**Raised:** 2026-10-16, REHBER-UI (branch `feature/service-accounts-guided-tour-20261016`). **Owner:** Service Accounts module (owner-approved
+scoped exception). Numbered G-41 because master ends at G-39 and G-40 was reported as taken by a parallel branch.
+
+The guided tour (`SoGuidedTour`, `docs/service-accounts/GUIDED-TOUR-DESIGN.md`) opens only when the person presses "Adım adım göster". Offering
+it once on a first visit needs to know whether this person has seen or dismissed it; browser storage is reserved for `wasas.appearance`
+(CLAUDE.md), and the module has no per-user preference. The resource catalogue's `ResourcePreferencesResponse.GuideDismissed` is a different
+module's contract and is not reused. **Needed (only if the owner wants a first-visit offer):** a per-user, per-page "guide dismissed/seen" flag
+under `/api/v1/service-accounts/me` (read) with a versioned write, audited like other preferences. Until then: no automatic opening.
+
 ## Note: enums cross the wire as numbers
 
 Not a gap. Recorded here because it caught out a test double, and now **formally frozen by the v1

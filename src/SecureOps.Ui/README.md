@@ -39,6 +39,23 @@ Open UI ↔ API contract gaps: [`docs/26-ui-backend-contract-gaps.md`](../../doc
 Below this point: reference sections (Layout to Testing) and dated handoff logs, kept with their source SHAs and
 evidence paths. Search for the feature or date you need rather than reading top to bottom.
 
+## Service accounts: guided tour (REHBER-UI), 2026-10-16
+
+`SoGuidedTour` (Shared/Components) is a person-started on-screen tour: "Adım adım göster" next to "Nasıl kullanılır?" in `SaPageGuide` on the
+list, account, imports, plans and plan pages (not reports). Each step frames the element carrying `data-tour="…"` (thick outline plus dimmed
+page, `forced-colors` aware, never takes clicks) and the box says **Ne:** / **Neden:** with "Adım n / m"; native buttons Geri / Kapat / İleri
+(Bitir), Esc closes, focus goes to the box heading on every step and back to the start button on close. A step whose area is not on the screen
+(empty list, no preview yet, a capability-gated section) is skipped and named in the box's `role="status"` line; nothing on the screen at all
+says so with only "Kapat". Steps come from `ServiceAccountTours` with `Allowed` from the access snapshot or record permissions; the tour never
+clicks or switches tabs (the account tour frames tab headers through `SaTabTitle Tour=`). `wwwroot/js/so-guided-tour.js` (ES module, imported
+on first use) only measures, scrolls (instant under reduced motion) and focuses; state is `GuidedTourState`. Below 700 px the box docks at the
+bottom (max 50 vh, scrolls itself) and the page gets temporary bottom padding so the last area can rise above it. No browser storage; no
+automatic opening (G-41). Tests: `GuidedTourTests` (state + the real component through a small test renderer and a fake JS module: start,
+next/back, skipped target, Esc, focus return, hidden step), `ServiceAccountGuidedTourUiTests` (every target rendered by its page, permissions,
+one-sentence what/why, short guides, no storage, reduced motion). Local Linux only: module and CSS in headless Chromium on a staged page
+(1440 / 390 px / 640×400). At 640×400 (200 % of 1280×800) an area taller than the space above the docked box is partly under it. Not verified:
+real pages in a browser, `tests/browser/service-accounts-guided-tour.cjs`, screen reader, Windows/IIS, corporate TEST.
+
 ## Service accounts: "Hangi sunucularda?" (KULLANIM-1), 2026-10-15
 
 `SaWhereUsedPanel` at the top of the account page's usage tab (`/service-accounts/{id}`), read once when the tab first opens (the directory is asked
