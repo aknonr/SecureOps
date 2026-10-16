@@ -27,14 +27,16 @@ public sealed class SelectAccessibilityTests
     {
         string html = await RenderSelectAsync(new() { ["Label"] = "İnceleyici" });
 
-        html.Should().Contain("mud-input-control mud-select", "the bridge walks .mud-input-control.mud-select");
+        html.Should().MatchRegex("class=\"mud-input-control(?: [^\"]*)? mud-select\"", "the bridge walks .mud-input-control.mud-select");
         html.Should().MatchRegex("<label class=\"mud-input-label[^\"]*\"[^>]*>İnceleyici</label>", "the visible label is the accessible name");
         // Before items register MudSelect renders the read-only text input and a hidden value div; once they have, the input becomes
         // type=hidden and the div takes tabindex=0. The bridge handles both, so only the parts they share are pinned.
         html.Should().MatchRegex("<input class=\"mud-input-slot[^\"]*mud-select-input\"", "the select input is where page attributes land");
         html.Should().MatchRegex("<div class=\"mud-input-slot[^\"]*mud-select-input\"", "the value div is the other keyboard target shape");
         html.Should().MatchRegex("id=\"popover-[0-9a-f-]{36}\"", "the popover placeholder shares its GUID with popovercontent-<guid>");
-        html.Should().NotContain("role=\"combobox\"", "if MudBlazor starts emitting roles, the bridge may no longer be needed");
+        // MudBlazor 9 already puts role=combobox, aria-haspopup, aria-expanded and aria-label on the select's inputs; the bridge keeps
+        // exactly one of them (the keyboard target) and adds the listbox/option semantics, which the closed list does not render.
+        html.Should().Contain("role=\"combobox\"", "MudBlazor 9 emits the combobox role itself");
         html.Should().NotContain("role=\"option\"");
     }
 

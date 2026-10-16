@@ -16050,7 +16050,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -16139,7 +16138,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16159,7 +16158,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16191,7 +16190,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -16201,7 +16199,6 @@
             "name": "accountId",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -16212,7 +16209,6 @@
             "in": "header",
             "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
             "required": true,
-            "style": "simple",
             "schema": {
               "enum": [
                 "1"
@@ -16322,7 +16318,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16342,7 +16338,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16374,7 +16370,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -16384,7 +16379,6 @@
             "name": "accountId",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -16395,7 +16389,6 @@
             "in": "header",
             "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
             "required": true,
-            "style": "simple",
             "schema": {
               "enum": [
                 "1"
@@ -16505,7 +16498,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16525,7 +16518,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16557,7 +16550,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -16567,7 +16559,6 @@
             "name": "accountId",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -16578,7 +16569,6 @@
             "in": "header",
             "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
             "required": true,
-            "style": "simple",
             "schema": {
               "enum": [
                 "1"
@@ -16688,7 +16678,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16708,7 +16698,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16740,7 +16730,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -16750,7 +16739,6 @@
             "name": "accountId",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -16761,7 +16749,6 @@
             "in": "header",
             "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
             "required": true,
-            "style": "simple",
             "schema": {
               "enum": [
                 "1"
@@ -16871,7 +16858,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16891,7 +16878,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -16923,7 +16910,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -16933,7 +16919,6 @@
             "name": "accountId",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -16944,7 +16929,6 @@
             "in": "header",
             "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
             "required": true,
-            "style": "simple",
             "schema": {
               "enum": [
                 "1"
@@ -17054,7 +17038,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17074,7 +17058,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17106,7 +17090,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -17116,7 +17099,6 @@
             "name": "accountId",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -17205,7 +17187,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -17225,7 +17207,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -23432,7 +23414,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -23452,7 +23434,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -23485,7 +23467,6 @@
             "in": "header",
             "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
             "required": true,
-            "style": "simple",
             "schema": {
               "enum": [
                 "1"
@@ -23595,7 +23576,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -23615,7 +23596,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -23647,7 +23628,6 @@
             "name": "jobId",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -23656,7 +23636,6 @@
           {
             "name": "after",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -23746,7 +23725,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -23766,7 +23745,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -23798,7 +23777,6 @@
             "name": "jobId",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -23809,7 +23787,6 @@
             "in": "header",
             "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
             "required": true,
-            "style": "simple",
             "schema": {
               "enum": [
                 "1"
@@ -23900,7 +23877,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -23920,7 +23897,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -23952,7 +23929,6 @@
             "name": "jobId",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -23963,7 +23939,6 @@
             "in": "header",
             "description": "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
             "required": true,
-            "style": "simple",
             "schema": {
               "enum": [
                 "1"
@@ -24054,7 +24029,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -24074,7 +24049,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -24106,7 +24081,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -24195,7 +24169,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -24215,7 +24189,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -24611,7 +24585,6 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "style": "simple",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -24620,7 +24593,6 @@
           {
             "name": "source",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "string"
             }
@@ -24628,7 +24600,6 @@
           {
             "name": "foundOnly",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "boolean",
               "default": false
@@ -24637,7 +24608,6 @@
           {
             "name": "page",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32",
@@ -24647,7 +24617,6 @@
           {
             "name": "pageSize",
             "in": "query",
-            "style": "form",
             "schema": {
               "type": "integer",
               "format": "int32"
@@ -24736,7 +24705,7 @@
             }
           },
           "503": {
-            "description": "Server Error",
+            "description": "Service Unavailable",
             "content": {
               "text/plain": {
                 "schema": {
@@ -24756,7 +24725,7 @@
             }
           },
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
@@ -40773,6 +40742,9 @@
       "name": "ServiceAccountMailHints"
     },
     {
+      "name": "ServiceAccountOperationalRecords"
+    },
+    {
       "name": "ServiceAccountReminders"
     },
     {
@@ -40780,6 +40752,9 @@
     },
     {
       "name": "ServiceAccounts"
+    },
+    {
+      "name": "ServiceAccountUsageScanJobs"
     },
     {
       "name": "Sessions"

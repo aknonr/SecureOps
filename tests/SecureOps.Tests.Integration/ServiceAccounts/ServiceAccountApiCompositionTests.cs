@@ -373,7 +373,7 @@ public sealed class ServiceAccountApiCompositionTests
         using HttpClient admin = factory.CreateApiClient();
         admin.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
         (await admin.PostAsync($"/api/v1/service-accounts/change-plans/{Guid.NewGuid()}/accounts/{Guid.NewGuid()}/operational-record",
-            JsonContent.Create(new { fingerprint = new string('a', 64), idempotencyKey = Guid.NewGuid() })))
+            JsonContent.Create(new { fingerprint = new string('a', 64), idempotencyKey = Guid.NewGuid() }), TestContext.Current.CancellationToken))
             .StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable, "the module itself is disabled in this composition; nothing is sent");
     }
 
