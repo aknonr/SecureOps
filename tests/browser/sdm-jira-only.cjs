@@ -134,7 +134,7 @@ const out = path.resolve(process.argv[6]);
         await role(['Operator']);
         await navigate(page, ui, 'operational-records');
         await page.getByRole('button', { name: 'Kaynağı yenile', exact: true }).click();
-        await page.getByText('Sınırlı kaynak yenilemesi tamamlandı.', { exact: false }).waitFor();
+        await page.getByText('Sınırlı kaynak yenilemesi tamamlandı', { exact: false }).waitFor();
         const beforeBrowse = query(database, "SELECT CHECKSUM_AGG(BINARY_CHECKSUM(SourceRecordId,UpdatedAt)) FROM ops.OperationalRecords");
         await page.getByRole('combobox', { name: 'Sayfa boyutu', exact: true }).selectOption('10');
         await page.getByRole('button', { name: 'Sonraki', exact: true }).click();
