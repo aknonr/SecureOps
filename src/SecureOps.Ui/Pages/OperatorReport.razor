@@ -13,8 +13,8 @@
 
     This is operational analytics, not employee scoring, and the difference has to survive contact
     with the page. So: no rank numbers, no leader board, no derived per-person rates, and no
-    superlatives. The API orders rows by recorded operation volume — the UI says so plainly rather
-    than letting the reader infer that position means merit.
+    superlatives. The API orders rows by account name, never by volume, so position carries no
+    information about activity — the UI says so plainly rather than letting the reader infer merit.
 
     A raw operation count is a count of recorded operations. It does not measure effort, difficulty,
     working hours, or contribution, and two operators doing the same job can differ several-fold for
@@ -71,9 +71,9 @@
 
         <section class="so-panel so-panel--notice">
             <p class="so-panel-text so-panel-text--sm">
-                Satırlar, kaydedilen işlem sayısına göre sıralanır. Bu bir başarı sıralaması
-                <strong>değildir</strong>: işlem sayısı; çabayı, işin zorluğunu, çalışma süresini
-                veya katkıyı ölçmez. Rapor kapasite ve yaygınlaşma sorularını yanıtlamak içindir.
+                Satırlar hesap adına göre sıralanır; sıra etkinlik düzeyi hakkında bilgi vermez.
+                Bu bir başarı sıralaması <strong>değildir</strong>: işlem sayısı; çabayı, işin
+                zorluğunu, çalışma süresini veya katkıyı ölçmez. Rapor kapasite ve yaygınlaşma sorularını yanıtlamak içindir.
             </p>
         </section>
 
@@ -135,7 +135,7 @@
                                             <code class="so-code">@row.Actor</code>
                                         </span>
                                     </th>
-                                    <td class="so-num so-num--lead">@ManagementReportView.Count(row.OperationCount)</td>
+                                    <td class="so-num">@ManagementReportView.Count(row.OperationCount)</td>
                                     <td class="so-num">@ManagementReportView.Count(Workflow(row, "IdentityLookup"))</td>
                                     <td class="so-num">@ManagementReportView.Count(Workflow(row, "Access"))</td>
                                     <td class="so-num">@ManagementReportView.Count(Workflow(row, "OperationalRecordJira"))</td>

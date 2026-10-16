@@ -3019,10 +3019,6 @@ html[data-so-input-modality="pointer"] [tabindex="-1"]:focus {
     font-variant-numeric: tabular-nums;
 }
 
-.so-plain-table .so-num--lead {
-    font-weight: 700;
-}
-
 .so-cell-unavailable {
     font-size: 0.78rem;
     font-style: italic;
