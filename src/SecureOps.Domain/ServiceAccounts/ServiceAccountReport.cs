@@ -74,9 +74,10 @@ public sealed record FindingFact(Guid AccountId, FindingStatus Status);
 /// <param name="TeamNames">Team labels.</param>
 /// <param name="Insights">Metric version 2 inputs; without them only the version 1 sections are computed.</param>
 /// <param name="RequestedGmsaNames">True when migration 031 is applied, so the requested gMSA name list can be computed.</param>
+/// <param name="Activity">Inputs of the first-page activity section; without them the report has no activity page.</param>
 public sealed record ReportFacts(IReadOnlyList<AccountFact> Accounts, IReadOnlyList<RequestFact> Requests, IReadOnlyList<ActionFact> Actions,
     IReadOnlyList<CommunicationFact> Communications, IReadOnlyList<HandoverFact> Handovers, IReadOnlyList<TransitionFact> Transitions,
-    IReadOnlyList<FindingFact> Findings, IReadOnlyDictionary<Guid, string> TeamNames, InsightFacts? Insights = null, bool RequestedGmsaNames = false);
+    IReadOnlyList<FindingFact> Findings, IReadOnlyDictionary<Guid, string> TeamNames, InsightFacts? Insights = null, bool RequestedGmsaNames = false, ActivityFacts? Activity = null);
 
 /// <summary>Reconciled weekly category counts: the parts always add up to the total.</summary>
 /// <param name="InPeriod">In the report week.</param>
@@ -161,7 +162,7 @@ public sealed record ServiceAccountReport(
     ReportTrend? Trend = null,
     RiskSummary? Risk = null,
     IReadOnlyList<DirectorateRow>? Directorate = null,
-    IReadOnlyList<GmsaNameLine>? GmsaNames = null);
+    IReadOnlyList<GmsaNameLine>? GmsaNames = null, ServiceAccountActivity? Activity = null);
 
 /// <summary>Report period kinds. The week stays the default; a month or a custom range uses the same metric rules.</summary>
 public static class ReportPeriods

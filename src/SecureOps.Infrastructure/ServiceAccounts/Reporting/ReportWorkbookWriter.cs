@@ -25,7 +25,6 @@ public static class ReportWorkbookWriter
     private const int _tileNoteStyle = 7;
     private const int _blockTitleStyle = 8;
     private const int _dashboardColumns = 12;
-    private const int _tilesPerRow = 4;
     private const int _rowsPerChart = 16;
     private const string _chartDataSheet = "Grafik verisi";
     private static readonly char[] _formulaStarts = ['=', '+', '-', '@', '\t', '\r', '\n'];
@@ -47,9 +46,17 @@ public static class ReportWorkbookWriter
             List<ReportChartXml.DataBlock> blocks = ChartData(document, tables);
             List<(string Name, string Xml, string? Filter)> sheets = [.. tables.Select(t => (t.Name, Sheet(t.Rows, t.HasHeaderBlock), FilterRange(t.Rows, t.HasHeaderBlock)))];
             int chartRow = 0;
+            int dashboardSheet = 0;
             if (document.Dashboard is { } dashboard)
             {
-                sheets.Insert(0, ("Yönetici özeti", DashboardSheet(document.Title, dashboard, blocks.Count, out chartRow), null));
+                sheets.Insert(0, ("Yönetici özeti", DashboardSheet(document.Title, dashboard, blocks.Count, document.ActivityPage is null, out chartRow), null));
+            }
+
+            if (document.ActivityPage is { Count: > 0 } activity)
+            {
+                // The activity sheet is the first sheet; the executive summary (with the charts) follows it.
+                sheets.Insert(0, (SheetName(ReportDocument.ActivityTitle, sheets.Select(s => s.Name)), ActivitySheet(document.Title, document.Dashboard?.Subtitle, activity), null));
+                dashboardSheet = document.Dashboard is null ? 0 : 1;
             }
 
             Add(zip, "[Content_Types].xml", stamp, $"""
@@ -70,7 +77,7 @@ public static class ReportWorkbookWriter
                 """);
             Add(zip, "xl/styles.xml", stamp, $"""
                 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-                <styleSheet xmlns="{_main}"><fonts count="7"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="14"/><color rgb="FF1B2A45"/><name val="Calibri"/></font><font><sz val="10"/><color rgb="FF4A5568"/><name val="Calibri"/></font><font><b/><sz val="20"/><color rgb="FF1B2A45"/><name val="Calibri"/></font><font><i/><sz val="10"/><color rgb="FF4A5568"/><name val="Calibri"/></font><font><sz val="9"/><color rgb="FF6B7280"/><name val="Calibri"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD9E0EB"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF2F5FA"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF8D99AE"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FFC7CCD5"/></left><right style="thin"><color rgb="FFC7CCD5"/></right><top style="thin"><color rgb="FFC7CCD5"/></top><bottom style="thin"><color rgb="FFC7CCD5"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="9"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="3" fillId="3" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="4" fillId="3" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="6" fillId="3" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>
+                <styleSheet xmlns="{_main}"><fonts count="7"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="14"/><color rgb="FF1B2A45"/><name val="Calibri"/></font><font><sz val="10"/><color rgb="FF4A5568"/><name val="Calibri"/></font><font><b/><sz val="20"/><color rgb="FF1B2A45"/><name val="Calibri"/></font><font><i/><sz val="10"/><color rgb="FF4A5568"/><name val="Calibri"/></font><font><sz val="9"/><color rgb="FF6B7280"/><name val="Calibri"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD9E0EB"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF2F5FA"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF8D99AE"/></bottom><diagonal/></border><border><left style="thin"><color rgb="FFC7CCD5"/></left><right style="thin"><color rgb="FFC7CCD5"/></right><top style="thin"><color rgb="FFC7CCD5"/></top><bottom style="thin"><color rgb="FFC7CCD5"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="9"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="3" fillId="3" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="4" fillId="3" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="6" fillId="3" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>
                 """);
             for (int i = 0; i < sheets.Count; i++)
             {
@@ -79,7 +86,7 @@ public static class ReportWorkbookWriter
 
             if (blocks.Count > 0)
             {
-                Add(zip, "xl/worksheets/_rels/sheet1.xml.rels", stamp, "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
+                Add(zip, $"xl/worksheets/_rels/sheet{dashboardSheet + 1}.xml.rels", stamp, "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">"
                     + "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing\" Target=\"../drawings/drawing1.xml\"/></Relationships>");
                 Add(zip, "xl/drawings/drawing1.xml", stamp, ReportChartXml.Drawing(blocks.Count, chartRow, _rowsPerChart));
                 Add(zip, "xl/drawings/_rels/drawing1.xml.rels", stamp, ReportChartXml.DrawingRelationships(blocks.Count));
@@ -216,7 +223,7 @@ public static class ReportWorkbookWriter
     /// Executive summary sheet: title, scope/period line, headline tiles (four per row, each a merged 3-column box with label,
     /// value and note) and short tables whose columns are spread over twelve grid columns. Values only, no formulas.
     /// </summary>
-    private static string DashboardSheet(string title, ReportDashboard dashboard, int charts, out int chartRow)
+    private static string DashboardSheet(string title, ReportDashboard dashboard, int charts, bool selected, out int chartRow)
     {
         SortedDictionary<int, SortedDictionary<int, string>> cells = [];
         List<string> merges = [];
@@ -257,8 +264,8 @@ public static class ReportWorkbookWriter
         heights[1] = 24;
         Span(2, 0, _dashboardColumns, dashboard.Subtitle, _subtitleStyle);
         int r = 4;
-        const int tileWidth = _dashboardColumns / _tilesPerRow;
-        foreach (ReportTile[] group in dashboard.Tiles.Chunk(_tilesPerRow))
+        int tileWidth = _dashboardColumns / dashboard.TilesPerRow;
+        foreach (ReportTile[] group in dashboard.Tiles.Chunk(dashboard.TilesPerRow))
         {
             for (int i = 0; i < group.Length; i++)
             {
@@ -268,6 +275,7 @@ public static class ReportWorkbookWriter
             }
 
             heights[r + 1] = 32;
+            heights[r + 2] = 30;
             r += 4;
         }
 
@@ -310,7 +318,7 @@ public static class ReportWorkbookWriter
         }
 
         StringBuilder xml = new($"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><worksheet xmlns=\"{_main}\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">");
-        xml.Append("<sheetViews><sheetView workbookViewId=\"0\" showGridLines=\"0\" tabSelected=\"1\"/></sheetViews>");
+        xml.Append("<sheetViews><sheetView workbookViewId=\"0\" showGridLines=\"0\"" + (selected ? " tabSelected=\"1\"" : "") + "/></sheetViews>");
         xml.Append(CultureInfo.InvariantCulture, $"<cols><col min=\"1\" max=\"{_dashboardColumns}\" width=\"13\" customWidth=\"1\"/></cols><sheetData>");
         foreach ((int row, SortedDictionary<int, string> line) in cells)
         {
@@ -331,6 +339,62 @@ public static class ReportWorkbookWriter
 
         xml.Append("</worksheet>");
         return xml.ToString();
+    }
+
+    /// <summary>
+    /// First sheet: title, scope/period line, the counts table and one list per group, stacked on one sheet. Values only, no formulas.
+    /// An empty list says so instead of showing a bare header.
+    /// </summary>
+    private static string ActivitySheet(string title, string? subtitle, IReadOnlyList<ReportSection> sections)
+    {
+        List<IReadOnlyList<(ReportCell Cell, int Style)>> rows = [[(title, _titleStyle)], [(subtitle ?? string.Empty, _subtitleStyle)]];
+        foreach (ReportSection section in sections)
+        {
+            rows.Add([]);
+            rows.Add([(section.Title, _blockTitleStyle)]);
+            rows.Add([.. section.Headers.Select(h => ((ReportCell)h, _headerStyle))]);
+            rows.AddRange(section.Rows.Select(r => (IReadOnlyList<(ReportCell, int)>)[.. r.Select(c => (c, 0))]));
+            if (section.Rows.Count == 0)
+            {
+                rows.Add([("(kayıt yok)", _subtitleStyle)]);
+            }
+        }
+
+        int columns = rows.Max(r => r.Count);
+        StringBuilder xml = new($"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><worksheet xmlns=\"{_main}\">");
+        xml.Append("<sheetViews><sheetView workbookViewId=\"0\" showGridLines=\"0\" tabSelected=\"1\"/></sheetViews><cols>");
+        int[] widths = [38, 28, 12, 40, 34, 18];
+        for (int c = 1; c <= columns; c++)
+        {
+            xml.Append(CultureInfo.InvariantCulture, $"<col min=\"{c}\" max=\"{c}\" width=\"{widths[Math.Min(c, widths.Length) - 1]}\" customWidth=\"1\"/>");
+        }
+
+        xml.Append("</cols><sheetData>");
+        for (int r = 0; r < rows.Count; r++)
+        {
+            xml.Append(CultureInfo.InvariantCulture, $"<row r=\"{r + 1}\">");
+            for (int c = 0; c < rows[r].Count; c++)
+            {
+                (ReportCell cell, int style) = rows[r][c];
+                string reference = Column(c) + (r + 1).ToString(CultureInfo.InvariantCulture);
+                if (cell.Number is { } number)
+                {
+                    xml.Append(CultureInfo.InvariantCulture, $"<c r=\"{reference}\"><v>{number}</v></c>");
+                }
+                else if (cell.Date is { } date)
+                {
+                    xml.Append(CultureInfo.InvariantCulture, $"<c r=\"{reference}\" s=\"{_dateStyle}\"><v>{date.DayNumber - new DateOnly(1899, 12, 30).DayNumber}</v></c>");
+                }
+                else
+                {
+                    xml.Append(CultureInfo.InvariantCulture, $"<c r=\"{reference}\" t=\"inlineStr\" s=\"{style}\"><is><t xml:space=\"preserve\">{Escape(Neutralize(cell.Text ?? string.Empty))}</t></is></c>");
+                }
+            }
+
+            xml.Append("</row>");
+        }
+
+        return xml.Append("</sheetData></worksheet>").ToString();
     }
 
     private static string Escape(string value)

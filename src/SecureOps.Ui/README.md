@@ -39,6 +39,14 @@ Open UI ↔ API contract gaps: [`docs/26-ui-backend-contract-gaps.md`](../../doc
 Below this point: reference sections (Layout to Testing) and dated handoff logs, kept with their source SHAs and
 evidence paths. Search for the feature or date you need rather than reading top to bottom.
 
+## Service accounts: report first page "Dönem içinde yapılan işlemler" (RAPOR-2), 2026-10-16
+
+`SaReportView` renders `Report.Activity` first (when present): a count strip (`SoMetric` per group + distinct acted accounts), then one `MudTable` per group (deleted, handed over with "Eski → yeni sorumlu ekip", moved to gMSA, changed,
+reported-but-not-verified), each with its own empty state ("Bu dönemde kayıt yok" / "Doğrulanmayı bekleyen işlem yok"), the "N satır daha" line when a list is capped at 200, and the definition notes. Then "Yönetici özeti": at most five
+cards (`.sa-cards` grid, `auto-fit` / `min(100%, 14rem)` so one column at 390 px) with a one-sentence meaning each; the old twelve-figure strip moved into a native `details` ("Tüm göstergeler"; open for reports without the activity page).
+Status is always text ("Doğrulandı · date" / "Bildirildi · doğrulanmadı" / "Karar kaydı"), never colour alone. No person column. The report page has "Son 7 gün" / "Son 30 gün" buttons (explicit custom range ending today).
+Tests: `ServiceAccountActivityUiTests` (2, static renderer with MudBlazor services). Not verified by eye: 390 px, 200 % zoom, light/dark, keyboard order (native elements only), screen reader.
+
 ## Service accounts: "Hangi sunucularda?" (KULLANIM-1), 2026-10-15
 
 `SaWhereUsedPanel` at the top of the account page's usage tab (`/service-accounts/{id}`), read once when the tab first opens (the directory is asked
