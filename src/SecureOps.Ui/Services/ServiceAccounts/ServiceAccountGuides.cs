@@ -20,7 +20,7 @@ public static class ServiceAccountGuides
         "Kapsamınızdaki servis hesaplarını bulup açtığınız ana sayfa. Ekrandaki alanları tek tek görmek için \"Adım adım göster\"e basın.",
         [
             ("Gör", "Üstte size ve ekibinize düşen işler."),
-            ("Bul", "Süzgeçleri ayarlayıp Listele'ye basın."),
+            ("Bul", "Süzgeç seçip Listele'ye basın (SID aranmaz); özet düğmeleri listeyi hemen açar."),
             ("Aç", "Hesaba tıklayın; iş hesap sayfasında yapılır.")
         ],
         "Kapsamınız dışındaki hesapları göstermez; " + _noServerChange);

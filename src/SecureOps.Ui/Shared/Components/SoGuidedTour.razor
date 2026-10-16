@@ -115,7 +115,9 @@
     private async Task<IReadOnlyList<bool>> PresentAsync()
     {
         _module ??= await Js.InvokeAsync<IJSObjectReference>("import", ModulePath);
-        bool[]? present = await _module.InvokeAsync<bool[]?>("present", _state.Steps.Select(s => s.Target).ToArray());
+        // One argument (the array), not one argument per name: a string[] would otherwise bind to the params array itself.
+        object?[] names = [_state.Steps.Select(s => s.Target).ToArray()];
+        bool[]? present = await _module.InvokeAsync<bool[]?>("present", names);
         return present ?? [];
     }
 
