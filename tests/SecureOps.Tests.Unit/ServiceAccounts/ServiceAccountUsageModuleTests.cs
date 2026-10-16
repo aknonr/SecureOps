@@ -117,6 +117,21 @@ public sealed class ServiceAccountUsageModuleTests
             ], "a pool or directory that sets nothing itself runs as the configured default");
     }
 
+    [Theory]
+    [InlineData("""<add name="SynEmpty"><processModel identityType="" /></add>""")]
+    [InlineData("""<add name="SynEmptyDefault" /><applicationPoolDefaults><processModel identityType="" /></applicationPoolDefaults>""")]
+    public void IisIdentities_AnExplicitlyEmptyIdentityTypeIsUnknown_NotTheDefault(string pools)
+    {
+        using PowerShell shell = Shell();
+        Stub(shell, "function script:Get-SoServiceIdentity { }\nfunction script:Get-SoTaskIdentity { }\n"
+            + $"function script:Get-SoIisConfiguration {{ [xml]'<configuration><system.applicationHost><applicationPools>{pools}</applicationPools></system.applicationHost></configuration>' }}");
+        shell.AddCommand("Get-SecureOpsAccountUsage").AddParameter("Account", new[] { "SYN\\svc_synapp" });
+        PSObject result = shell.Invoke().Single();
+
+        result.Properties["scanResult"].Value.Should().Be("Partial");
+        ((PSObject)result.Properties["sources"].Value).Properties["Iis"].Value.Should().Be("Failed");
+    }
+
     [Fact]
     public void Scan_TreatsAnUnreadableIisIdentityAsAFailedSource_NeverAsSuccess()
     {

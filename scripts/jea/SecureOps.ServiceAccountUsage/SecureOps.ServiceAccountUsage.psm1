@@ -107,7 +107,7 @@ function Read-SoIisIdentity {
     foreach ($pool in $root.SelectNodes('system.applicationHost/applicationPools/add')) {
         $chain = @($pool.SelectSingleNode('processModel'), $poolDefaults)
         $identityType = Get-SoInheritedAttribute -Chain $chain -Name 'identityType'
-        if ([string]::IsNullOrEmpty($identityType)) { $identityType = 'ApplicationPoolIdentity' }
+        if ($null -eq $identityType) { $identityType = 'ApplicationPoolIdentity' }
         if ($knownIdentityTypes -notcontains $identityType) { throw [System.FormatException]::new('Unknown IIS identityType.') }
         $userName = Get-SoInheritedAttribute -Chain $chain -Name 'userName'
         if ($identityType -eq 'SpecificUser' -and $userName) {
