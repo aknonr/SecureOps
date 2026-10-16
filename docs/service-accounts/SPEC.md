@@ -200,6 +200,29 @@ exists. A team label never creates a team for this purpose; nothing routes witho
 
 Version 1 snapshots are never recomputed; they render without these sections.
 
+## Report first page: what the team did in the period (RAPOR-2, 2026-10-16)
+
+The first page of the screen report, the XLSX (first sheet "Dönem içinde yapılan işlemler") and the PDF (first page) is the same payload section
+(`ServiceAccountReport.Activity`, filled by `ServiceAccountActivityRules`). It is team- and account-level evidence of operations, not people monitoring
+(AGENTS rule 5): there is no person column, no per-person count and no ordering by person; a handover line shows team names only.
+
+| Group | What lands in it (period = the report period; real business dates only) |
+|---|---|
+| Silinen hesaplar | Non-void `Deletion` action reported (`ActualOn`) or verified (`VerifiedOn`) in the period |
+| Devredilen hesaplar | Accepted handover decided in the period (source → target team); an in-app ownership decision whose team differs from the previous decision ("Sahiplik devri"); a `GmsaHandover` action only when the account has neither of those |
+| gMSA'ya geçen hesaplar | Non-void `GmsaConversion` action reported or verified in the period |
+| Değişen hesaplar | `PasswordChange` / `OwnershipConfirmation` action; first or repeated in-app ownership confirmation; verified account closure (rule 6) with its verification date in the period; completed change plan (migration 033 tables, only when readable) |
+| Bildirilen ama doğrulanmayan işlemler | Every non-void Deletion / GmsaConversion / GmsaHandover / PasswordChange / OwnershipConfirmation action that is not verified — all time (age in calendar days, undated ones last), because a backlog does not end with the period |
+
+Per line: account, operation, date, team(s), status, evidence. Status is "Doğrulandı · date" only when the Verified result has a verification date and a recorded verifier;
+anything else is "Bildirildi · doğrulanmadı". A decision record (handover, ownership) says "Karar kaydı"; a completed plan says "Plan kaydı" — neither proves a server change.
+An undated action never enters the period (never spread by guess); it appears only in the pending list. Counts are distinct accounts per group; "Dönemde işlem gören"
+is distinct accounts over the first four groups. Each group shows at most 200 lines (the count includes the rest; the list says how many are not shown).
+Ownership history comes from the append-only `svcacct.History` ("OwnershipConfirmed"), so bulk-imported ownership is not counted; plans are skipped with a note when the 033 tables are absent or unreadable.
+
+Executive summary (simplified): five cards, each with one sentence — Toplam hesap, Bu dönem işlem gören, Doğrulanmayı bekleyen, Sahip ekibi olmayan, gMSA ilerlemesi. The long tile list and the three summary tables
+were removed from the summary of new reports; the same figures stay in the detail sections. Snapshots stored before this section have `Activity = null` and render as before. No migration.
+
 ## Directory name search (ADR-0025)
 
 Coordinators with module View and `Identity.Lookup` may search the directory by first name or full name: at least 3

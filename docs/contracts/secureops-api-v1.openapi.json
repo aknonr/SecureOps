@@ -29797,6 +29797,70 @@
         },
         "additionalProperties": false
       },
+      "ActivityGroup": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "accounts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lines": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActivityLine"
+            },
+            "nullable": true
+          },
+          "notShown": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ActivityLine": {
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": "string",
+            "nullable": true
+          },
+          "operation": {
+            "type": "string",
+            "nullable": true
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "teams": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "evidence": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "AddPersonAliasRequest": {
         "type": "object",
         "properties": {
@@ -36051,6 +36115,24 @@
         },
         "additionalProperties": false
       },
+      "ReportCard": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "value": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sentence": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ReportSummary": {
         "type": "object",
         "properties": {
@@ -37140,6 +37222,37 @@
         },
         "additionalProperties": false
       },
+      "ServiceAccountActivity": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActivityGroup"
+            },
+            "nullable": true
+          },
+          "accountsActed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportCard"
+            },
+            "nullable": true
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ServiceAccountMe": {
         "type": "object",
         "properties": {
@@ -37265,6 +37378,9 @@
               "$ref": "#/components/schemas/GmsaNameLine"
             },
             "nullable": true
+          },
+          "activity": {
+            "$ref": "#/components/schemas/ServiceAccountActivity"
           }
         },
         "additionalProperties": false
