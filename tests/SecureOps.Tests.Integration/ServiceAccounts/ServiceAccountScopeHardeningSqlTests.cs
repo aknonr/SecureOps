@@ -69,9 +69,16 @@ public sealed class ServiceAccountScopeHardeningSqlTests
         SaResult<EventPreview> preview = await fx.Service.PreviewEventAsync(coordA.Principal, fx.Context, accA, draft, _token);
         preview.ErrorCode.Should().Be(SaErrors.Invalid);
         preview.Field.Should().Be("communication.providerMessageId");
-        SaResult<EventCommitResult> commit = await fx.Service.CommitEventAsync(coordA.Principal, fx.Context, accA,
-            draft with { IdempotencyKey = Guid.NewGuid(), PreviewDigest = "x" }, _token);
-        commit.IsSuccess.Should().BeFalse();
+
+        // The service refuses at planning; a commit that gets past it (the mail stored after the preview) must still be refused by the
+        // repository's own visibility check inside the write transaction. The write below carries a version the account really has.
+        AccountEventWrite write = new(accA, AccountEventKind.OwnerReplied, _on, AccountEventChannel.Mail, Guid.NewGuid(), "syn-draft-" + fx.Suffix,
+            account.Summary.Version, null, null,
+            new EventCommunicationWrite(CommunicationDirection.Incoming, CommunicationKind.Reply,
+                new CreateCommunicationRequest("Incoming", "Reply", [accA], _on, Summary: "SYN özet", ProviderMessageId: provider)),
+            null, [], false, null, null, false);
+        AccountEventOutcome outcome = await fx.Repository.CommitAccountEventAsync(write, new SaActor(coordA.User.Id, fx.Context.CorrelationId), _token);
+        outcome.Status.Should().Be(AccountEventStatus.CommunicationRefused);
         (await fx.CountAsync("SELECT COUNT(*) FROM svcacct.CommunicationAccounts WHERE AccountId = @accA", new { accA })).Should().Be(0);
         (await fx.CountAsync("SELECT COUNT(*) FROM svcacct.AccountEvents WHERE AccountId = @accA", new { accA })).Should().Be(0);
     }
