@@ -75,8 +75,9 @@ public sealed partial class ServiceAccountService
                 CoverageOrganizationIds = [.. (request.CoverageOrganizationIds ?? []).Distinct().Order()]
             };
             string replayKey = ReplayKey(normalized, sha);
-            if (await repository!.FindCommittedReplayAsync(replayKey, cancellationToken) is { } committed)
+            if (await repository!.FindCommittedReplayAsync(replayKey, cancellationToken) is { } committed && BatchReachable(caller, committed))
             {
+                // A committed batch from a scope the caller does not cover is treated as unseen: it is never revealed.
                 return View(committed, replay: true);
             }
 
