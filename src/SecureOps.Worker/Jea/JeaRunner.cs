@@ -74,9 +74,14 @@ public interface IJeaSession : IAsyncDisposable
 /// failures per stage, requires exactly one text output within the size limit, and always closes the session. A session left behind by a
 /// timeout is disposed in the background so the caller is not held by a remote host that stopped answering.
 /// </summary>
-public sealed class JeaRunner(IJeaTransport transport, ILogger<JeaRunner> logger) : IJeaRunner
+public sealed class JeaRunner(IJeaTransport transport, ILogger<JeaRunner> logger, int maxPendingCloses = JeaRunner.DefaultMaxPendingCloses,
+    TimeSpan? closeTimeout = null) : IJeaRunner
 {
-    private static readonly TimeSpan _closeTimeout = TimeSpan.FromSeconds(10);
+    /// <summary>Most session closes that may be unfinished at once; a hung close keeps its slot until it really ends.</summary>
+    public const int DefaultMaxPendingCloses = 16;
+
+    private readonly TimeSpan _closeTimeout = closeTimeout ?? TimeSpan.FromSeconds(10);
+    private readonly SemaphoreSlim _closeSlots = new(Math.Max(1, maxPendingCloses));
 
     /// <inheritdoc />
     public async Task<JeaInvocationResult> InvokeAsync(string computerName, JeaCommand command, JeaInvocationLimits limits, CancellationToken cancellationToken)
@@ -197,9 +202,23 @@ public sealed class JeaRunner(IJeaTransport transport, ILogger<JeaRunner> logger
     {
         try
         {
+            // Closes that hang are bounded: a slot is held until the close really ends, and a close that finds none within the close
+            // timeout is skipped (logged) instead of piling another blocked pool thread on top of the hung ones.
+            if (!await _closeSlots.WaitAsync(_closeTimeout))
+            {
+                logger.LogWarning("JEA session close skipped: too many closes are still unfinished.");
+                return;
+            }
+
             // Closing a real session can block its calling thread (synchronous runspace disposal), so it always runs on a pool thread and
             // a waiting caller is released after the close timeout; the close itself is left to finish or fail on its own.
-            await Task.Run(async () => await session.DisposeAsync()).WaitAsync(_closeTimeout);
+            var close = Task.Run(async () => await session.DisposeAsync());
+            _ = close.ContinueWith(t =>
+            {
+                _ = t.Exception;
+                _closeSlots.Release();
+            }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            await close.WaitAsync(_closeTimeout);
         }
         catch (TimeoutException)
         {
