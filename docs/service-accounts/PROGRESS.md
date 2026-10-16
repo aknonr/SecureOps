@@ -169,7 +169,7 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
   `src/SecureOps.Ui/README.md` ("gMSA change plan UI"). Checklist marking, evidence and closing are **not offered** (no API until PR 2: G-36).
 - F2 (2026-10-12): PR 1 branch (E-fix `2c245ad`) merged into this branch without conflict; OCO text corrected to the server rule
   (validated, upper-cased; 400 `ocoNumber` shown under the field). Verified on a fresh 001–033 DB: invalid OCO refused under the field with the
-  draft kept, `oco-9000124` saved as `OCO-9000124`; build 0/0, unit 2052 passed / 1 existing skip, scoped format clean.
+  draft kept, `oco-000000` saved as `OCO-000000`; build 0/0, unit 2052 passed / 1 existing skip, scoped format clean.
 - Shared pager `SaPager` replaces the four hand-written pagers (keyboard focus no longer falls to the page when a page changes).
 - Verified 2026-10-12 on the local Demo (API :5330, UI :5331/:5332, synthetic LocalDB `SecureOps_SaPlanUi1012`, migrations 001–033 applied
   by the harness without role scripts): create refused → per-account answers and draft kept; create; preview (counters 2/0/1/0/1/2/0:

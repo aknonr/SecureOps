@@ -46,6 +46,9 @@
 
     <!-- PowerShell / JEA -->
     <PackageVersion Include="Microsoft.PowerShell.SDK" Version="7.4.18" />
+    <!-- Transitive via PowerShell SDK; pinned for GHSA-846f-f764-76mx / GHSA-r955-8q5j-3h83 and later Xml advisories. -->
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="8.0.2" />
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="8.0.5" />
     <!-- Match PowerShell's Roslyn compiler floor and EF Design's exact compiler/workspace pair. -->
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.9.2" />
 

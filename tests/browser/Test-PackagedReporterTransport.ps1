@@ -9,7 +9,7 @@ function Invoke-Refresh {
     [CmdletBinding()]
     param()
     Invoke-RestMethod "$api/refresh" -Method Post -Headers $headers -ContentType application/json -Body (@{ commandId = [guid]::NewGuid() } | ConvertTo-Json) | Out-Null
-    (Invoke-RestMethod $api -Headers $headers).items | Where-Object { $_.source.code -eq 'OR-930000918' }
+    (Invoke-RestMethod $api -Headers $headers).items | Where-Object { $_.source.code -eq 'OR-930000001' }
 }
 Invoke-RestMethod "$stub/mode/current" -Method Post | Out-Null
 $first = Invoke-Refresh
