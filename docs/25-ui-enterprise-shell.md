@@ -307,8 +307,9 @@ teach the reader to treat a correct outcome as an incident.
 
 Operational analytics, not employee scoring, and the difference is on the page rather than in this
 document. No rank numbers, no leader board, no derived per-person rates, no superlatives. The API
-orders rows by recorded operation volume and the page says so plainly, together with the statement
-that an operation count does not measure effort, difficulty, working hours, or contribution.
+orders rows by account name (identity), never by volume, so row position says nothing about activity;
+the page says so plainly, together with the statement that an operation count does not measure
+effort, difficulty, working hours, or contribution. The count column carries no emphasis.
 
 Pagination is server-side (`page`, `pageSize`, capped at 100 by the API); the client never holds the
 full set, and the server's returned `page` is treated as authoritative. The endpoint performs no

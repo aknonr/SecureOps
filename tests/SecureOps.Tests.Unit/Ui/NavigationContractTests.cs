@@ -59,14 +59,19 @@ public sealed class NavigationContractTests
     [Fact]
     public void OperatorReport_KeepsItsAntiRankingStatement()
     {
-        // The screen orders rows by operation count, so it has to say plainly that the ordering is
-        // not a scoreboard. The disclaimer is the anti-ranking semantics; losing it while keeping
-        // the sort is the regression worth pinning.
+        // Rows are ordered by account name and the page says the order carries no information about
+        // activity. The disclaimer is the anti-ranking semantics; the count column must not be
+        // emphasised and the page must not claim a volume-based order.
         string page = Ui("Pages", "OperatorReport.razor");
 
+        page.Should().Contain("hesap adına göre sıralanır")
+            .And.Contain("etkinlik düzeyi hakkında bilgi vermez")
+            .And.NotContain("işlem sayısına göre sıralanır")
+            .And.NotContain("so-num--lead");
         page.Should().Contain("başarı sıralaması")
             .And.Contain("<strong>değildir</strong>")
-            .And.Contain("çabayı, işin zorluğunu, çalışma süresini");
+            .And.Contain("çabayı, işin")
+            .And.Contain("zorluğunu, çalışma süresini");
     }
 
     [Fact]
