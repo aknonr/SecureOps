@@ -19,8 +19,8 @@ eksikleri: `rc624-workflow-continuation.md` ve ilgili entegrasyon sözleşmeleri
 
 ## Önce hedef envanteri
 
-API `D:\Applications\api\wasasyonetimapi.thy.com`, UI
-`D:\Applications\ui\wasasyonetim.thy.com`, Worker `D:\secureops_worker`.
+API `D:\Applications\api\api.example.test`, UI
+`D:\Applications\ui\ui.example.test`, Worker `D:\secureops_worker`.
 Bu geliştirme makinesinde bu hedefler erişilebilir değil. Kurulu sürüm, 022'nin
 kurulumu, etkili ayarlar, gerçek süreç kimliği ve D: arşiv konumu hedef operatörü
 tarafından doğrulanmadan kurulu varsayılmaz. API'nin onaylı etki alanı kimliği,

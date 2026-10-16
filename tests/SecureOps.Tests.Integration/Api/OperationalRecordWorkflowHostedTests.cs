@@ -229,7 +229,7 @@ public sealed class OperationalRecordWorkflowHostedTests
 
         (await anonymous.GetAsync("/api/v1/operational-records")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
-        OperationalRecordResponse[] records = (await admin.GetFromJsonAsync<OperationalRecordResponse[]>("/api/v1/operational-records"))!;
+        OperationalRecordResponse[] records = (await RefreshRecordsAsync(admin))!;
         records.Should().HaveCount(4);
         OperationalRecordResponse eligible = records.Single(record => record.OrCode == "SYN-OR-100");
         eligible.WorkflowState.Should().Be(OperationalRecordWorkflowState.Eligible);
@@ -267,7 +267,7 @@ public sealed class OperationalRecordWorkflowHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient admin = factory.CreateApiClient();
         admin.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
-        OperationalRecordResponse[] records = (await admin.GetFromJsonAsync<OperationalRecordResponse[]>("/api/v1/operational-records"))!;
+        OperationalRecordResponse[] records = (await RefreshRecordsAsync(admin))!;
         OperationalRecordResponse stale = records.Single(record => record.OrCode == "SYN-OR-200");
         (await admin.PostAsync($"/api/v1/operational-records/{stale.Id}/jira-preview", null)).StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -305,7 +305,7 @@ public sealed class OperationalRecordWorkflowHostedTests
         HttpResponseMessage first = await PostCommandAsync(admin, $"/api/v1/operational-records/{record.Id}/jira", "synthetic-unknown-create");
         ProblemDetails firstProblem = await AssertProblemAsync(first, HttpStatusCode.ServiceUnavailable, OperationalErrorCodes.JiraUnavailable);
         OperationalRecordResponse detail = (await admin.GetFromJsonAsync<OperationalRecordResponse>($"/api/v1/operational-records/{record.Id}"))!;
-        OperationalRecordResponse refreshed = (await admin.GetFromJsonAsync<OperationalRecordResponse[]>("/api/v1/operational-records"))!
+        OperationalRecordResponse refreshed = (await RefreshRecordsAsync(admin))!
             .Single(item => item.Id == record.Id);
         HttpResponseMessage replay = await PostCommandAsync(admin, $"/api/v1/operational-records/{record.Id}/jira", "synthetic-unknown-create");
         HttpResponseMessage secondCreate = await PostCommandAsync(admin, $"/api/v1/operational-records/{record.Id}/jira", "synthetic-unknown-new-create");
@@ -417,12 +417,42 @@ public sealed class OperationalRecordWorkflowHostedTests
     }
 
     [Fact]
+    public async Task ListGet_ReturnsStoredRecordsOnly_AndRefreshPostImports()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+        const string route = "/api/v1/operational-records";
+
+        (await admin.GetFromJsonAsync<OperationalRecordResponse[]>(route))!.Should().BeEmpty("a list read never queries the source or writes");
+        (await admin.GetFromJsonAsync<OperationalRecordResponse[]>(route))!.Should().BeEmpty();
+        (await RefreshRecordsAsync(admin)).Should().HaveCount(4);
+        (await admin.GetFromJsonAsync<OperationalRecordResponse[]>(route))!.Should().HaveCount(4);
+    }
+
+    [Fact]
+    public async Task RefreshPost_RequiresIntentHeaderAndViewCapability_AndGetStaysAvailable()
+    {
+        using WebApplicationFactory<Program> factory = CreateFactory();
+        using HttpClient withHeader = Client(factory, DemoApiAuthentication.PlatformAdminActor);
+        using HttpClient withoutHeader = factory.CreateClient();
+        withoutHeader.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
+        using HttpClient anonymous = factory.CreateApiClient();
+        const string route = "/api/v1/operational-records/refresh";
+
+        (await withoutHeader.PostAsync(route, null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await withoutHeader.GetAsync("/api/v1/operational-records")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await anonymous.PostAsync(route, null)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await withHeader.PostAsync(route, null)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await withHeader.GetAsync(route)).StatusCode.Should().BeOneOf(HttpStatusCode.NotFound, HttpStatusCode.MethodNotAllowed);
+    }
+
+    [Fact]
     public async Task DisabledSourceProvider_ReturnsFailClosedProblem()
     {
         using WebApplicationFactory<Program> factory = CreateFactory(sourceProvider: "Disabled");
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
-        HttpResponseMessage response = await admin.GetAsync("/api/v1/operational-records");
+        HttpResponseMessage response = await admin.PostAsync("/api/v1/operational-records/refresh", null);
 
         await AssertProblemAsync(response, HttpStatusCode.ServiceUnavailable, OperationalErrorCodes.OperationalSourceUnavailable);
     }
@@ -458,7 +488,7 @@ public sealed class OperationalRecordWorkflowHostedTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient admin = Client(factory, DemoApiAuthentication.PlatformAdminActor);
 
-        using var document = JsonDocument.Parse(await admin.GetStringAsync("/api/v1/operational-records"));
+        using var document = JsonDocument.Parse(await (await admin.PostAsync("/api/v1/operational-records/refresh", null)).Content.ReadAsStringAsync());
         JsonElement record = document.RootElement.EnumerateArray().Single(item => item.GetProperty("orCode").GetString() == "SYN-OR-100");
 
         record.GetProperty("classification").GetInt32().Should().Be(4);
@@ -571,8 +601,15 @@ public sealed class OperationalRecordWorkflowHostedTests
         return client;
     }
 
+    private static async Task<OperationalRecordResponse[]> RefreshRecordsAsync(HttpClient client)
+    {
+        HttpResponseMessage response = await client.PostAsync("/api/v1/operational-records/refresh", null);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<OperationalRecordResponse[]>())!;
+    }
+
     private static async Task<OperationalRecordResponse> GetRecordAsync(HttpClient client, string orCode) =>
-        (await client.GetFromJsonAsync<OperationalRecordResponse[]>("/api/v1/operational-records"))!.Single(record => record.OrCode == orCode);
+        (await RefreshRecordsAsync(client))!.Single(record => record.OrCode == orCode);
 
     private static async Task<HttpResponseMessage> PostCommandAsync(HttpClient client, string path, string idempotencyKey)
     {

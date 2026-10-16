@@ -239,7 +239,8 @@ public sealed class SqlAssetContractTests
         string access = File.ReadAllText(Path.Combine(root, "src", "SecureOps.Infrastructure", "Access", "SqlAccessRepository.cs"));
         string sessions = File.ReadAllText(Path.Combine(root, "src", "SecureOps.Infrastructure", "Sessions", "SqlApplicationSessionRepository.cs"));
         string operational = File.ReadAllText(Path.Combine(root, "src", "SecureOps.Infrastructure", "OperationalRecords", "SqlOperationalRecordRepository.cs"));
-        string audit = File.ReadAllText(Path.Combine(root, "src", "SecureOps.Infrastructure", "Audit", "SqlAuditWriter.cs"));
+        string audit = File.ReadAllText(Path.Combine(root, "src", "SecureOps.Infrastructure", "Audit", "SqlAuditRow.cs"));
+        string auditWriter = File.ReadAllText(Path.Combine(root, "src", "SecureOps.Infrastructure", "Audit", "SqlAuditWriter.cs"));
         string firstAdmin = File.ReadAllText(Path.Combine(root, "src", "SecureOps.Infrastructure", "Access", "SqlFirstAdminBootstrapStore.cs"));
 
         access.Should().Contain("IsolationLevel.Serializable")
@@ -263,6 +264,7 @@ public sealed class SqlAssetContractTests
             .And.Contain("IsolationLevel.Serializable")
             .And.Contain("transaction.CommitAsync(cancellationToken)")
             .And.NotContain("DELETE FROM");
+        auditWriter.Should().Contain("SqlAuditRow.InsertAsync(connection, null, auditEvent, cancellationToken)");
         audit.Should().Contain("INSERT INTO audit.AuditLog")
             .And.Contain("commandTimeout: _commandTimeoutSeconds")
             .And.NotContain("UPDATE audit.AuditLog")

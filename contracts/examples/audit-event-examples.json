@@ -6,7 +6,7 @@
     "alertId": "8e2f7c8a-1b3d-4e5f-9a0b-2c4d6e8f0a12",
     "serverName": "APPSRV-12.contoso.local",
     "correlationId": "00-f1a2b3c4d5e6f708a9b0c1d2e3f40516-1234567890abcdef-01",
-    "sourceIp": "10.4.10.55",
+    "sourceIp": "198.51.100.55",
     "details": {
       "externalId": "SW-ALERT-12345",
       "turuncuhatEvtId": "EVT-54321",
@@ -67,7 +67,7 @@
     "alertId": "8e2f7c8a-1b3d-4e5f-9a0b-2c4d6e8f0a12",
     "serverName": "APPSRV-12.contoso.local",
     "correlationId": "00-aa11bb22cc33dd44ee55ff6677889900-fedcba9876543210-01",
-    "sourceIp": "10.4.22.18",
+    "sourceIp": "198.51.100.18",
     "details": { "viewedSection": "DiagnosticDetail" }
   },
   {

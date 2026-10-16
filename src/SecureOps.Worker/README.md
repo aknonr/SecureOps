@@ -76,7 +76,7 @@ Service mode requires explicit environment, configured Hangfire server and an
 existing absolute local WorkerHosting:DataDirectory. This directory holds a
 FileShare.None process lock and bounded JSON lifecycle logs (14 x 10 MiB), not audit
 or report archives. Console uses the same lock/logs when configured; diagnostics
-bypasses both and never starts the host. The lock cannot fence rc6.26, another
+bypasses both and never starts the host. The Worker always writes audit events directly to the sink (`Audit:Queue:Enabled` is forced to false; the queue drain runs only in the API host), so a failed audit write fails the operation. The lock cannot fence rc6.26, another
 directory or another machine; durable SQL leases remain authoritative. Stop the
 old console before handover. The host shutdown budget is 90 seconds; uncertain
 outcomes remain subject to existing lease reconciliation, not automatic retry.

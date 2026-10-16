@@ -27,16 +27,16 @@ public interface IOperationalRecordApiClient
     /// <summary>Builds a non-publishable, version-bound operator declaration.</summary>
     public Task<JiraPreviewResponse> ReviewAsync(Guid id, JiraReviewRequest request, CancellationToken cancellationToken);
     /// <summary>
-    /// Lists operational records.
+    /// Refreshes operational records from the source (POST).
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Records with workflow, claim, freshness, and version state.</returns>
     /// <remarks>
-    /// This is a <b>source refresh, not a passive read</b>: it imports and classifies from the
+    /// This is a <b>source refresh, not a passive read</b> (<c>POST .../refresh</c>): it imports and classifies from the
     /// bounded source response and is rate-limited. Callers must not treat it as free, and must not
     /// poll it.
     /// </remarks>
-    public Task<IReadOnlyList<OperationalRecordResponse>> ListAsync(CancellationToken cancellationToken);
+    public Task<IReadOnlyList<OperationalRecordResponse>> RefreshAsync(CancellationToken cancellationToken);
 
     /// <summary>
     /// Reads one operational record.

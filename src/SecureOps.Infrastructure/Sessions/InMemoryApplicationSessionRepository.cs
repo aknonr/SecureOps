@@ -1,4 +1,5 @@
 using SecureOps.Domain.Sessions;
+using SecureOps.Infrastructure.Audit;
 
 namespace SecureOps.Infrastructure.Sessions;
 
@@ -7,6 +8,9 @@ public sealed class InMemoryApplicationSessionRepository : IApplicationSessionRe
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Dictionary<Guid, ApplicationSession> _sessions = [];
+
+    /// <inheritdoc />
+    public bool WritesAuditAtomically => false;
 
     /// <inheritdoc />
     public async Task InsertAsync(ApplicationSession session, CancellationToken cancellationToken)
@@ -59,7 +63,7 @@ public sealed class InMemoryApplicationSessionRepository : IApplicationSessionRe
     }
 
     /// <inheritdoc />
-    public async Task<bool> EndAsync(Guid sessionId, DateTimeOffset endedAtUtc, SessionEndReason reason, CancellationToken cancellationToken)
+    public async Task<bool> EndAsync(Guid sessionId, DateTimeOffset endedAtUtc, SessionEndReason reason, CancellationToken cancellationToken, Func<ApplicationSession, AuditEvent>? auditFactory = null)
     {
         await _gate.WaitAsync(cancellationToken);
         try
@@ -79,7 +83,7 @@ public sealed class InMemoryApplicationSessionRepository : IApplicationSessionRe
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<ApplicationSession>> EndActiveForUserAsync(Guid userId, DateTimeOffset endedAtUtc, SessionEndReason reason, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ApplicationSession>> EndActiveForUserAsync(Guid userId, DateTimeOffset endedAtUtc, SessionEndReason reason, CancellationToken cancellationToken, Func<ApplicationSession, AuditEvent>? auditFactory = null)
     {
         await _gate.WaitAsync(cancellationToken);
         try
@@ -105,7 +109,8 @@ public sealed class InMemoryApplicationSessionRepository : IApplicationSessionRe
         DateTimeOffset nowUtc,
         DateTimeOffset idleCutoffUtc,
         int maximumCount,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<ApplicationSession, AuditEvent>? auditFactory = null)
     {
         await _gate.WaitAsync(cancellationToken);
         try

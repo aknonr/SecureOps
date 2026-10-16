@@ -57,6 +57,7 @@ explicitly. A pending user sees why they are waiting, not an empty dashboard.
 | Route | Purpose | Auth |
 |---|---|---|
 | `/login` | Single-action sign-in, `returnUrl` preserved | Anonymous |
+| `/sign-out` | Sign-out confirmation; the sign-out itself is an antiforgery-protected POST | Anonymous |
 | `/signed-out` | Confirms a completed sign-out | Anonymous |
 | `/session-expired` | Session lapsed; returns to where the operator was | Anonymous |
 | `/access-denied` | Authorization refusal, with a route to request access | Anonymous |
@@ -76,7 +77,7 @@ explicitly. A pending user sees why they are waiting, not an empty dashboard.
 | `/reporting/operators` | Operatör Raporu: paginated per-operator usage | Authenticated + `Reporting.ManagementView` |
 | `/audit-compliance`, `/diagnostics-readonly` | Truthful future-phase placeholders | Authenticated |
 
-Interim endpoints `POST /auth/sign-in` and `GET /auth/sign-out` replace the former `/demo-auth/*`
+Interim endpoints `POST /auth/sign-in` and `POST /auth/sign-out` (antiforgery-protected; `GET /auth/sign-out` only forwards to the `/sign-out` confirmation page) replace the former `/demo-auth/*`
 pair. They establish identity only and grant no application authority. When an identity provider is
 approved they become a challenge/callback pair; the login page keeps its shape.
 
@@ -236,7 +237,7 @@ Rules specific to this screen:
 - **Idempotency is the backend's.** No `Idempotency-Key` is sent, so the API's deterministic
   actor+command+record key applies and a repeat after refresh collapses onto the same command.
 - **Retry follows authoritative state, not HTTP status.**
-- **No polling.** The list endpoint is a rate-limited source refresh; refresh is deliberate, plus an
+- **No polling.** `POST /api/v1/operational-records/refresh` is the rate-limited source refresh (the list `GET` is read-only); refresh is deliberate, plus an
   automatic re-read after every write.
 
 Red stays reserved for genuinely critical conditions. Stale, claimed, pending, and reconciliation
@@ -306,8 +307,9 @@ teach the reader to treat a correct outcome as an incident.
 
 Operational analytics, not employee scoring, and the difference is on the page rather than in this
 document. No rank numbers, no leader board, no derived per-person rates, no superlatives. The API
-orders rows by recorded operation volume and the page says so plainly, together with the statement
-that an operation count does not measure effort, difficulty, working hours, or contribution.
+orders rows by account name (identity), never by volume, so row position says nothing about activity;
+the page says so plainly, together with the statement that an operation count does not measure
+effort, difficulty, working hours, or contribution. The count column carries no emphasis.
 
 Pagination is server-side (`page`, `pageSize`, capped at 100 by the API); the client never holds the
 full set, and the server's returned `page` is treated as authoritative. The endpoint performs no
@@ -725,7 +727,7 @@ takes `IApiSessionContext`, because a client that skipped it would fail silently
 
 ### Sign-out ends the API session
 
-`GET /auth/sign-out` calls `POST /api/v1/access/logout` **before** the UI authentication sign-out,
+`POST /auth/sign-out` calls `POST /api/v1/access/logout` **before** the UI authentication sign-out,
 then drops the browser session's cookie jar. If the API call fails the operator is still signed out
 and the failure is logged with its safe code and correlation ID only; refusing to sign someone out
 because the API was unreachable would strand them signed in. The jar is dropped either way.

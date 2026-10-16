@@ -106,6 +106,10 @@ against loopback Demo with synthetic data when available. Demo authentication is
 not evidence of real browser Negotiate or IIS/F5 behavior. Corporate origin values,
 header preservation and actual Negotiate/IIS acceptance remain deployment gates.
 
+
+## Addendum: operational-record refresh
+
+The GET safe-method contract is kept. The operational-record source refresh moved from `GET /api/v1/operational-records` to `POST /api/v1/operational-records/refresh`, so it is covered by the intent header and Origin checks like any other unsafe operation. The GET route now returns persisted records only. Older clients that refreshed through GET stop refreshing (breaking change).
 ## References
 
 - [OWASP CSRF Prevention](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html): custom headers, explicit origins, Fetch Metadata and signed double-submit tradeoffs.

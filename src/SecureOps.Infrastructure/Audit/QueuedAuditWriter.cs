@@ -5,10 +5,11 @@ using SecureOps.Shared.Configuration;
 namespace SecureOps.Infrastructure.Audit;
 
 /// <summary>
-/// Audit writer that only enqueues events on the request path.
+/// Audit writer that awaits durable acknowledgement of queued events.
 /// </summary>
 public sealed class QueuedAuditWriter : IAuditWriter
 {
+    private const int _ackTimeoutSeconds = 30;
     private readonly AuditQueue _queue;
     private readonly AuditOptions _options;
     private readonly IAuditStoreHealthState _healthState;
@@ -34,7 +35,7 @@ public sealed class QueuedAuditWriter : IAuditWriter
     }
 
     /// <inheritdoc />
-    public Task WriteAsync(AuditEvent auditEvent, CancellationToken cancellationToken)
+    public async Task WriteAsync(AuditEvent auditEvent, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -43,9 +44,19 @@ public sealed class QueuedAuditWriter : IAuditWriter
             throw new AuditWriteUnavailableException("Audit store is unhealthy.");
         }
 
-        if (_queue.TryEnqueue(auditEvent))
+        AuditQueueItem item = new(auditEvent);
+        if (_queue.TryEnqueue(item))
         {
-            return Task.CompletedTask;
+            try
+            {
+                await item.Completion.WaitAsync(TimeSpan.FromSeconds(_ackTimeoutSeconds), cancellationToken);
+            }
+            catch (Exception ex) when (ex is TimeoutException or OperationCanceledException)
+            {
+                throw new AuditWriteUnavailableException("Audit durable acknowledgement was not received in time.");
+            }
+
+            return;
         }
 
         if (IsFailClosed())
@@ -57,7 +68,6 @@ public sealed class QueuedAuditWriter : IAuditWriter
             "Audit queue is full; dropping audit event {AuditAction}. CorrelationId: {CorrelationId}",
             auditEvent.Action,
             auditEvent.CorrelationId);
-        return Task.CompletedTask;
     }
 
     private bool IsFailClosed()
@@ -111,8 +121,9 @@ public sealed class AuditWriteUnavailableException : Exception
     /// Initializes a new audit write unavailable exception.
     /// </summary>
     /// <param name="message">Failure message.</param>
-    public AuditWriteUnavailableException(string message)
-        : base(message)
+    /// <param name="innerException">Underlying persistence failure, when available.</param>
+    public AuditWriteUnavailableException(string message, Exception? innerException = null)
+        : base(message, innerException)
     {
     }
 }

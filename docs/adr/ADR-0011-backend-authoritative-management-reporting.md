@@ -44,6 +44,11 @@ SecureOps will expose a backend-authoritative management reporting read model wi
 - Reporting access through ordinary operational capabilities: rejected because cross-user reporting is a separate privileged purpose.
 - Individual performance rankings or time-saved claims: rejected by the anti-surveillance policy and lack of a measured manual baseline.
 
+## Amendment 2026-10-17: operator endpoint ordering
+
+- The per-operator endpoint orders rows by persisted corporate principal (stable, paged server-side), never by operation count or any other activity measure. Row position must carry no information about activity.
+- Ordering by operation count was rejected under the anti-surveillance policy above. The team-level summary remains the default view; capacity questions are answered from it.
+
 ## References
 
 - `docs/05-security-model.md`

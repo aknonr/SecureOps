@@ -196,7 +196,7 @@ Bir karar `Reddedildi` olarak kaydedilirse, kararın gerekçesi yazılı biçimd
 
 ## 7. Toplantı öncesi bağlam özeti
 
-SecureOps, SolarWinds → monthly.thy.com / HPE OpsBridge → Turuncuhat zincirinden gelen Windows alarm bağlamını alıp read-only tanılama işlerine dönüştüren bir operasyon platformudur. Hedef sunuculara erişimde JEA zorunludur; ancak Worker'ın BeyondTrust broker mı kullanacağı, direct WinRM + JEA mı kullanacağı, yoksa mevcut direct-JEA modelinin açık kabul ile mi süreceği henüz kararlaştırılmamıştır. PAM ekibi açısından ilk kritik ihtiyaç, SecureOps servis hesabının, gerekli secret yaşam döngüsünün ve bu erişim modelinin netleştirilmesidir.
+SecureOps, SolarWinds → kurumsal izleme portalı (HPE OpsBridge) → Turuncuhat zincirinden gelen Windows alarm bağlamını alıp read-only tanılama işlerine dönüştüren bir operasyon platformudur. Hedef sunuculara erişimde JEA zorunludur; ancak Worker'ın BeyondTrust broker mı kullanacağı, direct WinRM + JEA mı kullanacağı, yoksa mevcut direct-JEA modelinin açık kabul ile mi süreceği henüz kararlaştırılmamıştır. PAM ekibi açısından ilk kritik ihtiyaç, SecureOps servis hesabının, gerekli secret yaşam döngüsünün ve bu erişim modelinin netleştirilmesidir.
 
 Bu görüşmenin ana konusu güvenlik prensiplerinin soyut değerlendirmesi değil, uygulanabilir operasyonel hazırlıktır. Phase 1 için `CONTOSO\svc-secureops` hesabının ne zaman açılacağı, parolanın hangi sıklıkla döneceği ve uygulamanın secret'ları hangi yöntemle alacağı netleşmelidir. Ayrıca webhook HMAC secret ve ileride Phase 3 SMTP credential gibi secret'ların PAM kapsamına alınıp alınmayacağı karara bağlanmalıdır.
 

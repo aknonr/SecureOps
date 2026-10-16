@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.RegularExpressions;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -20,7 +21,7 @@ namespace SecureOps.Tests.Integration.Ui;
 /// listed on the Active Sessions page, still counted against the operator — until it idles out.
 /// Calling API logout first is what makes "Oturumu kapat" mean what an operator expects.
 /// </remarks>
-public sealed class UiSignOutTests
+public sealed partial class UiSignOutTests
 {
     [Fact]
     public async Task SignOut_EndsTheApiApplicationSession()
@@ -28,7 +29,7 @@ public sealed class UiSignOutTests
         RecordingAccessApiClient accessApi = new();
         using SignOutUiFactory factory = new(accessApi);
 
-        HttpResponseMessage response = await CreateClient(factory).GetAsync("/auth/sign-out");
+        HttpResponseMessage response = await SignOutAsync(CreateClient(factory));
 
         accessApi.LogoutCalls.Should().Be(1);
         response.StatusCode.Should().Be(HttpStatusCode.Redirect);
@@ -57,7 +58,7 @@ public sealed class UiSignOutTests
 
         using SignOutUiFactory factory = new(accessApi);
 
-        HttpResponseMessage response = await CreateClient(factory).GetAsync("/auth/sign-out");
+        HttpResponseMessage response = await SignOutAsync(CreateClient(factory));
 
         accessApi.LogoutCalls.Should().Be(1);
         response.StatusCode.Should().Be(HttpStatusCode.Redirect);
@@ -70,7 +71,7 @@ public sealed class UiSignOutTests
         RecordingAccessApiClient accessApi = new();
         using SignOutUiFactory factory = new(accessApi);
 
-        HttpResponseMessage response = await CreateClient(factory).GetAsync("/auth/sign-out");
+        HttpResponseMessage response = await SignOutAsync(CreateClient(factory));
         string headers = response.Headers.ToString();
 
         // The application-session handle is a credential. It is carried server-side and must never
@@ -78,6 +79,58 @@ public sealed class UiSignOutTests
         headers.Should().NotContain("__Host-SecureOps.ApplicationSession");
         response.Headers.Location!.OriginalString.Should().NotContain("session");
     }
+
+    [Fact]
+    public async Task SignOut_GetDoesNotEndTheSessionAndForwardsToConfirmation()
+    {
+        RecordingAccessApiClient accessApi = new();
+        using SignOutUiFactory factory = new(accessApi);
+
+        HttpResponseMessage response = await CreateClient(factory).GetAsync("/auth/sign-out");
+
+        accessApi.LogoutCalls.Should().Be(0);
+        response.StatusCode.Should().Be(HttpStatusCode.Redirect);
+        response.Headers.Location!.OriginalString.Should().EndWith("sign-out");
+    }
+
+    [Fact]
+    public async Task SignOut_PostWithoutAntiforgeryTokenIsRejectedWithoutSideEffects()
+    {
+        RecordingAccessApiClient accessApi = new();
+        using SignOutUiFactory factory = new(accessApi);
+
+        HttpResponseMessage response = await CreateClient(factory)
+            .PostAsync("/auth/sign-out", new FormUrlEncodedContent(new Dictionary<string, string>()));
+
+        accessApi.LogoutCalls.Should().Be(0);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task SignOutConfirmation_RendersAntiforgeryFormWithoutEndingTheSession()
+    {
+        RecordingAccessApiClient accessApi = new();
+        using SignOutUiFactory factory = new(accessApi);
+
+        string html = await CreateClient(factory).GetStringAsync("/sign-out");
+
+        accessApi.LogoutCalls.Should().Be(0);
+        html.Should().Contain("action=\"/auth/sign-out\"");
+        AntiforgeryTokenRegex().IsMatch(html).Should().BeTrue();
+    }
+
+    private static async Task<HttpResponseMessage> SignOutAsync(HttpClient client)
+    {
+        string html = await client.GetStringAsync("/sign-out");
+        string token = WebUtility.HtmlDecode(AntiforgeryTokenRegex().Match(html).Groups[1].Value);
+        return await client.PostAsync("/auth/sign-out", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token
+        }));
+    }
+
+    [GeneratedRegex("name=\"__RequestVerificationToken\"[^>]*value=\"([^\"]+)\"", RegexOptions.CultureInvariant)]
+    private static partial Regex AntiforgeryTokenRegex();
 
     private static HttpClient CreateClient(SignOutUiFactory factory) =>
         factory.CreateClient(new WebApplicationFactoryClientOptions

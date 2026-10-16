@@ -148,7 +148,7 @@ Current local synthetic walkthrough: `https://localhost:64622/in-use`, `/announc
 19064, console Worker 3928, loopback sink 23556. Restart/stop:
 `C:\SecureOpsBuild\validation\operations-completion-20260915\Start-VerifiedLocal.ps1`
 and `Stop-TaskHosts.ps1` (PID/time ownership checks). Earlier temporary task hosts
-were stopped; other accepted hosts/worktrees are untouched. Sample `OR-930091721`
+were stopped; other accepted hosts/worktrees are untouched. Sample `OR-000000`
 has distinct assignee/saver; OCO history includes Accepted and Unknown commands.
 The local sink never forwards mail; this launcher is not a corporate TEST recipe.
 
@@ -187,7 +187,7 @@ Rejection/disable reasons remain. The actual nine-role/action matrix is in
 ### Sunucuda Kalan Worker Adimlari
 
 1. Operator API/UI gecisini ve 001-018 uygulamasini bildirdi; bunlari yeniden
-   calistirmayin. API yolu `D:\Applications\api\wasasyonetimapi.thy.com`, Worker
+   calistirmayin. API yolu `D:\Applications\api\api.example.test`, Worker
    yolu `D:\secureops_worker`. Kurulu API/UI hashleri ve Worker heartbeat bu yerel
    calismada sunucudan bagimsiz dogrulanmadi. Onceki Worker DLL dogrulamasi rc6.19
    icindi; sonraki paketle ayni kabul edilmez.
@@ -593,7 +593,7 @@ kapıda durun. Eski rc6.19 (`2fe9d724`) bu yeni özellikleri içermez.
 
 Operatör API/UI ve 001–018 geçişini bildirdi; 001–018'i tekrar çalıştırmayın.
 Hangfire kurulum çıktısı schema 9'a ulaştı; mevcut doğru schema'da installer
-tekrarlanmaz. Bilinen API yolu `D:\Applications\api\wasasyonetimapi.thy.com`,
+tekrarlanmaz. Bilinen API yolu `D:\Applications\api\api.example.test`,
 Worker yolu `D:\secureops_worker`. Worker Windows Service değildir; mevcut
 foreground konsol yöntemi kullanılır. Bilinen yollar/özgün script/görseller
 yeniden istenmez. UI fiziksel yolu, gerçek kurulu hash'ler, runtime grant'leri,
@@ -603,7 +603,7 @@ Hosting sahibi onaylı hedefte yalnız gerekli alanları kaydeder; tüm config,
 environment, token, parola veya anahtar içeriği paylaşılmaz:
 
 ```powershell
-$Api = 'D:\Applications\api\wasasyonetimapi.thy.com'
+$Api = 'D:\Applications\api\api.example.test'
 $Worker = 'D:\secureops_worker'
 $Ui = '<mevcut onayli UI fiziksel yolu>'
 foreach ($dll in @("$Api\SecureOps.Api.dll","$Ui\SecureOps.Ui.dll","$Worker\SecureOps.Worker.dll")) {

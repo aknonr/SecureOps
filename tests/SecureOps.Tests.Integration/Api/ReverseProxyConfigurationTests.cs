@@ -21,13 +21,13 @@ public sealed class ReverseProxyConfigurationTests
     [Fact]
     public void Configure_UsesOnlyConfiguredExactProxyIp()
     {
-        IConfiguration configuration = Build("true", ["10.0.0.9"]);
+        IConfiguration configuration = Build("true", ["192.0.2.9"]);
         ForwardedHeadersOptions options = new();
 
         ReverseProxyConfiguration.Validate(configuration);
         ReverseProxyConfiguration.Configure(options, configuration);
 
-        options.KnownProxies.Should().ContainSingle().Which.ToString().Should().Be("10.0.0.9");
+        options.KnownProxies.Should().ContainSingle().Which.ToString().Should().Be("192.0.2.9");
         options.ForwardedHeaders.Should().Be(ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto);
     }
 

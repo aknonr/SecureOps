@@ -593,7 +593,7 @@ Two findings:
 2. **The fake returns nothing.** `FakeOperationalRecordClient.GetActiveAsync` returns
    `Array.Empty<OperationalRecordSourceItem>()` and `GetByIdAsync` returns `null`.
 
-Confirmed live: `GET /api/v1/operational-records` returns `[]` against the Demo host, and there is no
+Confirmed live: `GET /api/v1/operational-records` (stored records only; import is `POST .../refresh`) returns `[]` against the Demo host, and there is no
 route by which a record can be created — import is the only path in.
 
 **Consequence:** no end-to-end verification of preview, create, retry, claim, freshness, or

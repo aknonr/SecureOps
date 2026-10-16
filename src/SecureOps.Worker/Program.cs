@@ -42,6 +42,7 @@ try
         if (service)
         { builder.Logging.ClearProviders(); }
         builder.Services.Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(90));
+        WorkerHosting.UseDirectAuditWriter(builder.Configuration);
         builder.Services.AddSecureOpsInfrastructure(builder.Configuration, builder.Environment.EnvironmentName);
 
         // Preserve the legacy idle console mode; a service must not report Running with no job server.

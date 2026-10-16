@@ -44,7 +44,7 @@ public sealed partial class UiOidcAuthenticationTests
         query["response_type"].Should().Be("code");
         query["code_challenge"].Should().NotBeNullOrWhiteSpace();
         query["code_challenge_method"].Should().Be("S256");
-        query["redirect_uri"].Should().Be("https://wasasyonetim.thy.com/signin-oidc");
+        query["redirect_uri"].Should().Be("https://ui.example.test/signin-oidc");
         query["scope"].Split(' ').Should().Contain("openid");
         query["scope"].Split(' ').Should().Contain(["profile", "email"]);
         challenge.Headers.Location!.AbsolutePath.Should().Be("/idp/rest/authorize");
@@ -91,7 +91,7 @@ public sealed partial class UiOidcAuthenticationTests
         factory.Provider.TokenRequests.Should().Be(1);
         factory.Provider.LastTokenRequest!["grant_type"].Should().Be("authorization_code");
         factory.Provider.LastTokenContentType.Should().Be("application/json");
-        factory.Provider.LastTokenRequest["redirect_uri"].Should().Be("https://wasasyonetim.thy.com/signin-oidc");
+        factory.Provider.LastTokenRequest["redirect_uri"].Should().Be("https://ui.example.test/signin-oidc");
         factory.Provider.LastTokenRequest["client_id"].Should().Be("secureops-ui-test");
         factory.Provider.LastTokenRequest["code"].Should().Be("synthetic-code");
         factory.Provider.LastTokenRequest["code_verifier"].Should().NotBeNullOrWhiteSpace();
@@ -173,7 +173,7 @@ public sealed partial class UiOidcAuthenticationTests
         query["response_type"].Should().Be("code");
         query["client_id"].Should().Be("secureops-ui-test");
         query["scope"].Should().Be("openid profile email");
-        query["redirect_uri"].Should().Be("https://wasasyonetim.thy.com/signin-oidc");
+        query["redirect_uri"].Should().Be("https://ui.example.test/signin-oidc");
         query["nonce"].Should().MatchRegex("^[A-Za-z0-9_-]+$");
         Base64UrlEncoder.DecodeBytes(query["nonce"]).Should().HaveCount(32);
         query["nonce"].Should().NotBe(secondQuery["nonce"]);
@@ -251,13 +251,13 @@ public sealed partial class UiOidcAuthenticationTests
         factory.Provider.Nonce = query["nonce"];
         _ = await client.GetAsync($"/signin-oidc?code=synthetic-code&state={UrlEncoder.Default.Encode(query["state"])}");
 
-        HttpResponseMessage logout = await client.GetAsync("/auth/sign-out");
+        HttpResponseMessage logout = await SignOutAsync(client);
 
         accessApi.LogoutCalls.Should().Be(1);
         logout.StatusCode.Should().Be(HttpStatusCode.Redirect);
         logout.Headers.Location!.Host.Should().Be("identity.example.test");
         Query(logout.Headers.Location!)["post_logout_redirect_uri"].Should().Be(
-            "https://wasasyonetim.thy.com/signout-callback-oidc");
+            "https://ui.example.test/signout-callback-oidc");
         Query(logout.Headers.Location!)["id_token_hint"].Should().NotBeNullOrWhiteSpace();
     }
 
@@ -265,7 +265,7 @@ public sealed partial class UiOidcAuthenticationTests
         factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false,
-            BaseAddress = new Uri("https://wasasyonetim.thy.com")
+            BaseAddress = new Uri("https://ui.example.test")
         });
 
     private static async Task<HttpResponseMessage> ChallengeAsync(HttpClient client)
@@ -276,6 +276,16 @@ public sealed partial class UiOidcAuthenticationTests
         {
             ["__RequestVerificationToken"] = token,
             ["returnUrl"] = string.Empty
+        }));
+    }
+
+    private static async Task<HttpResponseMessage> SignOutAsync(HttpClient client)
+    {
+        string html = await client.GetStringAsync("/sign-out");
+        string token = WebUtility.HtmlDecode(AntiforgeryTokenRegex().Match(html).Groups[1].Value);
+        return await client.PostAsync("/auth/sign-out", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token
         }));
     }
 

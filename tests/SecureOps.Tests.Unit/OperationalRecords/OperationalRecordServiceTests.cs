@@ -13,7 +13,7 @@ namespace SecureOps.Tests.Unit.OperationalRecords;
 public sealed class OperationalRecordServiceTests
 {
     [Fact]
-    public async Task ListAsync_ImportsClassifiesAndAuditsWithoutPersonalProfileData()
+    public async Task RefreshAsync_ImportsClassifiesAndAuditsWithoutPersonalProfileData()
     {
         InMemoryOperationalRecordRepository repository = new();
         InMemoryAuditWriter audit = new();
@@ -25,7 +25,7 @@ public sealed class OperationalRecordServiceTests
             Options.Create(new OperationalRecordsOptions()),
             NullLogger<OperationalRecordService>.Instance);
 
-        OperationalRecordResult<IReadOnlyList<OperationalRecord>> result = await service.ListAsync(
+        OperationalRecordResult<IReadOnlyList<OperationalRecord>> result = await service.RefreshAsync(
             new OperationalRecordCommandContext("test:operator", "correlation-list", null),
             CancellationToken.None);
 
@@ -36,7 +36,25 @@ public sealed class OperationalRecordServiceTests
     }
 
     [Fact]
-    public async Task ListAsync_DescriptionBoundaryAndSourceOffset_RoundTripWithoutTruncation()
+    public async Task ListAsync_ReturnsStoredRecordsWithoutCallingSourceOrWriting()
+    {
+        InMemoryOperationalRecordRepository repository = new();
+        InMemoryAuditWriter audit = new();
+        OperationalRecordService refresher = new(new SourceClient([TestRecord.SourceItem()]), new ManualReviewOperationalRecordClassifier(),
+            repository, audit, Options.Create(new OperationalRecordsOptions()), NullLogger<OperationalRecordService>.Instance);
+        await refresher.RefreshAsync(new OperationalRecordCommandContext("test:operator", "correlation-seed", null), CancellationToken.None);
+        int auditBefore = audit.Events.Count;
+        OperationalRecordService reader = new(new FailingSourceClient(), new ManualReviewOperationalRecordClassifier(),
+            repository, audit, Options.Create(new OperationalRecordsOptions()), NullLogger<OperationalRecordService>.Instance);
+
+        IReadOnlyList<OperationalRecord> records = await reader.ListAsync(CancellationToken.None);
+
+        records.Should().ContainSingle();
+        audit.Events.Should().HaveCount(auditBefore);
+    }
+
+    [Fact]
+    public async Task RefreshAsync_DescriptionBoundaryAndSourceOffset_RoundTripWithoutTruncation()
     {
         DateTimeOffset sourceCreatedAt = new(2026, 9, 2, 12, 30, 0, TimeSpan.FromHours(3));
         OperationalRecordSourceItem source = TestRecord.SourceItem() with
@@ -46,7 +64,7 @@ public sealed class OperationalRecordServiceTests
         };
         OperationalRecordService service = Service(source);
 
-        OperationalRecordResult<IReadOnlyList<OperationalRecord>> result = await service.ListAsync(
+        OperationalRecordResult<IReadOnlyList<OperationalRecord>> result = await service.RefreshAsync(
             new OperationalRecordCommandContext("test:operator", "correlation-boundary", null),
             CancellationToken.None);
 
@@ -57,12 +75,12 @@ public sealed class OperationalRecordServiceTests
     }
 
     [Fact]
-    public async Task ListAsync_DescriptionAboveApplicationBoundary_FailsBeforePersistence()
+    public async Task RefreshAsync_DescriptionAboveApplicationBoundary_FailsBeforePersistence()
     {
         OperationalRecordSourceItem source = TestRecord.SourceItem() with { Description = new string('x', 8001) };
         OperationalRecordService service = Service(source);
 
-        OperationalRecordResult<IReadOnlyList<OperationalRecord>> result = await service.ListAsync(
+        OperationalRecordResult<IReadOnlyList<OperationalRecord>> result = await service.RefreshAsync(
             new OperationalRecordCommandContext("test:operator", "correlation-too-long", null),
             CancellationToken.None);
 
@@ -72,14 +90,14 @@ public sealed class OperationalRecordServiceTests
     }
 
     [Fact]
-    public async Task ListAsync_TuruncuHatProviderDoesNotReturnPreviouslyPersistedSyntheticRows()
+    public async Task RefreshAsync_TuruncuHatProviderDoesNotReturnPreviouslyPersistedSyntheticRows()
     {
         InMemoryOperationalRecordRepository repository = new();
         _ = await repository.UpsertImportedAsync(
             TestRecord.SourceItem("synthetic-old-record", "SYN-OR-OLD"),
             "correlation-old",
             CancellationToken.None);
-        OperationalRecordSourceItem corporateRecord = TestRecord.SourceItem("1683742", "OR-00668218") with
+        OperationalRecordSourceItem corporateRecord = TestRecord.SourceItem("1000001", "OR-00000001") with
         {
             Title = "Safe corporate title",
             Description = "Safe corporate description"
@@ -92,13 +110,13 @@ public sealed class OperationalRecordServiceTests
             Options.Create(new OperationalRecordsOptions { SourceProvider = "TuruncuHat" }),
             NullLogger<OperationalRecordService>.Instance);
 
-        OperationalRecordResult<IReadOnlyList<OperationalRecord>> result = await service.ListAsync(
+        OperationalRecordResult<IReadOnlyList<OperationalRecord>> result = await service.RefreshAsync(
             new OperationalRecordCommandContext("test:operator", "correlation-corporate", null),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
         OperationalRecord record = result.Value!.Should().ContainSingle().Which;
-        record.SourceRecordId.Should().Be("1683742");
+        record.SourceRecordId.Should().Be("1000001");
         record.WorkflowState.Should().Be(OperationalRecordWorkflowState.NeedsManualReview);
         record.JiraEligible.Should().BeFalse();
     }
@@ -106,7 +124,7 @@ public sealed class OperationalRecordServiceTests
     [Theory]
     [InlineData("synthetic-live-record", "OR-100")]
     [InlineData("1001", "SYN-OR-100")]
-    public async Task ListAsync_TuruncuHatProviderRejectsSyntheticSourceRowsBeforePersistence(string sourceRecordId, string orCode)
+    public async Task RefreshAsync_TuruncuHatProviderRejectsSyntheticSourceRowsBeforePersistence(string sourceRecordId, string orCode)
     {
         InMemoryOperationalRecordRepository repository = new();
         OperationalRecordService service = new(
@@ -117,7 +135,7 @@ public sealed class OperationalRecordServiceTests
             Options.Create(new OperationalRecordsOptions { SourceProvider = "TuruncuHat" }),
             NullLogger<OperationalRecordService>.Instance);
 
-        OperationalRecordResult<IReadOnlyList<OperationalRecord>> result = await service.ListAsync(
+        OperationalRecordResult<IReadOnlyList<OperationalRecord>> result = await service.RefreshAsync(
             new OperationalRecordCommandContext("test:operator", "correlation-synthetic", null),
             CancellationToken.None);
 
@@ -127,7 +145,7 @@ public sealed class OperationalRecordServiceTests
     }
 
     [Fact]
-    public async Task ListAsync_TuruncuHatFailureDoesNotReturnPersistedSyntheticRows()
+    public async Task RefreshAsync_TuruncuHatFailureDoesNotReturnPersistedSyntheticRows()
     {
         InMemoryOperationalRecordRepository repository = new();
         _ = await repository.UpsertImportedAsync(
@@ -142,7 +160,7 @@ public sealed class OperationalRecordServiceTests
             Options.Create(new OperationalRecordsOptions { SourceProvider = "TuruncuHat" }),
             NullLogger<OperationalRecordService>.Instance);
 
-        OperationalRecordResult<IReadOnlyList<OperationalRecord>> result = await service.ListAsync(
+        OperationalRecordResult<IReadOnlyList<OperationalRecord>> result = await service.RefreshAsync(
             new OperationalRecordCommandContext("test:operator", "correlation-source-failure", null),
             CancellationToken.None);
 

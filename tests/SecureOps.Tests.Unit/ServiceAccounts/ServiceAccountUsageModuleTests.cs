@@ -84,6 +84,56 @@ public sealed class ServiceAccountUsageModuleTests
     }
 
     [Fact]
+    public void IisIdentities_AreResolvedWithInheritedDefaults()
+    {
+        const string inherited = """
+            <configuration>
+              <system.applicationHost>
+                <applicationPools>
+                  <applicationPoolDefaults><processModel identityType="SpecificUser" userName="SYN\svc_synapp" /></applicationPoolDefaults>
+                  <add name="SynInherits" />
+                  <add name="SynInheritsUserOnly"><processModel idleTimeout="00:20:00" /></add>
+                  <add name="SynOverrides"><processModel identityType="ApplicationPoolIdentity" /></add>
+                  <add name="SynOwnUser"><processModel userName="SYN\other_app" /></add>
+                </applicationPools>
+                <sites>
+                  <virtualDirectoryDefaults userName="SYN\svc_synapp" />
+                  <site name="SynSite"><application path="/"><virtualDirectory path="/" physicalPath="D:\syn\site" /></application></site>
+                </sites>
+              </system.applicationHost>
+            </configuration>
+            """;
+        using PowerShell shell = Shell();
+        shell.AddCommand("Read-SoIisIdentity").AddParameter("Configuration", inherited);
+        PSObject[] items = [.. shell.Invoke()];
+
+        items.Select(i => $"{i.Properties["ComponentType"].Value}|{i.Properties["ComponentName"].Value}|{i.Properties["Identity"].Value}")
+            .Should().BeEquivalentTo(
+            [
+                "IisAppPool|SynInherits|SYN\\svc_synapp",
+                "IisAppPool|SynInheritsUserOnly|SYN\\svc_synapp",
+                "IisAppPool|SynOwnUser|SYN\\other_app",
+                "IisSite|SynSite|SYN\\svc_synapp"
+            ], "a pool or directory that sets nothing itself runs as the configured default");
+    }
+
+    [Fact]
+    public void Scan_TreatsAnUnreadableIisIdentityAsAFailedSource_NeverAsSuccess()
+    {
+        using PowerShell shell = Shell();
+        Stub(shell, """
+            function script:Get-SoServiceIdentity { }
+            function script:Get-SoTaskIdentity { }
+            function script:Get-SoIisConfiguration { [xml]'<configuration><system.applicationHost><applicationPools><add name="SynPool"><processModel identityType="FutureValue" /></add></applicationPools></system.applicationHost></configuration>' }
+            """);
+        shell.AddCommand("Get-SecureOpsAccountUsage").AddParameter("Account", new[] { "SYN\\svc_synapp" });
+        PSObject result = shell.Invoke().Single();
+
+        result.Properties["scanResult"].Value.Should().Be("Partial");
+        ((PSObject)result.Properties["sources"].Value).Properties["Iis"].Value.Should().Be("Failed");
+    }
+
+    [Fact]
     public void Scan_ReportsMatchesPerSource_AndAFailedSourceMakesItPartialWithoutLeakingTheMessage()
     {
         using PowerShell shell = Shell();

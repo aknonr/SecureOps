@@ -35,8 +35,28 @@ public sealed partial class ServiceAccountService
             return SaResult<AccountDetail>.Fail(SaErrors.NotFound);
         }
 
+        detail = await WithVisibleLinksAsync(caller, detail, cancellationToken);
         detail = WithVerificationReadiness(await WithCloseReadinessAsync(detail, cancellationToken));
         return await WithRulesAsync(detail with { Permissions = Permissions(caller, anchor.Anchor, detail.Requests) }, cancellationToken);
+    }
+
+    /// <summary>A shared mail lists only the linked accounts the caller may see.</summary>
+    private async Task<AccountDetail> WithVisibleLinksAsync(SaCaller caller, AccountDetail detail, CancellationToken cancellationToken)
+    {
+        if (caller.Scope.All || detail.Communications.Count == 0)
+        {
+            return detail;
+        }
+
+        Guid[] others = [.. detail.Communications.SelectMany(c => c.Accounts).Select(a => a.Id).Where(id => id != detail.Summary.Id).Distinct()];
+        IReadOnlyDictionary<Guid, AccountScopeAnchor> anchors = await repository!.ScopeAnchorsAsync(others, cancellationToken);
+        return detail with
+        {
+            Communications = [.. detail.Communications.Select(c => c with
+            {
+                Accounts = [.. c.Accounts.Where(a => a.Id == detail.Summary.Id || anchors.TryGetValue(a.Id, out AccountScopeAnchor? anchor) && caller.Scope.Covers(anchor))]
+            })]
+        };
     }
 
     /// <summary>
@@ -286,7 +306,8 @@ public sealed partial class ServiceAccountService
             string? rule = ServiceAccountRules.ValidateClose(facts.Status, facts.Type, outcome, request.Reason, facts.Actions, facts.OwnershipConfirmed);
             return rule is not null
                 ? SaResult<Guid>.Fail(SaErrors.Invalid, rule)
-                : await repository.CloseRequestAsync(accountId, requestId, request.ExpectedVersion, outcome, request.Reason?.Trim(), caller.Actor, cancellationToken);
+                : await repository.CloseRequestAsync(accountId, requestId, request.ExpectedVersion, outcome, request.Reason?.Trim(), caller.Actor, cancellationToken,
+                    (status, type, actions, owned) => ServiceAccountRules.ValidateClose(status, type, outcome, request.Reason, actions, owned));
         }, cancellationToken);
 
     /// <summary>
