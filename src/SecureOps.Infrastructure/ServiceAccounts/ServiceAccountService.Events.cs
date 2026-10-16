@@ -30,7 +30,7 @@ public sealed partial class ServiceAccountService
                 return SaResult<EventPreview>.Fail(detail.ErrorCode!, detail.Field);
             }
 
-            SaResult<AccountEventPlan> plan = await PlanEventAsync(detail.Value!, draft, cancellationToken);
+            SaResult<AccountEventPlan> plan = await PlanEventAsync(detail.Value!, draft, caller.Scope, cancellationToken);
             return plan.IsSuccess ? plan.Value!.Preview : SaResult<EventPreview>.Fail(plan.ErrorCode!, plan.Field, plan.Current);
         }, cancellationToken);
 
@@ -68,7 +68,7 @@ public sealed partial class ServiceAccountService
                     : SaResult<EventCommitResult>.Fail(SaErrors.IdempotencyKeyReused, "idempotencyKey");
             }
 
-            SaResult<AccountEventPlan> planned = await PlanEventAsync(detail.Value!, draft, cancellationToken);
+            SaResult<AccountEventPlan> planned = await PlanEventAsync(detail.Value!, draft, caller.Scope, cancellationToken);
             if (!planned.IsSuccess)
             {
                 return SaResult<EventCommitResult>.Fail(planned.ErrorCode!, planned.Field, planned.Current);
@@ -92,6 +92,7 @@ public sealed partial class ServiceAccountService
                 AccountEventStatus.Committed or AccountEventStatus.Replayed => await EventResultAsync(caller, accountId, outcome.EventId!.Value, outcome.Created,
                     outcome.Status == AccountEventStatus.Replayed, cancellationToken),
                 AccountEventStatus.KeyReused => SaResult<EventCommitResult>.Fail(SaErrors.IdempotencyKeyReused, "idempotencyKey"),
+                AccountEventStatus.CommunicationRefused => SaResult<EventCommitResult>.Fail(SaErrors.Invalid, "communication.providerMessageId"),
                 AccountEventStatus.CloseRefused => SaResult<EventCommitResult>.Fail(SaErrors.CloseNotAllowed, "closeRequest",
                     CloseReadinessView(outcome.RequestStatus ?? ServiceAccountRequestStatus.Open, ServiceAccountCloseOutcome.Completed, outcome.Gaps)),
                 _ => SaResult<EventCommitResult>.Fail(SaErrors.EventStale, "accountVersion")
@@ -121,7 +122,7 @@ public sealed partial class ServiceAccountService
     /// Validates the draft against the event table (§3) and the caller's permissions (§5.5), derives every record kind on the
     /// server and builds the preview and the write. Reads only.
     /// </summary>
-    private async Task<SaResult<AccountEventPlan>> PlanEventAsync(AccountDetail detail, EventDraft draft, CancellationToken cancellationToken)
+    private async Task<SaResult<AccountEventPlan>> PlanEventAsync(AccountDetail detail, EventDraft draft, ServiceAccountScope scope, CancellationToken cancellationToken)
     {
         static SaResult<AccountEventPlan> Invalid(string field) => SaResult<AccountEventPlan>.Fail(SaErrors.Invalid, field);
 
@@ -321,6 +322,11 @@ public sealed partial class ServiceAccountService
         {
             existingMail = ServiceAccountText.Clean(communication.Request.ProviderMessageId) is { } provider
                 ? await repository.CommunicationByProviderIdAsync(provider, cancellationToken) : null;
+            if (existingMail is { } recorded && !await repository.CommunicationVisibleAsync(recorded, scope, cancellationToken))
+            {
+                return Invalid("communication.providerMessageId");
+            }
+
             if (existingMail is not null)
             {
                 warnings.Add(new EventWarning("MailDuplicate", "communication.providerMessageId"));

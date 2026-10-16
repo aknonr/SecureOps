@@ -18,7 +18,39 @@ public sealed partial class ServiceAccountService
         [ServiceAccountImportProfiles.CoordinationList, ServiceAccountImportProfiles.LegacyPackage, ServiceAccountImportProfiles.LegacyWorkbook];
 
     /// <summary>Stored stage parameters (re-parse input); the file bytes stay server-side.</summary>
-    private sealed record StoredMapping(StageImportRequest Request, IReadOnlyList<ImportColumnMapping> Applied, IReadOnlyList<string> Warnings);
+    private sealed record StoredMapping(StageImportRequest Request, IReadOnlyList<ImportColumnMapping> Applied, IReadOnlyList<string> Warnings,
+        ImportBoundary? Boundary = null);
+
+    /// <summary>The organization-level scope of the stager when the batch was created; later reads and writes must cover it. Batches staged before it existed belong to their uploader.</summary>
+    private sealed record ImportBoundary(bool All, IReadOnlyList<Guid> Organizations);
+
+    /// <summary>Whether the caller's current scope covers the batch (the whole module, the whole stored boundary, or - for older batches - being the uploader).</summary>
+    private static bool BatchReachable(SaCaller caller, ImportBatchRecord batch)
+    {
+        if (!caller.Scope.HasOrganizationLevel)
+        {
+            return false;
+        }
+
+        if (caller.Scope.All)
+        {
+            return true;
+        }
+
+        ImportBoundary? boundary;
+        try
+        {
+            boundary = JsonSerializer.Deserialize<StoredMapping>(batch.MappingJson)?.Boundary;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+
+        return boundary is null
+            ? batch.UploadedBy == caller.User.Id
+            : !boundary.All && boundary.Organizations.Count > 0 && boundary.Organizations.All(caller.Scope.Organizations.Contains);
+    }
 
     /// <summary>Stages a file: validates, hashes, parses, plans and stores the preview. A committed replay returns the existing result.</summary>
     public Task<SaResult<ImportBatchView>> StageImportAsync(ClaimsPrincipal principal, AccessOperationContext context, StageImportRequest request,
@@ -68,7 +100,8 @@ public sealed partial class ServiceAccountService
             DateTimeOffset now = clock.GetUtcNow();
             ImportBatchRecord batch = new(Guid.NewGuid(), request.Profile, SafeName(fileName), ContentTypeOf(bytes), sha, bytes, request.SourceReportDate,
                 normalized.SourceDateProvenance, Clean(request.DeclaredScope, 200), Clean(request.DeclaredDomain, 128),
-                JsonSerializer.Serialize(new StoredMapping(normalized, staged.Mapping, [.. staged.Warnings, .. plan.Warnings])), 1, 1, 1,
+                JsonSerializer.Serialize(new StoredMapping(normalized, staged.Mapping, [.. staged.Warnings, .. plan.Warnings],
+                    new ImportBoundary(caller.Scope.All, [.. caller.Scope.Organizations.Order()]))), 1, 1, 1,
                 staged.Rows.Count == 0 ? "Staged" : "Previewed", replayKey, JsonSerializer.Serialize(Summary(plan, staged)), null, null,
                 caller.User.Id, now, null);
             await repository.StageAsync(batch, Records(plan, new Dictionary<int, ImportRowDecision>(), caller, now), caller.Actor, cancellationToken);
@@ -78,7 +111,7 @@ public sealed partial class ServiceAccountService
     /// <summary>Reads a batch with its summary.</summary>
     public Task<SaResult<ImportBatchView>> ImportAsync(ClaimsPrincipal principal, AccessOperationContext context, Guid id, CancellationToken cancellationToken) =>
         RunAsync(principal, context, ServiceAccountCapabilities.Import, async caller =>
-            caller.Scope.HasOrganizationLevel && await repository!.GetBatchAsync(id, false, cancellationToken) is { } batch
+            await repository!.GetBatchAsync(id, false, cancellationToken) is { } batch && BatchReachable(caller, batch)
                 ? View(batch, replay: false) : SaResult<ImportBatchView>.Fail(SaErrors.NotFound), cancellationToken);
 
     /// <summary>Lists recent import batches.</summary>
@@ -90,8 +123,8 @@ public sealed partial class ServiceAccountService
                 return SaResult<IReadOnlyList<ImportHistoryItem>>.Fail(SaErrors.Forbidden, "scope");
             }
 
-            IReadOnlyList<ImportBatchRecord> batches = await repository!.ListBatchesAsync(100, cancellationToken);
-            return new SaResult<IReadOnlyList<ImportHistoryItem>>([.. batches.Select(b => new ImportHistoryItem(b.Id, b.Profile, b.FileName, b.SourceReportDate,
+            IReadOnlyList<ImportBatchRecord> batches = await repository!.ListBatchesAsync(500, cancellationToken);
+            return new SaResult<IReadOnlyList<ImportHistoryItem>>([.. batches.Where(b => BatchReachable(caller, b)).Take(100).Select(b => new ImportHistoryItem(b.Id, b.Profile, b.FileName, b.SourceReportDate,
                 b.Status, b.UploadedAt, b.CommittedAt, b.SummaryJson is null ? 0 : JsonSerializer.Deserialize<ImportSummary>(b.SummaryJson)!.TotalRows))]);
         }, cancellationToken);
 
@@ -105,7 +138,12 @@ public sealed partial class ServiceAccountService
                 return SaResult<ImportRowPage>.Fail(caller.Scope.HasOrganizationLevel ? SaErrors.Invalid : SaErrors.Forbidden, "page");
             }
 
-            (IReadOnlyList<ImportRowRecord> rows, int total) = await repository!.GetRowsAsync(id, classification, kind, decisionsOnly, page, pageSize, cancellationToken);
+            if (await repository!.GetBatchAsync(id, false, cancellationToken) is not { } reachable || !BatchReachable(caller, reachable))
+            {
+                return SaResult<ImportRowPage>.Fail(SaErrors.NotFound);
+            }
+
+            (IReadOnlyList<ImportRowRecord> rows, int total) = await repository.GetRowsAsync(id, classification, kind, decisionsOnly, page, pageSize, cancellationToken);
             return new ImportRowPage([.. rows.Select(RowView)], total, page, pageSize);
         }, cancellationToken);
 
@@ -119,7 +157,7 @@ public sealed partial class ServiceAccountService
                 return SaResult<ImportBatchView>.Fail(SaErrors.Forbidden, "scope");
             }
 
-            if (await repository!.GetBatchAsync(id, true, cancellationToken) is not { Status: "Previewed" } batch)
+            if (await repository!.GetBatchAsync(id, true, cancellationToken) is not { Status: "Previewed" } batch || !BatchReachable(caller, batch))
             {
                 return SaResult<ImportBatchView>.Fail(SaErrors.NotFound);
             }
@@ -176,7 +214,8 @@ public sealed partial class ServiceAccountService
     public Task<SaResult<ImportBatchView>> RefreshImportAsync(ClaimsPrincipal principal, AccessOperationContext context, Guid id, CancellationToken cancellationToken) =>
         RunAsync(principal, context, ServiceAccountCapabilities.Import, async caller =>
         {
-            if (!caller.Scope.HasOrganizationLevel || await repository!.GetBatchAsync(id, true, cancellationToken) is not { Status: "Previewed" } batch)
+            if (!caller.Scope.HasOrganizationLevel || await repository!.GetBatchAsync(id, true, cancellationToken) is not { Status: "Previewed" } batch
+                || !BatchReachable(caller, batch))
             {
                 return SaResult<ImportBatchView>.Fail(SaErrors.NotFound);
             }
@@ -206,7 +245,12 @@ public sealed partial class ServiceAccountService
                 return SaResult<ImportBatchView>.Fail(SaErrors.Forbidden, "scope");
             }
 
-            Dictionary<int, ImportRowDecision> decisions = await repository!.GetDecisionsAsync(id, cancellationToken);
+            if (await repository!.GetBatchAsync(id, false, cancellationToken) is not { } target || !BatchReachable(caller, target))
+            {
+                return SaResult<ImportBatchView>.Fail(SaErrors.NotFound);
+            }
+
+            Dictionary<int, ImportRowDecision> decisions = await repository.GetDecisionsAsync(id, cancellationToken);
             if (decisions.Values.Any(d => d.Decision == ImportDecisions.Confirm) && !caller.Can(ServiceAccountCapabilities.Assign))
             {
                 return SaResult<ImportBatchView>.Fail(SaErrors.Forbidden, "confirmOwnership");

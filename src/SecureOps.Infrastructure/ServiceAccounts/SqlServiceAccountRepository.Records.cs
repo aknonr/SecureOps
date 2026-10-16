@@ -25,6 +25,13 @@ public sealed partial class SqlServiceAccountRepository
         await using SqlTransaction transaction = await BeginWriteAsync(connection, cancellationToken, IsolationLevel.Serializable);
         Guid? existing = provider is null ? null : await connection.QuerySingleOrDefaultAsync<Guid?>(Cmd(
             "SELECT Id FROM svcacct.Communications WITH (UPDLOCK, HOLDLOCK) WHERE ProviderMessageId = @provider;", new { provider }, transaction, cancellationToken));
+        if (existing is { } known && !await CommunicationVisibleAsync(connection, transaction,
+            await LockedScopeAsync(connection, transaction, actor.UserId, cancellationToken), known, cancellationToken))
+        {
+            // A message already recorded outside the caller's scope is neither returned nor linked.
+            return SaResult<(Guid, bool, int)>.Fail(SaErrors.Invalid, "providerMessageId");
+        }
+
         Guid id = existing ?? Guid.NewGuid();
         if (existing is null)
         {
@@ -44,6 +51,51 @@ public sealed partial class SqlServiceAccountRepository
             new { EntityId = id, Accounts = request.AccountIds.Count, Added = added }, actor, now, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return (id, existing is not null, added);
+    }
+
+    /// <summary>
+    /// Whether the stored communication is inside <paramref name="scope"/> by its own anchors: a linked in-scope account, or, for a
+    /// team-level mail without links, its contact team. Links being submitted by the caller never establish visibility.
+    /// </summary>
+    private static async Task<bool> CommunicationVisibleAsync(SqlConnection connection, SqlTransaction? transaction, ServiceAccountScope scope, Guid communicationId,
+        CancellationToken cancellationToken)
+    {
+        if (scope.All)
+        {
+            return true;
+        }
+
+        using SqlMapper.GridReader grid = await connection.QueryMultipleAsync(Cmd("""
+            SELECT ContactTeamId FROM svcacct.Communications WHERE Id = @communicationId;
+            SELECT AccountId FROM svcacct.CommunicationAccounts WHERE CommunicationId = @communicationId;
+            """, new { communicationId }, transaction, cancellationToken));
+        Guid? contactTeam = await grid.ReadSingleOrDefaultAsync<Guid?>();
+        Guid[] linked = [.. await grid.ReadAsync<Guid>()];
+        if (linked.Length == 0)
+        {
+            return contactTeam is null ? scope.HasOrganizationLevel : scope.CoversTeam(contactTeam);
+        }
+
+        return (await AnchorsAsync(connection, transaction, linked, cancellationToken)).Values.Any(a => scope.Covers(a.Anchor));
+    }
+
+    /// <summary>Scope anchors of several accounts (missing accounts are absent).</summary>
+    public async Task<IReadOnlyDictionary<Guid, AccountScopeAnchor>> ScopeAnchorsAsync(Guid[] accountIds, CancellationToken cancellationToken)
+    {
+        if (accountIds.Length == 0)
+        {
+            return new Dictionary<Guid, AccountScopeAnchor>();
+        }
+
+        await using SqlConnection connection = await OpenAsync(cancellationToken);
+        return (await AnchorsAsync(connection, null, accountIds, cancellationToken)).ToDictionary(a => a.Key, a => a.Value.Anchor);
+    }
+
+    /// <summary>Visibility of the communication recorded under a provider message id, for a preview outside any write transaction.</summary>
+    public async Task<bool> CommunicationVisibleAsync(Guid communicationId, ServiceAccountScope scope, CancellationToken cancellationToken)
+    {
+        await using SqlConnection connection = await OpenAsync(cancellationToken);
+        return await CommunicationVisibleAsync(connection, null, scope, communicationId, cancellationToken);
     }
 
     /// <summary>Inserts one communication row inside the caller's transaction (no account link, reference, history or audit).</summary>
