@@ -176,7 +176,7 @@ public sealed class JeaEndpointPackageTests
         text.Should().Contain("[string]$ServiceAccount = 'CONTOSO\\gmsa-placeholder$'")
             .And.Contain("if ($ServiceAccount -eq 'CONTOSO\\gmsa-placeholder$') { throw")
             .And.Contain("config $serviceName obj= $ServiceAccount |")
-            .And.Contain("-StartupType Manual")
+            .And.Contain("-StartupType Disabled").And.Contain("start= demand").And.Contain("sc.exe\" delete $serviceName")
             .And.Contain("[Diagnostics.EventLog]::CreateEventSource($eventSource, 'Application')")
             .And.Contain($"$eventSource = '{SecureOps.Worker.WorkerEventLog.SourceName}'");
         Commands(path).Should().BeSubsetOf(["Microsoft.PowerShell.Management\\Test-Path", "Microsoft.PowerShell.Management\\Get-Service",
