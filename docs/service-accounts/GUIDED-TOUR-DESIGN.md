@@ -29,9 +29,11 @@ Uzun metin 3–4 kısa maddeye iner; ayrıntı tura taşınır.
 - `aria-live`: yalnız atlama bildirimi (`role="status"`); adım metni odak ile okunur, ayrıca duyurulmaz.
 - Vurgu: hedefin çevresinde kalın çerçeve + sayfanın geri kalanı hafif karartılır (renk tek işaret değil: şekil ve karartma; kutu alanın adını yazar).
   `forced-colors` modunda sistem rengi. Çerçeve tıklamayı engellemez.
-- Hareket: geçiş animasyonu yalnız `prefers-reduced-motion: no-preference` altında; azaltılmış harekette kaydırma da anlık.
+- Hareket: yalnız açılışta kısa bir belirme, o da yalnız `prefers-reduced-motion: no-preference` altında; çerçeve alanı animasyonsuz izler
+  (kaydırırken geride kalmasın). Azaltılmış harekette animasyon yok, kaydırma anlık.
 - Dar ekran: 700 px ve altında (390 px telefon, 1280 px'te %200 yakınlaştırma) kutu ekranın altına sabitlenir, en çok yarım ekran yüksekliği,
-  içerik kendi içinde kayar; hedef üstte kalacak şekilde kaydırılır. Yatay kaydırma yok.
+  içerik kendi içinde kayar; hedef üstte kalacak şekilde kaydırılır ve sayfaya geçici alt boşluk eklenir (sondaki alan da kutunun üstüne
+  çıkabilsin; tur kapanınca geri alınır). Yatay kaydırma yok. 640×400 gibi çok alçak ekranda büyük bir alan kutunun altına kısmen girer.
 - JS modülü `wwwroot/js/so-guided-tour.js`: `present(adlar)`, `show(ad, kutu, çerçeve)`, `hide(düğmeId)`. Mantık yok; yalnız konum, kaydırma, odak.
 
 ## 4. Turlar (her adım: başlık · ne · neden; ayrıntı `ServiceAccountTours.cs`)
@@ -49,10 +51,10 @@ seçili sekmeyi değiştirmez.
 
 ## 5. Testler
 
-- `GuidedTourStateTests`: ileri/geri, atlanan hedef ve bildirimi, hiç hedef yok, yetkisiz adımın sayılmaması, son adımda "Bitir".
-- `SoGuidedTourRenderTests` (küçük test renderer, gerçek bileşen yaşam döngüsü, sahte `IJSRuntime`): başlatınca kutu ve odak çağrısı,
+- `GuidedTourTests` durum bölümü: ileri/geri, atlanan hedef ve bildirimi, hiç hedef yok, yetkisiz adımın sayılmaması, son adımda "Bitir".
+- `GuidedTourTests` bileşen bölümü (küçük test renderer, gerçek bileşen yaşam döngüsü, sahte `IJSRuntime`): başlatınca kutu ve odak çağrısı,
   ileri/geri, atlanan adımın metni, Esc ile kapanma ve odağın tetikleyen düğmeye dönmesi (`hide(düğmeId)`), yetkisiz adımın gizlenmesi.
-- Sayfa testleri: her turun her hedefi sayfa/bileşen kaynağında `data-tour` olarak var; rapor sayfasına tur eklenmedi; kısaltılmış rehberler 3–4 madde.
+- `ServiceAccountGuidedTourUiTests`: her turun her hedefi sayfa/bileşen kaynağında `data-tour` olarak var; rapor sayfasına tur eklenmedi; kısaltılmış rehberler 3–4 madde.
 - Tarayıcı: `tests/browser/service-accounts-guided-tour.cjs` (Demo profili): listede turu başlat, ilerle, Esc, odak dönüşü, 390 px'te yatay kaydırma yok.
   Cloud oturumunda koşulmadı (Demo API + UI gerekir); Windows'ta koşulacak.
 
