@@ -6,6 +6,11 @@ using SecureOps.Shared.Contracts.ServiceAccounts;
 
 namespace SecureOps.Tests.Integration.ServiceAccounts;
 
+/// <summary>
+/// Import staging is serialized by an application lock (no deadlock victim, no retry of writes). Runs alone: one test holds
+/// that lock, which would stall every other staging in parallel tests.
+/// </summary>
+[Collection(ServiceAccountWriteGateCollection.Name)]
 public sealed class ServiceAccountImportStageConcurrencySqlTests
 {
     private static readonly CancellationToken _token = CancellationToken.None;
