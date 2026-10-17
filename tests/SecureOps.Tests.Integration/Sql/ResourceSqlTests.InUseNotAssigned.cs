@@ -53,5 +53,20 @@ public sealed partial class ResourceSqlTests
         // Back to unknown: the record returns to review (fail closed).
         await Refresh(source);
         (await View("review")).Total.Should().Be(1);
+
+        // A re-check of a record discovery no longer returns: only the proven evidence is applied to the retained record.
+        async Task RefreshWithoutDiscovery(InUseEvidencePatch? patch) => (await repository.RefreshAsync((await repository.StateAsync(_token)).Version,
+            new InUseBatch([], false, "SourceCompletenessUnverified")
+            { Rechecked = patch is null ? null : new Dictionary<string, InUseEvidencePatch> { [prefix] = patch }, RecheckUnchecked = patch is null ? 1 : 0 },
+            null, audit, _token)).Should().BeTrue();
+        await RefreshWithoutDiscovery(null);
+        (await View("review")).Total.Should().Be(1, "an unchecked record stays listed");
+        (await repository.StateAsync(_token)).RecheckUnchecked.Should().Be(1);
+        await RefreshWithoutDiscovery(new InUseEvidencePatch(null, null, new("NotAssignedToWasas", "Synthetic rule")));
+        (await View("review")).Total.Should().Be(0);
+        InUseRecord rechecked = (await View("tracking")).Items.Single();
+        rechecked.ActivityStatus.Should().Be("NotAssigned");
+        rechecked.SourceObservationMissing.Should().BeTrue();
+        (await repository.StateAsync(_token)).RecheckUnchecked.Should().Be(0);
     }
 }
