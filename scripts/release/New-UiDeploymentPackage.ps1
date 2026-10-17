@@ -26,7 +26,7 @@ foreach ($required in $requiredFiles) {
     }
 }
 $runtime = Get-Content -LiteralPath (Join-Path $publishPath "SecureOps.$Component.runtimeconfig.json") -Raw | ConvertFrom-Json
-if ($runtime.runtimeOptions.tfm -ne 'net8.0') { throw 'Unexpected target framework.' }
+if ($runtime.runtimeOptions.tfm -ne 'net10.0') { throw 'Unexpected target framework.' }
 $dependencies = Get-Content -LiteralPath (Join-Path $publishPath "SecureOps.$Component.deps.json") -Raw | ConvertFrom-Json
 if (-not ($dependencies.libraries.PSObject.Properties.Name -like "SecureOps.$Component/*")) {
     throw 'Dependency manifest does not identify the packaged project.'
@@ -36,7 +36,7 @@ if ($Component -eq 'Worker') {
         if (!($dependencies.libraries.PSObject.Properties.Name -like "$name/*")) { throw "Missing Worker dependency: $name" }
     }
     foreach ($module in @('Microsoft.PowerShell.Management','Microsoft.PowerShell.Utility')) {
-        $moduleManifest = "runtimes/win/lib/net8.0/Modules/$module/$module.psd1"
+        $moduleManifest = "runtimes/win/lib/net10.0/Modules/$module/$module.psd1"
         if (!(Test-Path -LiteralPath (Join-Path $publishPath $moduleManifest) -PathType Leaf)) {
             throw "Missing Worker PowerShell module manifest: $module"
         }

@@ -96,10 +96,10 @@ public sealed class UsageScanJobRunnerTests
         GatedCollector gated = new(release: 2);
         Guid jobId = await h.CreateAsync();
         Task run = h.Runner(gated).RunAsync(jobId, CancellationToken.None);
-        await gated.Reported.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await gated.Reported.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         (await h.Store.RequestCancelAsync(jobId, new SaActor(_starter, "test"), _now, CancellationToken.None)).Should().BeTrue();
-        await run.WaitAsync(TimeSpan.FromSeconds(10));
+        await run.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         UsageScanJobRecord job = (await h.Store.GetAsync(jobId, CancellationToken.None))!;
         job.State.Should().Be(UsageScanJobState.Cancelled);
@@ -217,10 +217,10 @@ public sealed class UsageScanJobRunnerTests
         GatedCollector gated = new(release: 1);
         Guid jobId = await h.CreateAsync();
         Task run = h.Runner(gated).RunAsync(jobId, CancellationToken.None);
-        await gated.Reported.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        await gated.Reported.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         h.Store.LoseLease = true;
-        await run.WaitAsync(TimeSpan.FromSeconds(10));
+        await run.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         (await h.Store.GetAsync(jobId, CancellationToken.None))!.State.Should().Be(UsageScanJobState.Running, "this runner no longer owns it");
         h.Store.Evidence.Should().BeEmpty();

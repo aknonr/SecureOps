@@ -353,6 +353,9 @@ public sealed class OperationalRecordsController : ControllerBase
         BlockingConditions = record.SdmEvaluation?.Result.BlockingConditions ?? [],
         ExternalWriteEligible = record.SdmEvaluation?.Result.ExternalWriteEligible == true
             && !_readOnlyIntegrationMode && _controlledTestWritesEnabled,
+        SuggestedRequestType = RequestTypeSuggester.Suggest(record.Title, record.Description) is { } hint
+            ? new(hint.Type, hint.Terms, hint.RuleVersion)
+            : null,
         TransferIdempotencyKey = record.IdempotencyKey,
         JiraIssueKeyPersistedAt = record.JiraIssueKeyPersistedAt,
         JiraIssueUrl = JiraIssueLink.Create(_jiraOptions, record.JiraIssueKey)

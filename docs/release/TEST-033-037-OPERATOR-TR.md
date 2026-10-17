@@ -5,7 +5,7 @@ Paket **gözden geçirme adayıdır**: `readyForInstallation=false`. Kurmak beni
 sonra kullanılır. Paketi hazırlayan oturum TEST'e, IIS'e veya kurumsal SQL'e bağlanmadı. Yerel LocalDB provası hedef kabulü değildir.
 
 Taban: 2026-10-13 kurulumu. 025–032 uygulanmış, 033 ve sonrası yok. API+UI `b64068a` (Negotiate 8.0.30, CVE-2026-70179'dan
-etkilenen sürüm). Yeni paket Negotiate **8.0.32** taşır (`candidate.json.negotiate`). Eski `review-033-...-SONRA-KURULACAK` ve
+etkilenen sürüm). Yeni paket Negotiate **8.0.32** (.NET 8 yapısı) veya **10.0.13** (.NET 10 yapısı) taşır (`candidate.json.negotiate`). Eski `review-033-...-SONRA-KURULACAK` ve
 `review-034-...-SONRA-KURULACAK` klasörleri bayattır, kullanmıyoruz.
 
 ## 0. SSMS nasıl kullanılır

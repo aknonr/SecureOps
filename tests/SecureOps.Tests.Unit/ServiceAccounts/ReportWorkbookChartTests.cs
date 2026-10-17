@@ -36,7 +36,7 @@ public sealed class ReportWorkbookChartTests
         byte[] bytes = ReportWorkbookWriter.Write(Document());
 
         using var workbook = SpreadsheetDocument.Open(new MemoryStream(bytes), false);
-        ValidationErrorInfo[] errors = [.. new OpenXmlValidator(FileFormatVersions.Office2016).Validate(workbook)];
+        ValidationErrorInfo[] errors = [.. new OpenXmlValidator(FileFormatVersions.Office2016).Validate(workbook, TestContext.Current.CancellationToken)];
 
         errors.Select(e => $"{e.Part?.Uri} {e.Path?.XPath}: {e.Description}").Should().BeEmpty();
         workbook.WorkbookPart!.WorksheetParts.SelectMany(w => w.DrawingsPart?.ChartParts ?? []).Should().NotBeEmpty();
@@ -107,6 +107,6 @@ public sealed class ReportWorkbookChartTests
         byte[] bytes = ReportWorkbookWriter.Write(Document(withInsights: false) with { Dashboard = null });
 
         using var workbook = SpreadsheetDocument.Open(new MemoryStream(bytes), false);
-        new OpenXmlValidator(FileFormatVersions.Office2016).Validate(workbook).Select(e => e.Description).Should().BeEmpty();
+        new OpenXmlValidator(FileFormatVersions.Office2016).Validate(workbook, TestContext.Current.CancellationToken).Select(e => e.Description).Should().BeEmpty();
     }
 }

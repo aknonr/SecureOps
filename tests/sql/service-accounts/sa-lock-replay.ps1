@@ -28,7 +28,7 @@ foreach ($name in $otherOptIns) {
 }
 [ordered]@{
     sourceHead = (& git -C $root rev-parse HEAD)
-    integrationAssemblySha256 = (Get-FileHash (Join-Path $root 'tests\SecureOps.Tests.Integration\bin\Debug\net8.0\SecureOps.Tests.Integration.dll')).Hash
+    integrationAssemblySha256 = (Get-FileHash (Join-Path $root 'tests\SecureOps.Tests.Integration\bin\Debug\net10.0\SecureOps.Tests.Integration.dll')).Hash
     sdk = (& $dotnet --version)
     rounds = $Rounds
     prefix = $Prefix

@@ -29,7 +29,11 @@ public sealed record ManagementReportingData(
     long ReconciliationRequired,
     ReportingRetryOutcomes RetryOutcomes,
     IReadOnlyList<ReportingDurationStatistics> Durations,
-    DateTimeOffset? CoverageFromUtc);
+    DateTimeOffset? CoverageFromUtc)
+{
+    /// <summary>Where the evidence was read from; SQL-aggregated data is durable by construction.</summary>
+    public ReportingSources Sources { get; init; } = ReportingSources.Durable;
+}
 
 /// <summary>One server-aggregated operator row.</summary>
 public sealed record OperatorActivityData(

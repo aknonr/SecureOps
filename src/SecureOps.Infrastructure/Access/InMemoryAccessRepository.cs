@@ -1,4 +1,5 @@
 using SecureOps.Domain.Access;
+using SecureOps.Shared.Contracts.Access;
 
 namespace SecureOps.Infrastructure.Access;
 
@@ -75,6 +76,21 @@ public sealed class InMemoryAccessRepository : IAccessRepository
     /// <inheritdoc />
     public Task<ApplicationUser?> GetUserAsync(string corporateIdentity, CancellationToken cancellationToken) => ReadAsync(cancellationToken, () =>
         _userIds.TryGetValue(corporateIdentity, out Guid userId) ? ToUser(_users[userId]) : null);
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The in-memory store has the fixed reviewed catalog only; definitions cannot be edited here, so every
+    /// role reports as protected and role editing stays a SQL-only, guarded operation.
+    /// </remarks>
+    public Task<IReadOnlyList<AccessRoleDefinition>> GetRoleDefinitionsAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult<IReadOnlyList<AccessRoleDefinition>>(
+        [
+            .. AccessRoleCatalog.RoleCodes.Order(StringComparer.OrdinalIgnoreCase).Select(code =>
+                new AccessRoleDefinition(code, code, "Fixed in-memory role profile", 1, true, AccessRoleCatalog.GetCapabilities([code])))
+        ]);
+    }
 
     /// <inheritdoc />
     public Task<IReadOnlyList<ApplicationUser>> ListUsersAsync(CancellationToken cancellationToken) => ReadAsync<IReadOnlyList<ApplicationUser>>(

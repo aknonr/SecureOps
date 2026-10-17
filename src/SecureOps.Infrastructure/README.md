@@ -64,7 +64,7 @@ Folders present today: `Access/`, `Announcements/`, `Audit/`, `Commands/`, `Dire
 `ItsmRecords/` (read-only OR/OCO lookup, ADR-0031, no SQL),
 `OperationalRecords/`, `Persistence/`, `Reporting/`, `Resources/`, `ServiceAccounts/`, `Sessions/`. SQL access in
 all of them is Dapper with parameterized SQL over the numbered scripts in `sql/schema/` and `sql/migrations/`
-(ADR-0001, amended 2026-10-01). There is no ORM model; the EF Core package references in the project file are unused.
+(ADR-0001, amended 2026-10-01). There is no ORM.
 
 **Planned layout from the original architecture — not present unless listed above:**
 

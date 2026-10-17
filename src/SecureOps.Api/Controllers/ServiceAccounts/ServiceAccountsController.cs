@@ -228,7 +228,7 @@ public sealed class ServiceAccountsController(ServiceAccountService service) : C
     [RequestSizeLimit(_maxUsageScanRequestBytes)]
     [RequestFormLimits(MultipartBodyLengthLimit = _maxUsageScanRequestBytes)]
     [ProducesResponseType(typeof(AccountDetail), StatusCodes.Status200OK)]
-    public async Task<ActionResult<AccountDetail>> UsageScanUploadAsync(Guid id, [FromForm] IFormFile file, [FromForm] string? runStatement,
+    public async Task<ActionResult<AccountDetail>> UsageScanUploadAsync(Guid id, IFormFile file, [FromForm] string? runStatement,
         [FromForm] Guid? requestId, CancellationToken cancellationToken)
     {
         if (file is null || file.Length is 0 or > _maxUsageScanRequestBytes)
@@ -255,7 +255,7 @@ public sealed class ServiceAccountsController(ServiceAccountService service) : C
     [RequestSizeLimit(_maxUsageScanRequestBytes)]
     [RequestFormLimits(MultipartBodyLengthLimit = _maxUsageScanRequestBytes)]
     [ProducesResponseType(typeof(UsageScanBatchResult), StatusCodes.Status200OK)]
-    public async Task<ActionResult<UsageScanBatchResult>> UsageScanBatchUploadAsync([FromForm] IFormFile file, [FromForm] string? runStatement,
+    public async Task<ActionResult<UsageScanBatchResult>> UsageScanBatchUploadAsync(IFormFile file, [FromForm] string? runStatement,
         [FromForm] List<Guid>? accountIds, CancellationToken cancellationToken)
     {
         if (file is null || file.Length is 0 or > _maxUsageScanRequestBytes)
@@ -339,7 +339,7 @@ public sealed class ServiceAccountsController(ServiceAccountService service) : C
     [RequestSizeLimit(_maxEvidenceRequestBytes)]
     [RequestFormLimits(MultipartBodyLengthLimit = _maxEvidenceRequestBytes)]
     [ProducesResponseType(typeof(AccountDetail), StatusCodes.Status200OK)]
-    public async Task<ActionResult<AccountDetail>> EvidenceUploadAsync(Guid id, [FromForm] IFormFile file, [FromForm] string ownerType, [FromForm] Guid ownerId,
+    public async Task<ActionResult<AccountDetail>> EvidenceUploadAsync(Guid id, IFormFile file, [FromForm] string ownerType, [FromForm] Guid ownerId,
         [FromForm] string? label, CancellationToken cancellationToken)
     {
         if (file is null || file.Length is 0 or > _maxEvidenceRequestBytes)

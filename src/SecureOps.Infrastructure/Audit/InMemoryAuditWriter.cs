@@ -1,34 +1,39 @@
-using System.Collections.Concurrent;
-
 namespace SecureOps.Infrastructure.Audit;
 
 /// <summary>
 /// In-memory audit writer for development and tests.
 /// </summary>
-public sealed class InMemoryAuditWriter : IAuditWriter, IAuditEventSink
+public sealed class InMemoryAuditWriter : IAtomicAuditWriter, IAuditEventSink
 {
-    private readonly ConcurrentQueue<AuditEvent> _events = new();
+    private readonly Lock _gate = new();
+    private readonly List<AuditEvent> _events = [];
 
     /// <summary>
     /// Gets the captured audit events.
     /// </summary>
-    public IReadOnlyCollection<AuditEvent> Events => _events.ToArray();
+    public IReadOnlyCollection<AuditEvent> Events
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _events.ToArray();
+            }
+        }
+    }
 
     /// <inheritdoc />
-    public Task WriteAsync(AuditEvent auditEvent, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        _events.Enqueue(auditEvent);
-        return Task.CompletedTask;
-    }
+    public Task WriteAsync(AuditEvent auditEvent, CancellationToken cancellationToken) => WriteBatchAsync([auditEvent], cancellationToken);
 
     /// <inheritdoc />
     public Task WriteBatchAsync(IReadOnlyCollection<AuditEvent> events, CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        foreach (AuditEvent auditEvent in events)
+        AuditEvent[] batch = events.ToArray();
+        lock (_gate)
         {
-            _events.Enqueue(auditEvent);
+            cancellationToken.ThrowIfCancellationRequested();
+            _events.EnsureCapacity(checked(_events.Count + batch.Length));
+            _events.AddRange(batch);
         }
 
         return Task.CompletedTask;

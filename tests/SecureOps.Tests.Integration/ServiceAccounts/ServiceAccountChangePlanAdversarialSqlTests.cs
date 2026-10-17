@@ -7,7 +7,6 @@ using Microsoft.Data.SqlClient;
 using SecureOps.Domain.ServiceAccounts;
 using SecureOps.Infrastructure.ServiceAccounts;
 using SecureOps.Shared.Contracts.ServiceAccounts;
-using Xunit.Abstractions;
 
 namespace SecureOps.Tests.Integration.ServiceAccounts;
 

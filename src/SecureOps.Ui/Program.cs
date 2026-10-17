@@ -342,3 +342,6 @@ static string BuildAppPath(HttpContext httpContext, string relativePath)
 
     return $"{pathBase}/{relativePath}";
 }
+
+/// <summary>Kept internal so test hosts resolve the API <c>Program</c> unambiguously; .NET 10 otherwise generates a public one.</summary>
+internal partial class Program;

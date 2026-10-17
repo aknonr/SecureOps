@@ -24,7 +24,7 @@ public static class SdmEvidenceView
     /// <summary>Explains the evidence or decision needed to resolve a condition.</summary>
     public static string Guidance(string code) => code switch
     {
-        "OperatorDeclarationOnly" => "Talep türü operatör beyanıdır; kaynak kanıtı, altyapı kapsamı veya yayımlama onayı değildir.",
+        "OperatorDeclarationOnly" => "Talep türü sizin onayınızdır (öneriyi onaylamanız da dahil); kaynak kanıtı, altyapı kapsamı veya yayımlama onayı değildir.",
         "PilotPolicyExpired" => "Tek kayıt politika süresi yok veya dolmuş. Süreç sahibi süreli karar kaydını doğrulamalı.",
         "PilotRecordMismatch" => "Bu OR veya kaynak sürümü onaylı tek kayıt politikasıyla eşleşmiyor.",
         "PilotScopeUnproven" => "Onaylı kaynak kapsamı yapılandırmayla eşleşmiyor; In Use dışlaması korunmalıdır.",

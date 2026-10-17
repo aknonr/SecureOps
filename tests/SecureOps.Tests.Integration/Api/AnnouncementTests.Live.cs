@@ -62,15 +62,15 @@ public sealed partial class AnnouncementTests
         string root = Assets();
         var renderer = new AnnouncementRenderer(Options.Create(new AnnouncementOptions { AssetDirectory = root, Banners = new() { ["synthetic-v1"] = "banner.bin" } }));
         var timer = Stopwatch.StartNew();
-        (byte[] Bytes, string Type, string Hash) first = await renderer.AssetAsync("synthetic-v1", default);
+        (byte[] Bytes, string Type, string Hash) first = await renderer.AssetAsync("synthetic-v1", TestContext.Current.CancellationToken);
         long cold = timer.ElapsedTicks;
         timer.Restart();
         for (int i = 0; i < 20; i++)
-        { (await renderer.AssetAsync("synthetic-v1", default)).Hash.Should().Be(first.Hash); }
+        { (await renderer.AssetAsync("synthetic-v1", TestContext.Current.CancellationToken)).Hash.Should().Be(first.Hash); }
         output.WriteLine("Local asset cold ticks={0}; 20 hash-checked reads ticks={1}; bytes={2}", cold, timer.ElapsedTicks, first.Bytes.Length);
         File.Copy(Path.Combine(Assets(SKEncodedImageFormat.Jpeg), "banner.bin"), Path.Combine(root, "banner.bin"), true);
-        (await renderer.AssetAsync("synthetic-v1", default)).Type.Should().Be("jpeg");
-        await File.WriteAllBytesAsync(Path.Combine(root, "banner.bin"), new byte[64]);
+        (await renderer.AssetAsync("synthetic-v1", TestContext.Current.CancellationToken)).Type.Should().Be("jpeg");
+        await File.WriteAllBytesAsync(Path.Combine(root, "banner.bin"), new byte[64], TestContext.Current.CancellationToken);
         await FluentActions.Awaiting(() => renderer.AssetAsync("synthetic-v1", default)).Should().ThrowAsync<InvalidOperationException>();
         File.Move(Path.Combine(root, "banner.bin"), Path.Combine(root, "retained.bin"));
         await FluentActions.Awaiting(() => renderer.AssetAsync("synthetic-v1", default)).Should().ThrowAsync<FileNotFoundException>();

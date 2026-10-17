@@ -261,8 +261,8 @@
             { nameof(ResourceLayoutDialog.Save), (Func<SaveResourceLayoutRequest, Task<UiProblem?>>)SaveLayoutAsync }
         };
         IDialogReference dialog = await Dialogs.ShowAsync<ResourceLayoutDialog>("Çalışma alanını düzenle", parameters,
-            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, DisableBackdropClick = true, CloseOnEscapeKey = false });
-        if (!(await dialog.Result).Canceled) { _pageNumber = 1; await SearchAsync(); }
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseOnEscapeKey = false });
+        if (await dialog.Result is { Canceled: false }) { _pageNumber = 1; await SearchAsync(); }
     }
 
     private async Task<UiProblem?> SaveLayoutAsync(SaveResourceLayoutRequest request)
@@ -313,7 +313,7 @@
             { nameof(ResourceSetPickerDialog.Save), (Func<Guid?, SaveShiftSetRequest, Task<UiProblem?>>)SaveGroupAsync }
         };
         IDialogReference dialog = await Dialogs.ShowAsync<ResourceSetPickerDialog>("Seçilenleri grubuma kaydet", parameters,
-            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, DisableBackdropClick = true, CloseOnEscapeKey = false });
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, BackdropClick = false, CloseOnEscapeKey = false });
         await dialog.Result;
     }
 

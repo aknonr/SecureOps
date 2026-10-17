@@ -14,6 +14,7 @@ The hard rules are in `AGENTS.md`; the full model is `docs/05-security-model.md`
 - Authentication (Windows/Negotiate, or OIDC per ADR-0016/0017) establishes a principal only. Access comes from persisted approval → role bundle → capability (ADR-0010, ADR-0022); authorization is evaluated server-side on every request.
 - Use the capability policies in `SecureOps.Shared.Auth.Policies` (and module policy classes); never inline group or role-name checks. UI visibility is a courtesy, never a boundary.
 - Sessions are server-governed with idle and absolute limits (ADR-0014). Monitoring webhooks use HMAC-signed shared secrets; service-to-service uses Windows auth or mTLS — no static API keys or custom schemes.
+- Rate limits (`ApiRateLimits`, `RateLimiting` config): a per-actor global limit plus named per-operation policies. Give every new sensitive or expensive endpoint a named policy; limits are validated at startup.
 
 ## Secrets and data
 

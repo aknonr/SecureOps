@@ -30,7 +30,7 @@ public sealed partial class SqlAccessRepository
             !change.Code.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-') ||
             string.IsNullOrWhiteSpace(change.Name) || change.Name.Length > 100 ||
             string.IsNullOrWhiteSpace(change.Purpose) || change.Purpose.Length > 500 ||
-            change.ExpectedVersion < 0 || change.Capabilities is null || change.Capabilities.Count > 64)
+            change.ExpectedVersion < 0 || change.Capabilities is not { Count: <= 64 })
         {
             return AccessServiceResult<AccessRoleImpact>.Fail(OperationalErrorCodes.AccessValidationFailed);
         }
@@ -42,7 +42,7 @@ public sealed partial class SqlAccessRepository
         UserRow? actorRow = await connection.QuerySingleOrDefaultAsync<UserRow>(Command(
             $"{_readUserSql} WHERE u.CorporateIdentity=@actor {_userGroupBy}", new { actor }, transaction, cancellationToken));
         ApplicationUser? human = actorRow is null ? null : Map(actorRow);
-        if (human?.Status != AccessStatus.Approved || !human.Capabilities.Contains(Capabilities.AccessManageUsers) || !human.Capabilities.Contains(Capabilities.AccessAssignRoles))
+        if (human is not { Status: AccessStatus.Approved } || !human.Capabilities.Contains(Capabilities.AccessManageUsers) || !human.Capabilities.Contains(Capabilities.AccessAssignRoles))
         {
             return AccessServiceResult<AccessRoleImpact>.Fail(OperationalErrorCodes.AccessDenied);
         }
@@ -53,7 +53,7 @@ public sealed partial class SqlAccessRepository
             return AccessServiceResult<AccessRoleImpact>.Fail(OperationalErrorCodes.AccessConcurrencyConflict);
         }
 
-        if (row?.Protected == true)
+        if (row is { Protected: true })
         {
             return AccessServiceResult<AccessRoleImpact>.Fail(OperationalErrorCodes.AccessProtectedRole);
         }

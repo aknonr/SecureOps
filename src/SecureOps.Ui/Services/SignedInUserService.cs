@@ -9,7 +9,8 @@ namespace SecureOps.Ui.Services;
 /// <summary>
 /// Claims-based implementation of <see cref="ISignedInUserService"/>.
 /// </summary>
-public sealed class SignedInUserService : ISignedInUserService
+/// <param name="options">Shell options supplying the interim account name.</param>
+public sealed class SignedInUserService(IOptions<DemoModeOptions> options) : ISignedInUserService
 {
     /// <summary>Claim carrying how the session was established.</summary>
     public const string AuthenticationSourceClaim = "secureops:auth_source";
@@ -29,16 +30,7 @@ public sealed class SignedInUserService : ISignedInUserService
     /// <summary>Authentication source value used by the interim cookie sign-in path.</summary>
     public const string InterimAuthenticationSource = "interim-cookie";
 
-    private readonly DemoModeOptions _options;
-
-    /// <summary>
-    /// Initializes a new signed-in user service.
-    /// </summary>
-    /// <param name="options">Shell options supplying the interim account name.</param>
-    public SignedInUserService(IOptions<DemoModeOptions> options)
-    {
-        _options = options.Value;
-    }
+    private readonly DemoModeOptions _options = options.Value;
 
     /// <inheritdoc />
     public SignedInUser Describe(ClaimsPrincipal principal)

@@ -81,8 +81,7 @@ public sealed class AnnouncementSourceTests
         (ICollectionMembershipClient collections, IAnnouncementServiceSourceClient services) = Clients(205);
         services.GetDeviceServicesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(call => new ServiceLookupResult(call.Arg<string>(), ["service-" + call.Arg<string>()], "Resolved"));
-        AnnouncementSourceSnapshot snapshot = await Collector(collections, services).CollectAsync(
-            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "NonProd", "SYNTHETIC", "OCO-TEST", default);
+        AnnouncementSourceSnapshot snapshot = await Collector(collections, services).CollectAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "NonProd", "SYNTHETIC", "OCO-TEST", TestContext.Current.CancellationToken);
         snapshot.Services.Should().HaveCount(205).And.OnlyContain(s => s.Devices.Length == 1);
         snapshot.Completeness.Partial.Should().BeFalse();
         snapshot.Work!.ProposedStartDate.Should().BeNull();
@@ -98,8 +97,7 @@ public sealed class AnnouncementSourceTests
         (ICollectionMembershipClient collections, IAnnouncementServiceSourceClient services) = Clients(1);
         services.GetDeviceServicesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new ServiceLookupResult("device-0", resolution == "Ambiguous" ? ["a", "b"] : [], resolution));
-        AnnouncementSourceSnapshot snapshot = await Collector(collections, services).CollectAsync(
-            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "NonProd", "SYNTHETIC", "OCO-TEST", default);
+        AnnouncementSourceSnapshot snapshot = await Collector(collections, services).CollectAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "NonProd", "SYNTHETIC", "OCO-TEST", TestContext.Current.CancellationToken);
         snapshot.Completeness.Partial.Should().BeTrue();
         snapshot.Completeness.ServicesMissing.Should().Be(missing);
         snapshot.Completeness.ServicesFailed.Should().Be(failed);
@@ -113,8 +111,7 @@ public sealed class AnnouncementSourceTests
     {
         (ICollectionMembershipClient collections, IAnnouncementServiceSourceClient services) = Clients(0);
         services.GetChangeWindowAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(new ChangeWindowResult(null, null, "Missing"));
-        AnnouncementSourceSnapshot result = await Collector(collections, services).CollectAsync(
-            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "NonProd", "SYNTHETIC", "OCO-TEST", default);
+        AnnouncementSourceSnapshot result = await Collector(collections, services).CollectAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "NonProd", "SYNTHETIC", "OCO-TEST", TestContext.Current.CancellationToken);
         result.Completeness.Partial.Should().BeTrue();
         result.Completeness.Warnings.Should().Contain("CollectionHadNoDevices").And.Contain("ChangeWindowMissing");
     }
@@ -135,7 +132,7 @@ public sealed class AnnouncementSourceTests
                 new { Key = "num", Value = "1" }, new { Key = key, Value = "service-a" } } }
             }
         }));
-        ServiceLookupResult result = await Adapter(handler).GetDeviceServicesAsync("device-1", default);
+        ServiceLookupResult result = await Adapter(handler).GetDeviceServicesAsync("device-1", TestContext.Current.CancellationToken);
         result.Resolution.Should().Be(resolution);
         handler.Requests.Should().Be(1);
     }
@@ -162,7 +159,7 @@ public sealed class AnnouncementSourceTests
         using var cancellation = new CancellationTokenSource();
         Task<AnnouncementSourceSnapshot> pending = collector.CollectAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
             "NonProd", "SYNTHETIC", "OCO-TEST", cancellation.Token);
-        await started.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
         calls.Should().Be(2);
         cancellation.Cancel();
         await FluentActions.Awaiting(() => pending).Should().ThrowAsync<OperationCanceledException>();
@@ -176,19 +173,19 @@ public sealed class AnnouncementSourceTests
             {"QueryResult":{"Items":[[{"Key":"SET.p_proposed_finish_date_time","Value":"14.09.2026 02:00"},
             {"Key":"SET.p_proposed_start_date_time","Value":"14.09.2026 01:00"}]]}}
             """);
-        ChangeWindowResult result = await Adapter(dates).GetChangeWindowAsync("OCO-TEST", default);
+        ChangeWindowResult result = await Adapter(dates).GetChangeWindowAsync("OCO-TEST", TestContext.Current.CancellationToken);
         result.StartText.Should().Be("14.09.2026 01:00");
         result.Resolution.Should().Be("Unresolved");
         using var duplicate = new ResponseHandler("""
             {"QueryResult":{"Items":[[{"Key":"SET.service","Value":"a"},{"Key":"SET.service","Value":"b"}]]}}
             """);
-        (await Adapter(duplicate).GetDeviceServicesAsync("device-1", default)).Resolution.Should().Be("Failed");
+        (await Adapter(duplicate).GetDeviceServicesAsync("device-1", TestContext.Current.CancellationToken)).Resolution.Should().Be("Failed");
         using var repeated = new ResponseHandler("""
             {"QueryResult":{"Items":[
             [{"Key":"SET.p_proposed_start_date_time","Value":"2026-09-14T01:00Z"},{"Key":"SET.p_proposed_finish_date_time","Value":"2026-09-14T02:00Z"}],
             [{"Key":"SET.p_proposed_start_date_time","Value":"2026-09-14T01:00Z"},{"Key":"SET.p_proposed_finish_date_time","Value":"2026-09-14T02:00Z"}]]}}
             """);
-        (await Adapter(repeated).GetChangeWindowAsync("OCO-TEST", default)).Resolution.Should().Be("Ambiguous");
+        (await Adapter(repeated).GetChangeWindowAsync("OCO-TEST", TestContext.Current.CancellationToken)).Resolution.Should().Be("Ambiguous");
     }
 
     private static MaintenanceProfileOptions Profile() => new()

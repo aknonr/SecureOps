@@ -1,5 +1,5 @@
-using Microsoft.OpenApi.Any;
-using Microsoft.OpenApi.Models;
+using System.Text.Json.Nodes;
+using Microsoft.OpenApi;
 using SecureOps.Domain.OperationalRecords;
 using SecureOps.Shared.Contracts.OperationalRecords;
 using Swashbuckle.AspNetCore.SwaggerGen;
@@ -10,20 +10,21 @@ namespace SecureOps.Api.OpenApi;
 public sealed class SdmEvaluationSchemaFilter : ISchemaFilter
 {
     /// <inheritdoc />
-    public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+    public void Apply(IOpenApiSchema schema, SchemaFilterContext context)
     {
-        if (context.Type != typeof(OperationalRecordResponse))
+        // Swashbuckle also passes each use site as a $ref; only the component definition is annotated.
+        if (context.Type != typeof(OperationalRecordResponse) || schema is OpenApiSchemaReference)
         {
             return;
         }
-        schema.Properties["recommendedClassification"] = new OpenApiSchema
+        IDictionary<string, IOpenApiSchema> properties = OpenApiModel.Concrete(schema).Properties!;
+        properties["recommendedClassification"] = new OpenApiSchema
         {
-            Type = "integer",
-            Nullable = true,
-            Enum = Enum.GetValues<OperationalRecordClassification>()
-                .Select(value => (IOpenApiAny)new OpenApiInteger((int)value)).Append(new OpenApiNull()).ToList()
+            Type = JsonSchemaType.Integer | JsonSchemaType.Null,
+            // The v1 contract lists null as an allowed value; JSON null has no JsonNode instance.
+            Enum = [.. Enum.GetValues<OperationalRecordClassification>().Select(value => (JsonNode)JsonValue.Create((int)value)).Append(null!)]
         };
-        schema.Properties["reasonCodes"].Nullable = false;
-        schema.Properties["blockingConditions"].Nullable = false;
+        OpenApiModel.NotNullable(properties["reasonCodes"]);
+        OpenApiModel.NotNullable(properties["blockingConditions"]);
     }
 }

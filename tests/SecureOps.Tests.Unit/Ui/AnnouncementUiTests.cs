@@ -49,7 +49,7 @@ public sealed class AnnouncementUiTests
         });
         using var http = new HttpClient(handler) { BaseAddress = new Uri("https://localhost/") };
         var client = new AnnouncementApiClient(http, new FakeApiSessionContext());
-        (await client.DraftAsync(id, 2, Content(), default)).Version.Should().Be(3);
+        (await client.DraftAsync(id, 2, Content(), TestContext.Current.CancellationToken)).Version.Should().Be(3);
         handler.Response = _ => new(HttpStatusCode.Conflict) { Content = JsonContent.Create(new { code = "AnnouncementConflict" }) };
         FluentAssertions.Specialized.ExceptionAssertions<SecureOpsApiException> failure = await FluentActions.Awaiting(() => client.DraftAsync(id, 2, Content(), default)).Should().ThrowAsync<SecureOpsApiException>();
         failure.Which.Problem.RequiresRefresh.Should().BeTrue();

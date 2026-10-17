@@ -175,24 +175,23 @@ public sealed class WasasBrandingTests
     }
 
     [Fact]
-    public void FlightLoading_UsesRealOperationMessageWithoutFakeProgress()
+    public void PanelLoading_IsAnIndeterminateSkeletonWithoutOverlayOrFakeProgress()
     {
-        string loading = File.ReadAllText(
-            Path.Combine(UiRoot(), "Shared", "Components", "SoFlightLoading.razor"));
+        string loading = File.ReadAllText(Path.Combine(UiRoot(), "Shared", "Components", "SoLoading.razor"));
 
         loading.Should().Contain("role=\"status\"");
         loading.Should().Contain("aria-live=\"polite\"");
-        loading.Should().Contain("brand/world-land.svg");
-        loading.Should().Contain("Yükleniyor...");
+        loading.Should().Contain("<MudSkeleton");
         loading.Should().Contain("@Message");
-        loading.Should().Contain("M 251 56");
+        loading.Should().NotContain("SoFlightLoading");
         loading.Should().NotContain("Task.Delay");
         loading.Should().NotContain("aria-valuenow");
         loading.Should().NotContain("<progress");
+        File.Exists(Path.Combine(UiRoot(), "Shared", "Components", "SoFlightLoading.razor")).Should().BeFalse();
 
         string css = File.ReadAllText(Path.Combine(UiRoot(), "wwwroot", "css", "secureops-theme.css"));
-        css.Should().Contain("animation: so-flight-travel-reference 3.2s linear infinite");
-        css.Should().NotContain("animation-direction: alternate");
+        css.Should().Contain("animation: so-loading-reveal 160ms ease 250ms both");
+        css.Should().NotContain(".so-flight");
     }
 
     [Fact]
@@ -207,6 +206,9 @@ public sealed class WasasBrandingTests
         layout.Should().Contain("_routeNavigating = true");
         layout.Should().Contain("_routeNavigating = false");
         layout.Should().NotContain("Task.Delay");
+        layout.Should().NotContain("so-route-progress-plane");
+        // The 300 ms grace period is a CSS transition delay, so quick navigations never paint the bar.
+        css.Should().Contain("transition: opacity 120ms ease 300ms");
         host.Should().Contain("dataset.soInputModality");
         css.Should().Contain("html[data-so-input-modality=\"pointer\"] [tabindex=\"-1\"]:focus");
     }

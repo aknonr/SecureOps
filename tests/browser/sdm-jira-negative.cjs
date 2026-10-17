@@ -164,7 +164,7 @@ const out = path.resolve(process.argv[7]);
         const typed = fixture('SIM-OR-400');
         await open(typed);
         for (const label of ['Sunucu İadesi/Emekliliği', 'Uygulama Kurulumu']) {
-            await page.getByRole('combobox', { name: 'Talep türü (operatör beyanı)', exact: true }).selectOption({ label });
+            await page.getByRole('combobox', { name: 'Talep türü', exact: true }).selectOption({ label });
             await button('İnceleme taslağı hazırla').click();
             await settled('ReviewOnly');
             assert.equal(await button('Jira Kaydı Oluştur').isDisabled(), true);

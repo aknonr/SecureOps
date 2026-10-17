@@ -77,11 +77,10 @@ public sealed class SdmEvidenceRenderTests
         if (!string.IsNullOrWhiteSpace(evidenceDirectory))
         {
             Directory.CreateDirectory(evidenceDirectory);
-            await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "synthetic-sdm-component.html"),
-                "<!doctype html><html lang=\"tr\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+            await File.WriteAllTextAsync(Path.Combine(evidenceDirectory, "synthetic-sdm-component.html"), "<!doctype html><html lang=\"tr\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
                 + "<link rel=\"stylesheet\" href=\"https://localhost:6497/_content/MudBlazor/MudBlazor.min.css\">"
                 + "<link rel=\"stylesheet\" href=\"https://localhost:6497/css/secureops-theme.css\"><body><main class=\"so-page\">"
-                + "<h1>Yerel sentetik SDM bileşen doğrulaması</h1>" + html + "</main></body></html>");
+                + "<h1>Yerel sentetik SDM bileşen doğrulaması</h1>" + html + "</main></body></html>", TestContext.Current.CancellationToken);
         }
     }
 }

@@ -32,7 +32,7 @@ public sealed partial class InUseTests
         refreshed.SourceVersion.Should().Be(r.SourceVersion);
         f.Source.ClearReceivedCalls();
         (await f.Service.OverviewAsync(_principal, _context, _token)).Value!.Total.Should().Be(2);
-        await f.Source.DidNotReceiveWithAnyArgs().DiscoverAsync(default);
+        await f.Source.DidNotReceiveWithAnyArgs().DiscoverAsync(TestContext.Current.CancellationToken);
         var denied = new Fixture("InUseReviewer");
         (await denied.Service.OverviewAsync(_principal, _context, _token)).Error.Should().Be("AccessDenied");
     }
@@ -64,7 +64,7 @@ public sealed partial class InUseTests
         saved.Completion.ActorId.Should().Be(f.User.Id);
         saved.Completion.ReportSha256.Should().Be(report.Sha256);
         (await f.Service.ConfirmAsync(_principal, _context, r.Id, request, _token)).Value!.Version.Should().Be(saved.Version);
-        await f.Source.DidNotReceiveWithAnyArgs().DiscoverAsync(default);
+        await f.Source.DidNotReceiveWithAnyArgs().DiscoverAsync(TestContext.Current.CancellationToken);
         await f.Audit.Received(1).WriteAsync(Arg.Is<AuditEvent>(a => a.Action == "InUseCompletionIntentBlocked"), Arg.Any<CancellationToken>());
         f.Audit.WriteAsync(Arg.Any<AuditEvent>(), Arg.Any<CancellationToken>()).Returns(_ => throw new IOException("Synthetic audit failure"));
         (await f.Service.OverviewAsync(_principal, _context, _token)).Error.Should().Be("PersistenceUnavailable");

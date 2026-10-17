@@ -128,18 +128,28 @@ public sealed class ApplicationSessionService : IApplicationSessionService
         try
         {
             ApplicationSession? session = await _repository.GetAsync(sessionId, cancellationToken);
-            if (session is null || !session.IsActive)
+            if (session is null)
             {
                 return Failure(ApplicationSessionDisposition.Revoked, OperationalErrorCodes.SessionRevoked);
             }
-
-            await _repository.EndAsync(sessionId, now, SessionEndReason.Logout, cancellationToken);
-            if (!await TryAuditAsync(AuditActions.ApplicationSessionLoggedOut, session, SessionEndReason.Logout, context, null, cancellationToken))
+            if (!session.IsActive)
             {
-                return Failure(ApplicationSessionDisposition.AuditUnavailable, OperationalErrorCodes.AuditStoreUnavailable);
+                return CommittedEndResult(session, forValidation: false);
+            }
+
+            bool ended = await _repository.EndWithAuditAsync(sessionId, now, SessionEndReason.Logout,
+                CreateAudit(AuditActions.ApplicationSessionLoggedOut, session, SessionEndReason.Logout, context, null), cancellationToken);
+            if (!ended)
+            {
+                return await ReadConcurrentEndAsync(sessionId, forValidation: false, cancellationToken);
             }
 
             return new ApplicationSessionResult(ApplicationSessionDisposition.Ended, session with { EndedAtUtc = now, EndReason = SessionEndReason.Logout }, null);
+        }
+        catch (AuditWriteUnavailableException)
+        {
+            _logger.LogError("Application session logout audit failed. CorrelationId: {CorrelationId}", context.CorrelationId);
+            return Failure(ApplicationSessionDisposition.AuditUnavailable, OperationalErrorCodes.AuditStoreUnavailable);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -164,21 +174,12 @@ public sealed class ApplicationSessionService : IApplicationSessionService
         try
         {
             DateTimeOffset now = _timeProvider.GetUtcNow();
-            IReadOnlyList<ApplicationSession> expired = await _repository.EndExpiredAsync(
+            _ = await _repository.EndExpiredAsync(
                 now,
                 now.AddMinutes(-_options.IdleTimeoutMinutes),
                 _options.MaxAdminPageSize,
+                session => CreateAudit(ExpiryAction(session), session, session.EndReason, context, null),
                 cancellationToken);
-            foreach (ApplicationSession session in expired)
-            {
-                string action = session.EndReason == SessionEndReason.AbsoluteTimeout
-                    ? AuditActions.ApplicationSessionAbsoluteTimedOut
-                    : AuditActions.ApplicationSessionIdleTimedOut;
-                if (!await TryAuditAsync(action, session, session.EndReason, context, null, cancellationToken))
-                {
-                    return new ApplicationSessionListResult(null, OperationalErrorCodes.AuditStoreUnavailable);
-                }
-            }
 
             IReadOnlyList<ApplicationSession> sessions = await _repository.ListActiveAsync(
                 now,
@@ -187,6 +188,11 @@ public sealed class ApplicationSessionService : IApplicationSessionService
                 pageSize,
                 cancellationToken);
             return new ApplicationSessionListResult(sessions, null);
+        }
+        catch (AuditWriteUnavailableException)
+        {
+            _logger.LogError("Application session expiry audit failed. CorrelationId: {CorrelationId}", context.CorrelationId);
+            return new ApplicationSessionListResult(null, OperationalErrorCodes.AuditStoreUnavailable);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -206,19 +212,29 @@ public sealed class ApplicationSessionService : IApplicationSessionService
         try
         {
             ApplicationSession? session = await _repository.GetAsync(sessionId, cancellationToken);
-            if (session is null || !session.IsActive)
+            if (session is null)
             {
                 return Failure(ApplicationSessionDisposition.Revoked, OperationalErrorCodes.SessionNotFound);
             }
+            if (!session.IsActive)
+            {
+                return CommittedEndResult(session, forValidation: false);
+            }
 
             DateTimeOffset now = _timeProvider.GetUtcNow();
-            await _repository.EndAsync(sessionId, now, SessionEndReason.Revoked, cancellationToken);
-            if (!await TryAuditAsync(AuditActions.ApplicationSessionRevoked, session, SessionEndReason.Revoked, context, reason.Trim(), cancellationToken))
+            bool ended = await _repository.EndWithAuditAsync(sessionId, now, SessionEndReason.Revoked,
+                CreateAudit(AuditActions.ApplicationSessionRevoked, session, SessionEndReason.Revoked, context, reason.Trim()), cancellationToken);
+            if (!ended)
             {
-                return Failure(ApplicationSessionDisposition.AuditUnavailable, OperationalErrorCodes.AuditStoreUnavailable);
+                return await ReadConcurrentEndAsync(sessionId, forValidation: false, cancellationToken);
             }
 
             return new ApplicationSessionResult(ApplicationSessionDisposition.Ended, session with { EndedAtUtc = now, EndReason = SessionEndReason.Revoked }, null);
+        }
+        catch (AuditWriteUnavailableException)
+        {
+            _logger.LogError("Application session revocation audit failed. CorrelationId: {CorrelationId}", context.CorrelationId);
+            return Failure(ApplicationSessionDisposition.AuditUnavailable, OperationalErrorCodes.AuditStoreUnavailable);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -237,19 +253,18 @@ public sealed class ApplicationSessionService : IApplicationSessionService
 
         try
         {
-            IReadOnlyList<ApplicationSession> sessions = await _repository.EndActiveForUserAsync(userId, _timeProvider.GetUtcNow(), reason, cancellationToken);
             string action = reason == SessionEndReason.AccessDisabled
                 ? AuditActions.ApplicationSessionAccessDisabled
                 : AuditActions.ApplicationSessionAccessChanged;
-            foreach (ApplicationSession session in sessions)
-            {
-                if (!await TryAuditAsync(action, session, reason, context, null, cancellationToken))
-                {
-                    return new ApplicationSessionTerminationResult(sessions.Count, OperationalErrorCodes.AuditStoreUnavailable);
-                }
-            }
+            IReadOnlyList<ApplicationSession> sessions = await _repository.EndActiveForUserAsync(userId, _timeProvider.GetUtcNow(), reason,
+                session => CreateAudit(action, session, reason, context, null), cancellationToken);
 
             return new ApplicationSessionTerminationResult(sessions.Count, null);
+        }
+        catch (AuditWriteUnavailableException)
+        {
+            _logger.LogError("Application user session termination audit failed. CorrelationId: {CorrelationId}", context.CorrelationId);
+            return new ApplicationSessionTerminationResult(0, OperationalErrorCodes.AuditStoreUnavailable);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -302,7 +317,6 @@ public sealed class ApplicationSessionService : IApplicationSessionService
         AccessOperationContext context,
         CancellationToken cancellationToken)
     {
-        await _repository.EndAsync(session.SessionId, now, reason, cancellationToken);
         string action = reason switch
         {
             SessionEndReason.IdleTimeout => AuditActions.ApplicationSessionIdleTimedOut,
@@ -310,12 +324,37 @@ public sealed class ApplicationSessionService : IApplicationSessionService
             SessionEndReason.AccessChanged => AuditActions.ApplicationSessionAccessChanged,
             _ => throw new InvalidOperationException("Unsupported validation end reason.")
         };
-        if (!await TryAuditAsync(action, session, reason, context, null, cancellationToken))
+        try
         {
+            bool ended = await _repository.EndWithAuditAsync(session.SessionId, now, reason, CreateAudit(action, session, reason, context, null), cancellationToken);
+            if (!ended)
+            {
+                return await ReadConcurrentEndAsync(session.SessionId, forValidation: true, cancellationToken);
+            }
+        }
+        catch (AuditWriteUnavailableException)
+        {
+            _logger.LogError("Application session validation audit failed. CorrelationId: {CorrelationId}", context.CorrelationId);
             return Failure(ApplicationSessionDisposition.AuditUnavailable, OperationalErrorCodes.AuditStoreUnavailable);
         }
 
         return Failure(disposition, errorCode, session with { EndedAtUtc = now, EndReason = reason });
+    }
+
+    private async Task<ApplicationSessionResult> ReadConcurrentEndAsync(Guid sessionId, bool forValidation, CancellationToken cancellationToken)
+    {
+        ApplicationSession? winner = await _repository.GetAsync(sessionId, cancellationToken);
+        return CommittedEndResult(winner, forValidation);
+    }
+
+    private static ApplicationSessionResult CommittedEndResult(ApplicationSession? winner, bool forValidation)
+    {
+        if (winner is null || winner.IsActive || winner.EndReason is null)
+        {
+            return Failure(ApplicationSessionDisposition.StoreUnavailable, OperationalErrorCodes.SessionStoreUnavailable);
+        }
+
+        return forValidation ? EndedFailure(winner) : new ApplicationSessionResult(ApplicationSessionDisposition.Ended, winner, null);
     }
 
     private async Task<bool> TryAuditAsync(
@@ -328,23 +367,7 @@ public sealed class ApplicationSessionService : IApplicationSessionService
     {
         try
         {
-            await _auditWriter.WriteAsync(new AuditEvent
-            {
-                OccurredAt = _timeProvider.GetUtcNow(),
-                Actor = context.Actor,
-                Action = action,
-                CorrelationId = context.CorrelationId,
-                Details = new
-                {
-                    sessionId = session?.SessionId,
-                    userId = session?.UserId,
-                    endReason = reason?.ToString(),
-                    authenticationMethod = session?.AuthenticationMethod,
-                    accessVersion = session?.AccessVersion,
-                    reasonHash = operationalReason is null ? null : AuditAccountHasher.HashAccountInput(operationalReason),
-                    reasonLength = operationalReason?.Length
-                }
-            }, cancellationToken);
+            await _auditWriter.WriteAsync(CreateAudit(action, session, reason, context, operationalReason), cancellationToken);
             return true;
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -353,6 +376,28 @@ public sealed class ApplicationSessionService : IApplicationSessionService
             return false;
         }
     }
+
+    private AuditEvent CreateAudit(string action, ApplicationSession? session, SessionEndReason? reason, AccessOperationContext context, string? operationalReason) => new()
+    {
+        OccurredAt = _timeProvider.GetUtcNow(),
+        Actor = context.Actor,
+        Action = action,
+        CorrelationId = context.CorrelationId,
+        Details = new
+        {
+            sessionId = session?.SessionId,
+            userId = session?.UserId,
+            endReason = reason?.ToString(),
+            authenticationMethod = session?.AuthenticationMethod,
+            accessVersion = session?.AccessVersion,
+            reasonHash = operationalReason is null ? null : AuditAccountHasher.HashAccountInput(operationalReason),
+            reasonLength = operationalReason?.Length
+        }
+    };
+
+    private static string ExpiryAction(ApplicationSession session) => session.EndReason == SessionEndReason.AbsoluteTimeout
+        ? AuditActions.ApplicationSessionAbsoluteTimedOut
+        : AuditActions.ApplicationSessionIdleTimedOut;
 
     private static ApplicationSessionResult EndedFailure(ApplicationSession session) => session.EndReason switch
     {

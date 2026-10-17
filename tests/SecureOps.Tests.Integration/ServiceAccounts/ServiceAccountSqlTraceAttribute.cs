@@ -7,7 +7,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using SecureOps.Tests.Integration.ServiceAccounts;
-using Xunit.Sdk;
+using Xunit.v3;
 
 [assembly: ServiceAccountSqlTrace]
 
@@ -23,7 +23,7 @@ public sealed class ServiceAccountSqlTraceAttribute : BeforeAfterTestAttribute
     private static readonly Lazy<IDisposable> _listener = new(() => DiagnosticListener.AllListeners.Subscribe(new Listeners()));
 
     /// <inheritdoc/>
-    public override void Before(MethodInfo methodUnderTest)
+    public override void Before(MethodInfo methodUnderTest, IXunitTest test)
     {
         if (string.IsNullOrWhiteSpace(_file))
         {
@@ -36,7 +36,7 @@ public sealed class ServiceAccountSqlTraceAttribute : BeforeAfterTestAttribute
     }
 
     /// <inheritdoc/>
-    public override void After(MethodInfo methodUnderTest)
+    public override void After(MethodInfo methodUnderTest, IXunitTest test)
     {
         if (string.IsNullOrWhiteSpace(_file))
         {

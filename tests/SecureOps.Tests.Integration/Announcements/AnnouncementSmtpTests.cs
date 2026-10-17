@@ -24,7 +24,7 @@ public sealed class AnnouncementSmtpTests
         var policy = new AnnouncementMailPolicy(Options.Create(config), "Test");
         var transport = new SmtpAnnouncementTransport(Options.Create(config), policy);
         AnnouncementMailExecution execution = await ExecutionAsync(policy);
-        AnnouncementTransportOutcome result = await transport.SubmitAsync(execution, default);
+        AnnouncementTransportOutcome result = await transport.SubmitAsync(execution, TestContext.Current.CancellationToken);
         result.State.Should().Be(state);
         result.Accepted.Count.Should().Be(accepted);
         result.Rejected.Count.Should().Be(rejected);
@@ -46,8 +46,8 @@ public sealed class AnnouncementSmtpTests
         policy = new(Options.Create(config), "Test");
         AnnouncementMailExecution execution = await ExecutionAsync(policy);
         var transport = new SmtpAnnouncementTransport(Options.Create(config), policy);
-        (await transport.SubmitAsync(execution with { Message = [1, 2, 3] }, default)).State.Should().Be("Denied");
-        (await transport.SubmitAsync(execution with { Command = execution.Command with { Intent = execution.Command.Intent with { Kind = "SelfTest" } } }, default)).State.Should().Be("Denied");
+        (await transport.SubmitAsync(execution with { Message = [1, 2, 3] }, TestContext.Current.CancellationToken)).State.Should().Be("Denied");
+        (await transport.SubmitAsync(execution with { Command = execution.Command with { Intent = execution.Command.Intent with { Kind = "SelfTest" } } }, TestContext.Current.CancellationToken)).State.Should().Be("Denied");
         sink.Connections.Should().Be(0);
     }
 

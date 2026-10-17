@@ -146,7 +146,7 @@ const out = path.resolve(process.argv[5]);
         // ---- unsupported type: review-only drafts can never be submitted
         const other = fixture('SIM-OR-500');
         await open(other);
-        const select = page.getByRole('combobox', { name: 'Talep türü (operatör beyanı)', exact: true });
+        const select = page.getByRole('combobox', { name: 'Talep türü', exact: true });
         await select.focus();
         await select.selectOption({ label: 'Uygulama Kurulumu' });
         await button('İnceleme taslağı hazırla').click();

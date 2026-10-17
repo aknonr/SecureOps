@@ -20,11 +20,11 @@ public sealed partial class AnnouncementTests
         };
         var renderer = new AnnouncementRenderer(Options.Create(options));
         string file = Path.Combine(root, "banner.bin");
-        await File.WriteAllBytesAsync(file, new byte[1024 * 1024 + 1]);
+        await File.WriteAllBytesAsync(file, new byte[1024 * 1024 + 1], TestContext.Current.CancellationToken);
         await FluentActions.Awaiting(() => renderer.AssetAsync("asset", default)).Should().ThrowAsync<InvalidOperationException>();
         using (var wide = new SKBitmap(2049, 1))
         using (SKData encoded = wide.Encode(SKEncodedImageFormat.Png, 100))
-        { await File.WriteAllBytesAsync(file, encoded.ToArray()); }
+        { await File.WriteAllBytesAsync(file, encoded.ToArray(), TestContext.Current.CancellationToken); }
         await FluentActions.Awaiting(() => renderer.AssetAsync("asset", default)).Should().ThrowAsync<InvalidOperationException>();
         using var bitmap = new SKBitmap(512, 256, SKColorType.Bgra8888, SKAlphaType.Opaque);
         byte[] noise = new byte[bitmap.ByteCount];
@@ -35,8 +35,8 @@ public sealed partial class AnnouncementTests
         using SKData data = bitmap.Encode(SKEncodedImageFormat.Png, 100);
         byte[] bytes = data.ToArray();
         bytes.Length.Should().BeInRange(350_000, 1024 * 1024);
-        await File.WriteAllBytesAsync(file, bytes);
-        (await renderer.AssetAsync("asset", default)).Type.Should().Be("png");
+        await File.WriteAllBytesAsync(file, bytes, TestContext.Current.CancellationToken);
+        (await renderer.AssetAsync("asset", TestContext.Current.CancellationToken)).Type.Should().Be("png");
         await FluentActions.Awaiting(() => renderer.PresentationAsync(FinalContent(), default)).Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("Presentation image budget exceeded.");
     }

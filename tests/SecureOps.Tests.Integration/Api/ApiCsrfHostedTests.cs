@@ -38,7 +38,7 @@ public sealed class ApiCsrfHostedTests
         using HttpRequestMessage request = new(new HttpMethod(method), path + "?sentinel=never-log");
         request.Headers.Add("Origin", "https://evil.example");
         request.Content = new MultipartFormDataContent { { new StringContent("never-log-body"), "file", "synthetic.json" } };
-        using HttpResponseMessage response = await client.SendAsync(request);
+        using HttpResponseMessage response = await client.SendAsync(request, TestContext.Current.CancellationToken);
         await AssertProblem(response, HttpStatusCode.Forbidden, OperationalErrorCodes.ApiCsrfRejected);
         InMemoryAuditWriter audit = factory.Services.GetRequiredService<InMemoryAuditWriter>();
         AuditEvent denial = audit.Events.Single(item => item.Action == AuditActions.ApiCsrfRejected);
@@ -54,22 +54,22 @@ public sealed class ApiCsrfHostedTests
     {
         using WebApplicationFactory<Program> factory = Factory();
         using HttpClient client = Client(factory);
-        ResourceCategory[] before = (await client.GetFromJsonAsync<ResourceCategory[]>("/api/v1/resources/categories"))!;
+        ResourceCategory[] before = (await client.GetFromJsonAsync<ResourceCategory[]>("/api/v1/resources/categories", cancellationToken: TestContext.Current.CancellationToken))!;
         using HttpRequestMessage hostile = new(HttpMethod.Post, "/api/v1/resources/categories");
         hostile.Headers.Add("Origin", "https://evil.example");
         hostile.Content = JsonContent.Create(new SaveResourceCategoryRequest("Rejected synthetic category"));
-        using HttpResponseMessage denied = await client.SendAsync(hostile);
+        using HttpResponseMessage denied = await client.SendAsync(hostile, TestContext.Current.CancellationToken);
         await AssertProblem(denied, HttpStatusCode.Forbidden, OperationalErrorCodes.ApiCsrfRejected);
-        (await client.GetFromJsonAsync<ResourceCategory[]>("/api/v1/resources/categories"))!.Should().BeEquivalentTo(before);
+        (await client.GetFromJsonAsync<ResourceCategory[]>("/api/v1/resources/categories", cancellationToken: TestContext.Current.CancellationToken))!.Should().BeEquivalentTo(before);
 
         using HttpRequestMessage browser = new(HttpMethod.Post, "/api/v1/resources/categories");
         browser.Headers.Add("Origin", "https://trusted.example.invalid");
         browser.Headers.Add("Sec-Fetch-Site", "same-origin");
         browser.Content = JsonContent.Create(new SaveResourceCategoryRequest("Allowed synthetic category"));
-        (await client.SendAsync(browser)).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await client.PostAsJsonAsync("/api/v1/resources/categories", new SaveResourceCategoryRequest("Server synthetic category")))
+        (await client.SendAsync(browser, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await client.PostAsJsonAsync("/api/v1/resources/categories", new SaveResourceCategoryRequest("Server synthetic category"), cancellationToken: TestContext.Current.CancellationToken))
             .StatusCode.Should().Be(HttpStatusCode.OK);
-        (await client.GetFromJsonAsync<ResourceCategory[]>("/api/v1/resources/categories"))!.Should().HaveCount(before.Length + 2);
+        (await client.GetFromJsonAsync<ResourceCategory[]>("/api/v1/resources/categories", cancellationToken: TestContext.Current.CancellationToken))!.Should().HaveCount(before.Length + 2);
     }
 
     [Fact]
@@ -84,8 +84,7 @@ public sealed class ApiCsrfHostedTests
             { new StringContent("Synthetic file, no real scan"), "file", "synthetic.json" },
             { new StringContent("Synthetic operator statement"), "runStatement" }
         };
-        using HttpResponseMessage response = await client.PostAsync(
-            "/api/v1/service-accounts/accounts/00000000-0000-0000-0000-000000000001/usage-scans", form);
+        using HttpResponseMessage response = await client.PostAsync("/api/v1/service-accounts/accounts/00000000-0000-0000-0000-000000000001/usage-scans", form, TestContext.Current.CancellationToken);
         await AssertProblem(response, HttpStatusCode.ServiceUnavailable, "ServiceAccountsNotConfigured");
         factory.Services.GetRequiredService<InMemoryAuditWriter>().Events.Should().NotContain(item => item.Action == AuditActions.ApiCsrfRejected);
     }
@@ -97,7 +96,7 @@ public sealed class ApiCsrfHostedTests
         using HttpClient client = Client(factory);
         client.DefaultRequestHeaders.Add("Origin", "https://trusted.example.invalid");
         client.DefaultRequestHeaders.Add("Sec-Fetch-Site", "cross-site");
-        using HttpResponseMessage response = await client.PostAsJsonAsync("/api/v1/resources/categories", new SaveResourceCategoryRequest("Rejected"));
+        using HttpResponseMessage response = await client.PostAsJsonAsync("/api/v1/resources/categories", new SaveResourceCategoryRequest("Rejected"), cancellationToken: TestContext.Current.CancellationToken);
         await AssertProblem(response, HttpStatusCode.Forbidden, OperationalErrorCodes.ApiCsrfRejected);
         JsonSerializer.Serialize(factory.Services.GetRequiredService<InMemoryAuditWriter>().Events
             .Single(item => item.Action == AuditActions.ApiCsrfRejected).Details).Should().Contain("CrossSite");
@@ -110,10 +109,10 @@ public sealed class ApiCsrfHostedTests
         using HttpClient client = Client(factory, intent: false);
         client.DefaultRequestHeaders.Add("Origin", "https://evil.example");
         client.DefaultRequestHeaders.Add("Sec-Fetch-Site", "cross-site");
-        (await client.GetAsync("/api/v1/resources/categories")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await client.GetAsync("/api/v1/resources/categories", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK);
         client.DefaultRequestHeaders.Remove("Origin");
         client.DefaultRequestHeaders.Remove("Sec-Fetch-Site");
-        await AssertProblem(await client.PostAsJsonAsync("/api/v1/resources/categories", new SaveResourceCategoryRequest("Rejected")),
+        await AssertProblem(await client.PostAsJsonAsync("/api/v1/resources/categories", new SaveResourceCategoryRequest("Rejected"), cancellationToken: TestContext.Current.CancellationToken),
             HttpStatusCode.Forbidden, OperationalErrorCodes.ApiCsrfRejected);
     }
 
@@ -123,10 +122,10 @@ public sealed class ApiCsrfHostedTests
         using WebApplicationFactory<Program> factory = Factory();
         using HttpClient anonymous = factory.CreateClient();
         using HttpClient lead = Client(factory, intent: false, actor: "team-lead");
-        (await anonymous.PostAsync("/api/v1/resources/categories", null)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        using HttpResponseMessage response = await lead.PostAsync("/api/v1/resources/categories", null);
+        (await anonymous.PostAsync("/api/v1/resources/categories", null, TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        using HttpResponseMessage response = await lead.PostAsync("/api/v1/resources/categories", null, TestContext.Current.CancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-        (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("stage").GetString().Should().Be("authorization");
+        (await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: TestContext.Current.CancellationToken)).GetProperty("stage").GetString().Should().Be("authorization");
         factory.Services.GetRequiredService<InMemoryAuditWriter>().Events.Should().NotContain(item => item.Action == AuditActions.ApiCsrfRejected);
     }
 
@@ -154,7 +153,7 @@ public sealed class ApiCsrfHostedTests
         invoked.Should().BeFalse();
         context.Response.StatusCode.Should().Be(status);
         context.Response.Body.Position = 0;
-        string body = await new StreamReader(context.Response.Body).ReadToEndAsync();
+        string body = await new StreamReader(context.Response.Body).ReadToEndAsync(TestContext.Current.CancellationToken);
         body.Should().Contain(code).And.NotContain("secret-sentinel");
         await writer.Received(1).WriteAsync(Arg.Is<AuditEvent>(item => item.Actor == "synthetic:operator" && item.Action == AuditActions.ApiCsrfRejected),
             Arg.Any<CancellationToken>());
@@ -165,7 +164,7 @@ public sealed class ApiCsrfHostedTests
     {
         using WebApplicationFactory<Program> factory = Factory();
         using HttpClient client = Client(factory);
-        JsonElement document = await client.GetFromJsonAsync<JsonElement>("/swagger/v1/swagger.json");
+        JsonElement document = await client.GetFromJsonAsync<JsonElement>("/swagger/v1/swagger.json", cancellationToken: TestContext.Current.CancellationToken);
         int unsafeCount = 0;
         foreach (JsonProperty path in document.GetProperty("paths").EnumerateObject())
         {

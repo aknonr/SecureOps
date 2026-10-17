@@ -34,7 +34,7 @@ const attribute = (box, name, value) => box.evaluate((e, [n, v]) => new Promise(
 async function keyboard(page, route, name) {
     const box = page.getByRole('combobox', { name, exact: true }).first();
     await box.waitFor();
-    assert.equal(await page.getByLabel(name, { exact: true }).first().evaluate(e => e.getAttribute('role')), 'combobox', route + ': getByLabel reaches the combobox');
+    assert.equal(await page.getByLabel(name, { exact: true }).locator('visible=true').first().evaluate(e => e.getAttribute('role')), 'combobox', route + ': getByLabel reaches the combobox');
     await box.focus();
     const before = await box.textContent();
     await page.keyboard.press('Enter');

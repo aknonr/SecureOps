@@ -128,8 +128,8 @@ public sealed class UiHttpsOffloadTests
             HandleCookies = false
         });
 
-        using HttpResponseMessage healthResponse = await client.GetAsync("/health");
-        using HttpResponseMessage loginResponse = await client.GetAsync("/login");
+        using HttpResponseMessage healthResponse = await client.GetAsync("/health", TestContext.Current.CancellationToken);
+        using HttpResponseMessage loginResponse = await client.GetAsync("/login", TestContext.Current.CancellationToken);
 
         healthResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -158,8 +158,8 @@ public sealed class UiHttpsOffloadTests
             BaseAddress = new Uri($"http://{_expectedHost}"),
             HandleCookies = false
         });
-        HttpResponseMessage login = await client.GetAsync("/login");
-        string html = await login.Content.ReadAsStringAsync();
+        HttpResponseMessage login = await client.GetAsync("/login", TestContext.Current.CancellationToken);
+        string html = await login.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         const string marker = "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"";
         int start = html.IndexOf(marker, StringComparison.Ordinal) + marker.Length;
         string token = System.Net.WebUtility.HtmlDecode(html[start..html.IndexOf('"', start)]);
@@ -175,7 +175,7 @@ public sealed class UiHttpsOffloadTests
         request.Headers.Add(
             "Cookie",
             string.Join("; ", login.Headers.GetValues("Set-Cookie").Select(value => value.Split(';')[0])));
-        HttpResponseMessage response = await client.SendAsync(request);
+        HttpResponseMessage response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Redirect);
         string redirectUri = response.Headers.Location!.Query

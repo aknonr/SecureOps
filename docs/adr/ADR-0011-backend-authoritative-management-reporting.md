@@ -29,13 +29,33 @@ SecureOps will expose a backend-authoritative management reporting read model wi
 ## Consequences
 
 - Migration 005 creates the reporting schema/views and supporting indexes but no mutable reporting fact table.
-- The reporting endpoint is unavailable unless Audit, Access, and Operational Record persistence all use SQL Server.
+- ~~The reporting endpoint is unavailable unless Audit, Access, and Operational Record persistence all use SQL Server.~~ Superseded by Amendment 1.
 - Rate-limit rejection counts remain unavailable because current rate-limit responses are not audited.
 - Invalid items skipped inside historical bulk identity requests do not have individual terminal audit rows.
 - Idempotent duplicate-prevention events become measurable only from this release forward.
 - Real-user pilot reporting requires Demo authentication and Demo access compatibility to be disabled during real-user bootstrap and thereafter.
 - Evidence coverage uses the earliest indexed, known reporting action from the existing `reporting.ManagementAuditEvents` view. Report-read audit noise is excluded. A null boundary or a boundary after the requested start is incomplete; metric-specific historical limitations still apply.
 - G-16 adoption and Operational Record/Jira trend series remain out of scope.
+
+## Amendment 1 — Report from the configured source (2026-10-03)
+
+**Why:** the owner wants the management summary to work in every configuration, using SQL wherever SQL is
+configured. The original rule ("unavailable unless Audit, Access and Operational Record persistence all use SQL
+Server") left Demo/local hosts with an empty summary and required Access persistence that the summary never reads.
+
+**Decision (owner):** the summary reads each evidence stream from where it is configured.
+
+- Audit and Operational Record workflow both on SQL Server: unchanged set-based SQL aggregation.
+- Either stream in memory: the same rules are applied to raw rows read from each stream's own source (SQL or
+  memory) — `FactManagementReportingRepository`. The in-memory Operational Record repository records the same
+  workflow transitions SQL writes to `ops.OperationalRecordWorkflowHistory`.
+- Access persistence no longer gates reporting; the summary does not read it.
+- File audit cannot be queried and stays fail-closed (`ReportingPersistenceNotConfigured`).
+- A report built from any in-memory stream carries the `NonDurableReportingSource` limitation naming the
+  stream; in-memory evidence is lost on restart and is never authoritative history. Production already rejects
+  in-memory audit.
+
+The original Consequences line on SQL-only availability is superseded; all other decisions stand.
 
 ## Rejected Alternatives
 

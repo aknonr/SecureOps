@@ -1,4 +1,4 @@
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using SecureOps.Api.Controllers.ServiceAccounts;
 using SecureOps.Domain.ServiceAccounts;
 using Swashbuckle.AspNetCore.SwaggerGen;
@@ -6,8 +6,8 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 namespace SecureOps.Api.OpenApi;
 
 /// <summary>
-/// Describes the two usage-scan uploads (ADR-0027) as the form actually sent: <c>file</c> as binary (Swashbuckle 6 otherwise
-/// expands <c>[FromForm] IFormFile</c> into its own properties), the run statement's bounds, the optional request and the
+/// Describes the two usage-scan uploads (ADR-0027) as the form actually sent: <c>file</c> as binary (Swashbuckle 10 rejects
+/// <c>[FromForm]</c> on an <c>IFormFile</c>, so the parameter binds from the form by default), the run statement's bounds, the optional request and the
 /// 1–20 distinct account ids. The server still validates every field; this only documents it.
 /// </summary>
 public sealed class ServiceAccountUploadOperationFilter : IOperationFilter
@@ -19,33 +19,34 @@ public sealed class ServiceAccountUploadOperationFilter : IOperationFilter
             || context.MethodInfo.Name is not (nameof(ServiceAccountsController.UsageScanUploadAsync) or nameof(ServiceAccountsController.UsageScanBatchUploadAsync)))
         { return; }
         bool batch = context.MethodInfo.Name == nameof(ServiceAccountsController.UsageScanBatchUploadAsync);
-        OpenApiSchema schema = new()
+        Dictionary<string, IOpenApiSchema> properties = new()
         {
-            Type = "object",
-            Required = new HashSet<string>(batch ? ["file", "runStatement", "accountIds"] : ["file", "runStatement"]),
-            Properties = new Dictionary<string, OpenApiSchema>
-            {
-                ["file"] = new() { Type = "string", Format = "binary", Description = "Combined usage-scan JSON (Invoke-ServiceAccountUsageScan.ps1 -CombinePath)." },
-                ["runStatement"] = new() { Type = "string", MinLength = 5, MaxLength = 400, Description = "Where and under which authority the scan ran; no control characters." }
-            }
+            ["file"] = new OpenApiSchema { Type = JsonSchemaType.String, Format = "binary", Description = "Combined usage-scan JSON (Invoke-ServiceAccountUsageScan.ps1 -CombinePath)." },
+            ["runStatement"] = new OpenApiSchema { Type = JsonSchemaType.String, MinLength = 5, MaxLength = 400, Description = "Where and under which authority the scan ran; no control characters." }
         };
         if (batch)
         {
-            schema.Properties["accountIds"] = new()
+            properties["accountIds"] = new OpenApiSchema
             {
-                Type = "array",
+                Type = JsonSchemaType.Array,
                 MinItems = 1,
                 MaxItems = UsageScanBatch.MaxAccounts,
                 UniqueItems = true,
-                Items = new() { Type = "string", Format = "uuid" },
+                Items = new OpenApiSchema { Type = JsonSchemaType.String, Format = "uuid" },
                 Description = "Repeated form field, one account id per value."
             };
         }
         else
         {
-            schema.Properties["requestId"] = new() { Type = "string", Format = "uuid", Description = "Open request of this account (participant basis)." };
+            properties["requestId"] = new OpenApiSchema { Type = JsonSchemaType.String, Format = "uuid", Description = "Open request of this account (participant basis)." };
         }
 
+        OpenApiSchema schema = new()
+        {
+            Type = JsonSchemaType.Object,
+            Required = new HashSet<string>(batch ? ["file", "runStatement", "accountIds"] : ["file", "runStatement"]),
+            Properties = properties
+        };
         operation.RequestBody = new OpenApiRequestBody
         {
             Required = true,
@@ -54,7 +55,7 @@ public sealed class ServiceAccountUploadOperationFilter : IOperationFilter
                 ["multipart/form-data"] = new()
                 {
                     Schema = schema,
-                    Encoding = batch ? new Dictionary<string, OpenApiEncoding> { ["accountIds"] = new() { Style = ParameterStyle.Form, Explode = true } } : []
+                    Encoding = batch ? new Dictionary<string, OpenApiEncoding> { ["accountIds"] = new() { Style = ParameterStyle.Form, Explode = true } } : null
                 }
             }
         };

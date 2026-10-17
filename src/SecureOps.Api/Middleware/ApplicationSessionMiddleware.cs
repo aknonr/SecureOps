@@ -3,6 +3,7 @@ using SecureOps.Api.Security;
 using SecureOps.Infrastructure.Access;
 using SecureOps.Infrastructure.Sessions;
 using SecureOps.Shared.Contracts.Api;
+using SecureOps.Shared.Contracts.Sessions;
 
 namespace SecureOps.Api.Middleware;
 
@@ -34,7 +35,7 @@ public sealed class ApplicationSessionMiddleware
         ApplicationSessionCookieReadResult cookieResult = cookie.Read(httpContext.Request);
         if (cookieResult.Status == ApplicationSessionCookieStatus.Invalid)
         {
-            cookie.Delete(httpContext.Response);
+            httpContext.Response.Headers[ApplicationSessionHeaders.ReauthenticationRequired] = ApplicationSessionHeaders.Required;
             await OperationalProblemDetails.WriteAsync(
                 httpContext,
                 StatusCodes.Status403Forbidden,
@@ -68,8 +69,13 @@ public sealed class ApplicationSessionMiddleware
             return;
         }
 
-        cookie.Delete(httpContext.Response);
         bool unavailable = result.Disposition is ApplicationSessionDisposition.StoreUnavailable or ApplicationSessionDisposition.AuditUnavailable;
+        if (!unavailable)
+        {
+            // Retain the terminal handle so a subsequent authenticated request cannot start over.
+            httpContext.Response.Headers[ApplicationSessionHeaders.ReauthenticationRequired] = ApplicationSessionHeaders.Required;
+        }
+
         await OperationalProblemDetails.WriteAsync(
             httpContext,
             unavailable ? StatusCodes.Status503ServiceUnavailable : StatusCodes.Status403Forbidden,

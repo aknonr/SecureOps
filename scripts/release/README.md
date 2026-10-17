@@ -110,7 +110,7 @@ one file per step from `ConvertTo-SsmsSingleFile.ps1` — the exact source lines
 preamble (`:on error exit`, `QUOTED_IDENTIFIER ON`, and a SQLCMD-mode check that turns on `NOEXEC` in normal
 mode), a duplicate-DECLARE-per-batch refusal, UTF-8 BOM and CRLF; identities in `DBA/ssms/ssms-scripts.json`.
 Read-only inventories (`scripts/release/sql/Get-InstalledMigrationInventory033To037.sql` and the 025–032 one) and
-pre/post checks are included. `candidate.json` records `negotiate` (both hosts must ship Negotiate 8.0.32,
+pre/post checks are included. `candidate.json` records `negotiate` (both hosts must ship Negotiate 10.0.13,
 CVE-2026-70179), `sqlSteps`, `ssmsSequence`, `defaultsOff` and `readyForInstallation=false`.
 Operator entry: `docs/release/TEST-033-037-OPERATOR-TR.md`.
 
@@ -251,7 +251,7 @@ It uses the shared payload/secret scanner, publishes framework-dependent win-x64
 smoke-checks the no-network usage path, creates per-file size/SHA256 and runtime/
 source metadata, and verifies every ZIP entry. It refuses existing destinations;
 it does not replace rc6.14, publish API/UI, deploy, or collect corporate evidence.
-The target needs both .NET 8 shared runtimes, not an SDK or repository. Operator
+The target needs both .NET 10 shared runtimes (both .NET 8 for packages built before 2026-10-02), not an SDK or repository. Operator
 instructions, the legacy `{}` dictionary, DOM candidate dictionary and unfilled
 RFC representation template are in `scripts/diagnostics/InUseEvidence`. Current
 A/B commands are in `operator-reporter-tr.md`; only Evidence may be shared.

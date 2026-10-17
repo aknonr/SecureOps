@@ -8,12 +8,13 @@
 @inject IApiSessionStore ApiSessions
 
 <MudThemeProvider @ref="_themeProvider" Theme="@SecureOpsTheme.For(_mode)" IsDarkMode="@IsDarkMode" />
+<MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 <NavigationLock OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
 
 @* Bound by MudHidden: true when the viewport is lg-and-up, where the drawer is docked. *@
-<MudHidden Breakpoint="Breakpoint.LgAndUp" @bind-IsHidden="_isDesktop" />
+<MudHidden Breakpoint="Breakpoint.LgAndUp" @bind-Hidden="_isDesktop" />
 
 <MudLayout>
     <AuthorizeView>
@@ -63,9 +64,6 @@
             <div class="so-route-progress @(_routeNavigating ? "is-active" : null)"
                  role="presentation" aria-hidden="true">
                 <span class="so-route-progress-line"></span>
-                <svg class="so-route-progress-plane" viewBox="-36 -25 72 50" focusable="false">
-                    <path d="M36 0 C33 -3 29 -4 24 -4 L10 -4 L-6 -25 L-13 -25 L-4 -4 L-20 -4 L-29 -12 L-34 -12 L-29 -3 L-34 -2 L-34 2 L-29 3 L-34 12 L-29 12 L-20 4 L-4 4 L-13 25 L-6 25 L10 4 L24 4 C29 4 33 3 36 0 Z" />
-                </svg>
             </div>
 
             <MudDrawer @bind-Open="_drawerOpen"
@@ -133,7 +131,7 @@
             "light" => AppearanceMode.Light,
             "dark" => AppearanceMode.Dark,
             "night" => AppearanceMode.Dark,
-            _ => await _themeProvider.GetSystemPreference() ? AppearanceMode.Dark : AppearanceMode.Light
+            _ => await _themeProvider.GetSystemDarkModeAsync() ? AppearanceMode.Dark : AppearanceMode.Light
         };
 
         await SyncThemeClassAsync();
@@ -199,8 +197,9 @@
     /// Mirrors the active palette onto the document element as <c>so-dark</c>.
     /// </summary>
     /// <remarks>
-    /// MudBlazor 6.16 signals dark mode only by rewriting the <c>--mud-palette-*</c> values on
-    /// <c>:root</c>; it adds no class, and CSS cannot branch on a variable's value. Custom rules that
+    /// MudBlazor signals dark mode mainly by rewriting the <c>--mud-palette-*</c> values on
+    /// <c>:root</c> (6.16 added no class at all), and CSS cannot branch on a variable's value. This app keeps its
+    /// own class so custom CSS never depends on library class names, which changed across 7-9. Custom rules that
     /// must differ by more than a colour — tint strength and shadow depth, which both need to be
     /// stronger on a dark ground — therefore have nothing to hook onto. This supplies that hook.
     /// <para>

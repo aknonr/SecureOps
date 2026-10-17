@@ -47,19 +47,11 @@ public interface IApiSessionContext
 /// their scope outlives the request. Razor Pages, endpoints, and prerendering read it straight off
 /// the authenticated principal, which is where it lives for the whole browser session.
 /// </remarks>
-public sealed class ApiSessionContext : IApiSessionContext
+/// <param name="httpContextAccessor">Accessor used for the non-circuit fallback.</param>
+public sealed class ApiSessionContext(IHttpContextAccessor httpContextAccessor) : IApiSessionContext
 {
-    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
     private string? _seeded;
-
-    /// <summary>
-    /// Initializes a new API session context.
-    /// </summary>
-    /// <param name="httpContextAccessor">Accessor used for the non-circuit fallback.</param>
-    public ApiSessionContext(IHttpContextAccessor httpContextAccessor)
-    {
-        _httpContextAccessor = httpContextAccessor;
-    }
 
     /// <inheritdoc />
     public string? BrowserSessionKey => _seeded ?? FromHttpContext();

@@ -1,0 +1,57 @@
+/* Module tones are decoration only; every card names its module and every action states its result in words. */
+.eff { display: flex; flex-direction: column; gap: var(--so-space-4); }
+.eff-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--so-space-3); }
+.eff-title { margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--so-text); }
+.eff-lead { margin: 4px 0 0; color: var(--so-text-muted); }
+.eff-lead strong { color: var(--so-text); }
+.eff-roles { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0; }
+.eff-roles-label { color: var(--so-text-muted); font-size: 0.85rem; margin-right: 4px; }
+
+.eff-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: var(--so-space-4); }
+
+.eff-card {
+    --tone: var(--so-accent);
+    position: relative;
+    display: flex; flex-direction: column; gap: var(--so-space-2);
+    padding: var(--so-space-4);
+    border: 1px solid var(--so-border);
+    border-radius: var(--so-radius-lg);
+    background: var(--so-surface);
+    overflow: hidden;
+    transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.eff-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: var(--tone); }
+.eff-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgb(0 0 0 / 12%); }
+
+.so-tone-0 { --tone: #3b82f6; } .so-tone-1 { --tone: #10b981; } .so-tone-2 { --tone: #f59e0b; }
+.so-tone-3 { --tone: #8b5cf6; } .so-tone-4 { --tone: #ef4444; } .so-tone-5 { --tone: #06b6d4; }
+
+.eff-card-head { display: flex; align-items: center; gap: var(--so-space-3); }
+.eff-icon {
+    display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 12px;
+    color: var(--tone); background: color-mix(in srgb, var(--tone) 14%, transparent);
+}
+.eff-card-title h3 { margin: 0; font-size: 1rem; font-weight: 700; color: var(--so-text); }
+.eff-count { font-size: 0.8rem; color: var(--so-text-muted); }
+
+.eff-meter { height: 6px; border-radius: 99px; background: var(--so-bg-sunken); overflow: hidden; }
+.eff-meter > span { display: block; height: 100%; border-radius: inherit; background: var(--tone); transition: width 400ms ease; }
+
+.eff-guidance { margin: 0; font-size: 0.82rem; color: var(--so-text-muted); }
+
+.eff-actions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.eff-action { display: flex; gap: var(--so-space-2); align-items: flex-start; padding: 6px 8px; border-radius: var(--so-radius-sm); }
+.eff-action.is-granted { background: color-mix(in srgb, var(--so-success) 9%, transparent); }
+.eff-action.is-granted ::deep .mud-icon-root { color: var(--so-success); }
+.eff-action.is-denied { opacity: 0.72; }
+.eff-action.is-denied ::deep .mud-icon-root { color: var(--so-text-faint); }
+.eff-action-text { display: flex; flex-direction: column; min-width: 0; }
+.eff-action-name { font-weight: 600; color: var(--so-text); }
+.eff-state { margin-left: 6px; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; color: var(--so-text-muted); }
+.eff-action-desc { font-size: 0.8rem; color: var(--so-text-muted); }
+.eff-via { font-size: 0.78rem; color: var(--so-accent-strong); }
+
+@media (prefers-reduced-motion: reduce) {
+    .eff-card, .eff-meter > span { transition: none; }
+    .eff-card:hover { transform: none; }
+}

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using SecureOps.Api.Middleware;
 using SecureOps.Api.Security;
 using SecureOps.Domain.Access;
@@ -23,19 +24,16 @@ public sealed class SessionsController : ControllerBase
 {
     private readonly ApplicationSessionContext _sessionContext;
     private readonly IApplicationSessionService _sessionService;
-    private readonly ApplicationSessionCookie _cookie;
     private readonly IAccessRepository _accessRepository;
 
     /// <summary>Initializes the controller.</summary>
     public SessionsController(
         ApplicationSessionContext sessionContext,
         IApplicationSessionService sessionService,
-        ApplicationSessionCookie cookie,
         IAccessRepository accessRepository)
     {
         _sessionContext = sessionContext;
         _sessionService = sessionService;
-        _cookie = cookie;
         _accessRepository = accessRepository;
     }
 
@@ -81,6 +79,7 @@ public sealed class SessionsController : ControllerBase
 
     /// <summary>Revokes one exact active application session.</summary>
     [HttpPost("revoke")]
+    [EnableRateLimiting(ApiRateLimits.AccessAdministration)]
     [Authorize(Policy = Policies.CanManageUsers)]
     [ProducesResponseType(typeof(ApplicationSessionEndedResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -97,7 +96,7 @@ public sealed class SessionsController : ControllerBase
         ApplicationSession ended = result.Session!;
         if (_sessionContext.Current?.SessionId == ended.SessionId)
         {
-            _cookie.Delete(Response);
+            Response.Headers[ApplicationSessionHeaders.ReauthenticationRequired] = ApplicationSessionHeaders.Required;
         }
 
         return Ok(new ApplicationSessionEndedResponse(ended.SessionId, ended.EndReason!.Value.ToString(), ended.EndedAtUtc!.Value));

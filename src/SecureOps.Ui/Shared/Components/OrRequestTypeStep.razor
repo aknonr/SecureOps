@@ -1,0 +1,104 @@
+@*
+    The operator's request-type step on an operational record (ADR-0018 Amendment 1).
+
+    The server may suggest a type from explicit title/description words and says which words. The
+    operator confirms it in one click or changes it; either way the type sent is the operator's
+    confirmation, never eligibility. Without a suggestion the operator chooses. Choosing a type other
+    than the suggestion is allowed and is warned about, because a wrong type maps to a wrong Jira form.
+*@
+@using SecureOps.Domain.OperationalRecords
+@using SecureOps.Shared.Contracts.OperationalRecords
+
+<section class="so-review-type or-type" data-guide="review-type" aria-labelledby="or-type-title">
+    <h2 id="or-type-title" class="so-panel-title">Talep türünü onaylayın</h2>
+    @if (Hint is { } hint && !_changing)
+    {
+        <div class="or-suggest">
+            <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Class="or-suggest-icon" aria-hidden="true" />
+            <div class="or-suggest-body">
+                <span class="or-label">Önerilen tür</span>
+                <strong class="or-suggest-type">@SdmEvidenceView.RequestTypeLabel(hint.Type)</strong>
+                <p>Neden: başlık veya açıklamada @string.Join(", ", hint.Terms.Select(term => $"“{term}”")) geçiyor. Öneri yalnız ön seçimdir; uygunluk veya yayımlama onayı vermez.</p>
+                <div class="or-actions">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Check"
+                               Disabled="Busy" OnClick="() => OnConfirm.InvokeAsync(hint.Type)">Doğru, inceleme taslağını hazırla</MudButton>
+                    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Edit" Disabled="Busy" OnClick="() => SwitchAsync(changing: true)">Türü değiştir</MudButton>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        @if (Hint is null)
+        { <MudAlert Dense="true" Severity="Severity.Info">Metinden tür önerilemedi: başlık ve açıklamada tek bir türü gösteren açık bir kelime yok. Türü siz seçin.</MudAlert> }
+        <label for="sdm-request-type" class="so-field-label">Talep türü</label>
+        <select id="sdm-request-type" class="so-request-type" value="@(DeclaredType?.ToString() ?? "")" disabled="@Busy" data-sdm-review-type @onchange="SelectAsync">
+            <option value="">Tür seçin</option>
+            @foreach (OperationalRecordClassification type in Types)
+            { <option value="@type">@SdmEvidenceView.RequestTypeLabel(type)</option> }
+        </select>
+        @if (Hint is { } differs && DeclaredType is { } chosen && chosen != differs.Type)
+        { <MudAlert Dense="true" Severity="Severity.Warning" role="status">Seçtiğiniz tür metindeki öneriden (@SdmEvidenceView.RequestTypeLabel(differs.Type)) farklı. Talebi tekrar okuyun; yanlış tür yanlış Jira eşlemesine gider.</MudAlert> }
+        <div class="or-actions">
+            <MudButton StartIcon="@Icons.Material.Filled.Preview" Variant="Variant.Filled" Color="Color.Primary"
+                       Disabled="@(Busy || DeclaredType is null)" OnClick="OnReview">İnceleme taslağı hazırla</MudButton>
+            @if (Hint is not null)
+            { <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Undo" Disabled="Busy" OnClick="() => SwitchAsync(changing: false)">Öneriye dön</MudButton> }
+        </div>
+        @if (DeclaredType is null)
+        { <p class="or-hint">Taslak için önce bir tür seçin.</p> }
+    }
+    @if ((DeclaredType ?? Hint?.Type) == OperationalRecordClassification.ServerRetirement)
+    { <p class="or-hint">Sunucu İadesi/Emekliliği yalnız talep takibidir; altyapı silme veya kaynak kapatma yetkisi vermez.</p> }
+    @if (DeclaredType is not null)
+    { <p class="or-hint">SDM takip gerekçesi: @SdmEvidenceView.TrackingReason(DeclaredType)</p> }
+    @if (OfferPilotValidation)
+    {
+        <details class="or-more">
+            <summary>Onaylı tek kayıt politikası</summary>
+            <p>Bu kayıt süreç sahibinin onayladığı tek kayıt politikasındaysa tür seçmeden doğrudan doğrulayıp önizleyebilirsiniz.</p>
+            <MudButton StartIcon="@Icons.Material.Filled.Verified" Disabled="Busy" OnClick="OnValidatePilot">Onaylı tek kayıt politikasını doğrula ve önizle</MudButton>
+        </details>
+    }
+</section>
+
+@code {
+    private static readonly OperationalRecordClassification[] Types =
+        [OperationalRecordClassification.ServerRequest, OperationalRecordClassification.SoftwareInstallation, OperationalRecordClassification.ServerRetirement];
+
+    private bool _changing;
+
+    /// <summary>Server suggestion for this record, if any.</summary>
+    [Parameter] public RequestTypeSuggestionResponse? Hint { get; set; }
+
+    /// <summary>The type the operator has selected; null until chosen.</summary>
+    [Parameter] public OperationalRecordClassification? DeclaredType { get; set; }
+
+    /// <summary>Raised when the operator selects or clears a type.</summary>
+    [Parameter] public EventCallback<OperationalRecordClassification?> DeclaredTypeChanged { get; set; }
+
+    /// <summary>The operator confirmed the suggestion; the page declares it and prepares the draft.</summary>
+    [Parameter] public EventCallback<OperationalRecordClassification> OnConfirm { get; set; }
+
+    /// <summary>Prepare the review draft for the selected type.</summary>
+    [Parameter] public EventCallback OnReview { get; set; }
+
+    /// <summary>Validate the approved single-record policy instead of declaring a type.</summary>
+    [Parameter] public EventCallback OnValidatePilot { get; set; }
+
+    /// <summary>Whether the approved single-record policy path applies (never in simulation).</summary>
+    [Parameter] public bool OfferPilotValidation { get; set; }
+
+    /// <summary>A command is in flight.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    private Task SelectAsync(ChangeEventArgs args) =>
+        DeclaredTypeChanged.InvokeAsync(Enum.TryParse(args.Value?.ToString(), out OperationalRecordClassification type) && Types.Contains(type) ? type : null);
+
+    // Leaving or returning to the suggestion clears any selection, so a stale choice is never sent.
+    private Task SwitchAsync(bool changing)
+    {
+        _changing = changing;
+        return DeclaredTypeChanged.InvokeAsync(null);
+    }
+}

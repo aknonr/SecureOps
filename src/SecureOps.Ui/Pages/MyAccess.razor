@@ -2,6 +2,8 @@
 @attribute [Authorize]
 @implements IDisposable
 @inject ICurrentAccessProvider AccessProvider
+@inject IAccessApiClient AccessApi
+@inject ILogger<MyAccess> Logger
 
 <PageTitle>Erişimim · @WasasBrand.Name</PageTitle>
 
@@ -110,6 +112,15 @@
             }
         </section>
 
+        @if (_effective is not null)
+        {
+            <section class="so-panel">
+                <AccessEffectivePanel Effective="_effective" Title="Yetkileriniz" StartWithGrantedOnly="true" />
+                <p class="so-panel-text so-panel-text--sm mt-3">Yetkiler sunucu tarafında her istekte yeniden doğrulanır; bu görünüm sunucunun hesabınız için verdiği açıklamadır.</p>
+            </section>
+        }
+        else
+        {
         <section class="so-panel">
             <div class="so-panel-head">
                 <h2 class="so-panel-title">Yetkileriniz</h2>
@@ -157,19 +168,40 @@
                 hesabınız için bildirdiği güncel yetkileri gösterir.
             </p>
         </section>
+        }
     }
 </div>
 
 @code {
     private AccessSnapshot? _access;
+    private AccessEffectiveResponse? _effective;
 
     protected override async Task OnInitializedAsync()
     {
         AccessProvider.Changed += OnAccessChanged;
         _access = await AccessProvider.GetAsync();
+        await LoadEffectiveAsync();
     }
 
-    private async Task RefreshAsync() => _access = await AccessProvider.RefreshAsync();
+    private async Task RefreshAsync()
+    {
+        _access = await AccessProvider.RefreshAsync();
+        await LoadEffectiveAsync();
+    }
+
+    // The per-module explanation is an enhancement: if it cannot be read, the capability list above it
+    // (from /access/me) still states the authoritative grants, so the page degrades instead of failing.
+    private async Task LoadEffectiveAsync()
+    {
+        if (_access is not { IsResolved: true }) { _effective = null; return; }
+        try { _effective = await AccessApi.GetMyEffectiveAsync(CancellationToken.None); }
+        catch (SecureOpsApiException ex)
+        {
+            Logger.LogWarning("Per-module access explanation unavailable. Code: {Code}. CorrelationId: {CorrelationId}.",
+                ex.Problem.Code, ex.Problem.CorrelationId);
+            _effective = null;
+        }
+    }
 
     private IReadOnlyList<IGrouping<string, CapabilityDescriptor>> CapabilityGroups =>
         _access is null ? [] : AccessLabels.Group(_access.Capabilities);

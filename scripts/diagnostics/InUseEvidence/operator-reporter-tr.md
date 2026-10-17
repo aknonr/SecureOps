@@ -6,7 +6,7 @@ Bu araç uygulamaya veri yazmaz; başarılı toplama uçtan uca kabul değildir.
 
 ZIP SHA256 değerini teslim kaydıyla, açılan dosyaları payload-manifest.json ile
 karşılaştırın. delivery-metadata.json kesin kaynak SHA'sını ve runtime sürümlerini
-içerir. Windows x64: Microsoft.NETCore.App 8.0 ve Microsoft.AspNetCore.App 8.0
+içerir. Windows x64: Microsoft.NETCore.App 10.0 ve Microsoft.AspNetCore.App 10.0
 gerekir; `dotnet --list-runtimes` ile kontrol edin. SDK/IIS/SQL değişikliği yoktur.
 
 ## A. Aday alan incelemesi

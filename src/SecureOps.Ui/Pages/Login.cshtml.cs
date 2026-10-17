@@ -16,22 +16,13 @@ namespace SecureOps.Ui.Pages;
 /// before the response starts, which a Blazor circuit cannot do. It also keeps the page reachable when
 /// no circuit can be established.
 /// </remarks>
+/// <param name="shellMode">Effective shell mode.</param>
+/// <param name="oidcOptions">Server-owned OIDC feature configuration.</param>
 [AllowAnonymous]
-public sealed class LoginModel : PageModel
+public sealed class LoginModel(IDemoModeState shellMode, IOptions<OidcOptions> oidcOptions) : PageModel
 {
-    private readonly IDemoModeState _shellMode;
-    private readonly OidcOptions _oidc;
-
-    /// <summary>
-    /// Initializes a new login page model.
-    /// </summary>
-    /// <param name="shellMode">Effective shell mode.</param>
-    /// <param name="oidcOptions">Server-owned OIDC feature configuration.</param>
-    public LoginModel(IDemoModeState shellMode, IOptions<OidcOptions> oidcOptions)
-    {
-        _shellMode = shellMode;
-        _oidc = oidcOptions.Value;
-    }
+    private readonly IDemoModeState _shellMode = shellMode;
+    private readonly OidcOptions _oidc = oidcOptions.Value;
 
     /// <summary>
     /// Whether a session can currently be established from this page.

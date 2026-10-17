@@ -11,7 +11,8 @@ public sealed class ServiceAccountSql030FactAttribute : FactAttribute
     /// <summary>Environment variable holding the isolated 030 test connection.</summary>
     public const string Variable = "SECUREOPS_SA_SQL_TEST_CONNECTION_030";
 
-    public ServiceAccountSql030FactAttribute()
+    public ServiceAccountSql030FactAttribute([System.Runtime.CompilerServices.CallerFilePath] string? sourceFilePath = null, [System.Runtime.CompilerServices.CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(Variable)))
         {

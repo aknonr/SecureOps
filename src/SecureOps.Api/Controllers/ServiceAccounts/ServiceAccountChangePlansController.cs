@@ -101,7 +101,7 @@ public sealed class ServiceAccountChangePlansController(ServiceAccountService se
     [RequestSizeLimit(_maxEvidenceRequestBytes)]
     [RequestFormLimits(MultipartBodyLengthLimit = _maxEvidenceRequestBytes)]
     [ProducesResponseType(typeof(ChangePlanView), StatusCodes.Status200OK)]
-    public async Task<ActionResult<ChangePlanView>> EvidenceUploadAsync(Guid id, [FromForm] IFormFile file, [FromForm] string? label,
+    public async Task<ActionResult<ChangePlanView>> EvidenceUploadAsync(Guid id, IFormFile file, [FromForm] string? label,
         CancellationToken cancellationToken)
     {
         if (file is null || file.Length is 0 or > _maxEvidenceRequestBytes)

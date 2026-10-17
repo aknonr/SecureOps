@@ -64,6 +64,8 @@ public sealed record OperationalRecordResponse(
     public IReadOnlyList<string> BlockingConditions { get; init; } = [];
     /// <summary>Evaluation never grants permission to perform an external write.</summary>
     public bool ExternalWriteEligible { get; init; }
+    /// <summary>Advisory request type read from explicit title/description words; null when none or ambiguous. Never eligibility.</summary>
+    public RequestTypeSuggestionResponse? SuggestedRequestType { get; init; }
     /// <summary>Reviewed-draft fingerprint fixed on the transfer (duplicate protection); null before any preview.</summary>
     public string? TransferIdempotencyKey { get; init; }
     /// <summary>UTC time the Jira key was durably saved; null without a key or when no durable entry exists.</summary>
@@ -71,6 +73,12 @@ public sealed record OperationalRecordResponse(
     /// <summary>Absolute HTTPS issue address from server configuration (Corporate only); null when not configured.</summary>
     public string? JiraIssueUrl { get; init; }
 }
+
+/// <summary>Advisory request type the operator may confirm or change; it grants nothing (ADR-0018 Amendment 1).</summary>
+/// <param name="Type">Suggested supported request type.</param>
+/// <param name="Terms">Source words that matched, as written.</param>
+/// <param name="RuleVersion">Keyword rule set identifier.</param>
+public sealed record RequestTypeSuggestionResponse(OperationalRecordClassification Type, IReadOnlyList<string> Terms, string RuleVersion);
 
 /// <summary>Stable UI presentation categories derived from durable workflow states.</summary>
 public static class OperationalRecordPresentationStates

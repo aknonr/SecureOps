@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 if ($DeferInUseFollowup -and $RunTests) { throw 'Current regression requires 024. Deferred mode is for the isolated upgrade checkpoint only.' }
-# Fresh isolated acceptance includes additive 022-024; never targets an installed corporate database.
+# Fresh isolated acceptance includes additive 022-036; never targets an installed corporate database.
 $IncludeAnnouncementPreparations = $true
 if ($IncludeAnnouncementPreparations) { $IncludeAnnouncementSources = $true }
 if ($IncludeAnnouncementSources) { $IncludeAnnouncementDrafts = $true }
@@ -93,6 +93,19 @@ try {
         Invoke-ResourceTestSql -File '022-in-use-review-and-execution.sql'
         Invoke-ResourceTestSql -File '023-workflow-report-snapshots.sql'
         Invoke-ResourceTestSql -File '024-in-use-report-catalogue.sql'
+        # 025-036 keep the fresh test schema equal to the current chain; capability seeds come from 025/027/028.
+        Invoke-ResourceTestSql -File '025-service-accounts.sql'
+        Invoke-ResourceTestSql -File '026-service-account-usage-rules.sql'
+        Invoke-ResourceTestSql -File '027-admin-service-account-navigation.sql'
+        Invoke-ResourceTestSql -File '028-admin-service-account-operations.sql'
+        Invoke-ResourceTestSql -File '029-service-account-scope-bootstrap.sql'
+        Invoke-ResourceTestSql -File '030-service-account-usage-scans.sql'
+        Invoke-ResourceTestSql -File '031-service-account-requested-gmsa-name.sql'
+        Invoke-ResourceTestSql -File '032-access-request-user-index.sql'
+        Invoke-ResourceTestSql -File '033-service-account-change-plans.sql'
+        Invoke-ResourceTestSql -File '034-service-account-plan-evidence.sql'
+        # 035 is intentionally absent from the chain; 036 follows 034.
+        Invoke-ResourceTestSql -File '036-service-account-events.sql'
     }
 }
 finally { Pop-Location }
@@ -114,4 +127,4 @@ if ($RunTests) {
         } finally { Pop-Location }
     } finally { $env:SECUREOPS_SQL_TEST_CONNECTION = $previous }
 }
-[PSCustomObject]@{ Database = $database; Migrations = $(if ($DeferInUseFollowup) { '001-021' } else { '001-024' }); UpgradeFixture = 'Passed'; SqlTestsRequested = [bool]$RunTests; RetainedForInspection = $true }
+[PSCustomObject]@{ Database = $database; Migrations = $(if ($DeferInUseFollowup) { '001-021' } else { '001-036' }); UpgradeFixture = 'Passed'; SqlTestsRequested = [bool]$RunTests; RetainedForInspection = $true }

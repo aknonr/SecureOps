@@ -37,4 +37,5 @@ Business and security constraints. They hold even if a request asks otherwise: e
 
 ## Where to look
 
+Stack: .NET 10 (`net10.0`, C# 14, SDK pinned in `global.json`), Blazor Server with MudBlazor 9.11 — ADR-0001 Amendment 2.
 Guides in `docs/agent-guides/`: 010 architecture · 020 backend/SQL · 030 Worker · 040 PowerShell/JEA · 050 security · 060 UI · 070 analysis · 080 product AI · 090 testing. Service Accounts: `docs/service-accounts/PROGRESS.md`. Layer `README.md`, `*-HISTORY.md` and gap registers are dated logs: search, never read end to end.

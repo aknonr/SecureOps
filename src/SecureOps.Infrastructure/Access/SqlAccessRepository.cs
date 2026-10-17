@@ -39,7 +39,8 @@ public sealed partial class SqlAccessRepository : IAccessRepository
         }
 
         ApplicationUser user = (await GetUserAsync(registration.UserId, cancellationToken))!;
-        ApplicationAccessRequest? request = registration.RequestId is null ? null : await GetRequestAsync(registration.RequestId.Value, cancellationToken);
+        ApplicationAccessRequest? request = registration.RequestId is { } existingRequestId
+            ? await GetRequestAsync(existingRequestId, cancellationToken) : null;
         return new EnsureAccessUserResult(user, request, registration.UserCreated, registration.RequestCreated);
     }
 

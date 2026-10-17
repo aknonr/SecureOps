@@ -32,7 +32,7 @@
 </MudDialog>
 
 @code {
-    [CascadingParameter] private MudDialogInstance Dialog { get; set; } = default!;
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
     [Parameter, EditorRequired] public ResourcePreferencesResponse Preferences { get; set; } = default!;
     [Parameter, EditorRequired] public AccessSnapshot Access { get; set; } = default!;
     [Parameter, EditorRequired] public Func<SaveResourceLayoutRequest, Task<UiProblem?>> Save { get; set; } = default!;

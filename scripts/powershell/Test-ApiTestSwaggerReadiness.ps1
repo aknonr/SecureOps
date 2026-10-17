@@ -41,8 +41,8 @@ foreach ($package in @('Swashbuckle.AspNetCore.Swagger', 'Swashbuckle.AspNetCore
 }
 
 $runtimeConfig = Get-Content -LiteralPath (Join-Path $publishPath 'SecureOps.Api.runtimeconfig.json') -Raw | ConvertFrom-Json
-if ($runtimeConfig.runtimeOptions.tfm -ne 'net8.0') {
-    throw "Swagger readiness failed: expected net8.0 but found '$($runtimeConfig.runtimeOptions.tfm)'."
+if ($runtimeConfig.runtimeOptions.tfm -ne 'net10.0') {
+    throw "Swagger readiness failed: expected net10.0 but found '$($runtimeConfig.runtimeOptions.tfm)'."
 }
 
 [pscustomobject]@{

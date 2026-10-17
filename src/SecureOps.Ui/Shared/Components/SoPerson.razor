@@ -1,0 +1,46 @@
+@*
+    A person as operators recognise them: initials avatar, readable name, optional caption (team, role).
+    Display only — it says who a record names, never what that person may do. A missing name renders
+    the supplied fallback text instead of an empty avatar, so "unknown" stays visibly unknown.
+*@
+<span class="so-person @(Compact ? "so-person--compact" : null) @(string.IsNullOrWhiteSpace(Name) ? "so-person--empty" : null)" title="@Title">
+    <span class="so-person-avatar" aria-hidden="true">@Initials</span>
+    <span class="so-person-text">
+        <span class="so-person-name">@(string.IsNullOrWhiteSpace(Name) ? Fallback : Name)</span>
+        @if (!string.IsNullOrWhiteSpace(Caption)) { <span class="so-person-caption">@Caption</span> }
+    </span>
+</span>
+
+@code {
+    /// <summary>Display name as provided by the server; may contain "Ad Soyad - Ekip".</summary>
+    [Parameter] public string? Name { get; set; }
+
+    /// <summary>Secondary line, e.g. team or "RFC: OR-…".</summary>
+    [Parameter] public string? Caption { get; set; }
+
+    /// <summary>Text shown when no name is known.</summary>
+    [Parameter] public string Fallback { get; set; } = "Bilinmiyor";
+
+    /// <summary>Optional tooltip (e.g. technical account).</summary>
+    [Parameter] public string? Title { get; set; }
+
+    /// <summary>Smaller variant for dense lists.</summary>
+    [Parameter] public bool Compact { get; set; }
+
+    // "ENGIN UYSAL - Wasas Takimi" → "EU"; the team suffix after " - " is not part of the initials.
+    private string Initials
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(Name)) { return "?"; }
+            string person = Name.Split(" - ", 2, StringSplitOptions.TrimEntries)[0];
+            string[] parts = person.Split((char[])[' ', '.', '_'], StringSplitOptions.RemoveEmptyEntries);
+            return parts.Length switch
+            {
+                0 => "?",
+                1 => parts[0][..Math.Min(2, parts[0].Length)].ToUpperInvariant(),
+                _ => string.Concat(char.ToUpperInvariant(parts[0][0]), char.ToUpperInvariant(parts[^1][0]))
+            };
+        }
+    }
+}

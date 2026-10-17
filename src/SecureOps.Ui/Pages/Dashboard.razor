@@ -677,6 +677,7 @@
     private static async Task GoToAsync(ElementReference heading) => await heading.FocusAsync();
 
     private bool _managementView;
+    private bool _redirecting;
     private ReportingWindowPreset _preset = ReportingWindowPreset.Last7Days;
     private ReportingWindowRequest _window = ReportingWindowSelection.ForPreset(ReportingWindowPreset.Last7Days);
     private ManagementReportResponse? _report;
@@ -702,8 +703,30 @@
         // from "/". "/dashboard" stays reachable, and any other capability with its own entry keeps the board.
         if (OnlyServiceAccounts(_snapshot, _available, _managementView) && IsRootRoute())
         {
+            _redirecting = true;
             Navigation.NavigateTo("service-accounts", replace: true);
         }
+    }
+
+    // The page is prerendered, and the server holds the HTML until OnInitializedAsync completes. The
+    // access snapshot is quick and decides what the page is, so it is awaited here. The management
+    // report and the provider check are separate API calls that can take seconds: awaiting them here
+    // sent a blank page until they finished. They load after the first render instead, so the page
+    // arrives at once with its loading state and fills in. A user being sent on to Service Accounts
+    // does not start them.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_redirecting && _snapshot is { IsApproved: true })
+        {
+            await LoadDetailAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        await LoadAsync(force: true);
+        await LoadDetailAsync();
     }
 
     private bool IsRootRoute() => IsRoot(Navigation.ToBaseRelativePath(Navigation.Uri));
@@ -723,8 +746,6 @@
         && available.Count == 1
         && available[0].Route == "service-accounts";
 
-    private Task RefreshAsync() => LoadAsync(force: true);
-
     private async Task LoadAsync(bool force)
     {
         _snapshot = force
@@ -733,8 +754,11 @@
 
         _available = BuildTasks(_snapshot);
         _managementView = _snapshot.IsApproved && _snapshot.Can(Capabilities.ManagementReportingView);
+    }
 
-        if (!_snapshot.IsApproved)
+    private async Task LoadDetailAsync()
+    {
+        if (_snapshot is not { IsApproved: true })
         {
             return;
         }

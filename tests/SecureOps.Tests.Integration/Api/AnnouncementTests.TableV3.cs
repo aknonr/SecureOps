@@ -27,15 +27,15 @@ public sealed partial class AnnouncementTests
         };
         var renderer = new AnnouncementRenderer(Options.Create(config));
         AnnouncementContent oldContent = FinalContent();
-        AnnouncementPresentation oldPresentation = await renderer.PresentationAsync(oldContent, default);
+        AnnouncementPresentation oldPresentation = await renderer.PresentationAsync(oldContent, TestContext.Current.CancellationToken);
         var oldDraft = new AnnouncementDraft(Guid.NewGuid(), Guid.NewGuid(), 1, DateTimeOffset.UtcNow, oldContent,
             "sender@example.invalid", oldPresentation.Hash, TemplateRevision: oldContent.TemplateRevision);
-        byte[] oldBytes = await AnnouncementRenderer.EmailAsync(oldDraft, oldPresentation, default);
+        byte[] oldBytes = await AnnouncementRenderer.EmailAsync(oldDraft, oldPresentation, TestContext.Current.CancellationToken);
         AnnouncementContent content = oldContent with { TemplateRevision = "oco-table-v3", Description = "First line\nSecond <line>" };
-        AnnouncementPresentation presentation = await renderer.PresentationAsync(content, default);
+        AnnouncementPresentation presentation = await renderer.PresentationAsync(content, TestContext.Current.CancellationToken);
         presentation.Hash.Should().NotBe(oldPresentation.Hash);
         AnnouncementDraft draft = oldDraft with { Content = content, TemplateRevision = content.TemplateRevision, BannerHash = presentation.Hash };
-        using var mail = MimeMessage.Load(new MemoryStream(await AnnouncementRenderer.EmailAsync(draft, presentation, default)));
+        using var mail = MimeMessage.Load(new MemoryStream(await AnnouncementRenderer.EmailAsync(draft, presentation, TestContext.Current.CancellationToken)), TestContext.Current.CancellationToken);
         string html = mail.HtmlBody!;
         html.Should().Contain("<!--[if mso]>").And.Contain("width=\"600\" align=\"center\"").And.NotContain("<main").And.NotContain("white-space:pre-wrap");
         html.Should().Contain("First line<br>Second &lt;line&gt;");
@@ -49,14 +49,14 @@ public sealed partial class AnnouncementTests
         {
             MimePart part = mail.BodyParts.OfType<MimePart>().Single(p => p.ContentId == image.Role);
             using var bytes = new MemoryStream();
-            part.Content!.DecodeTo(bytes);
+            part.Content!.DecodeTo(bytes, TestContext.Current.CancellationToken);
             bytes.ToArray().Should().Equal(image.Bytes);
         }
-        using var oldMail = MimeMessage.Load(new MemoryStream(oldBytes));
-        using var repeatedOldMail = MimeMessage.Load(new MemoryStream(await AnnouncementRenderer.EmailAsync(oldDraft, oldPresentation, default)));
+        using var oldMail = MimeMessage.Load(new MemoryStream(oldBytes), TestContext.Current.CancellationToken);
+        using var repeatedOldMail = MimeMessage.Load(new MemoryStream(await AnnouncementRenderer.EmailAsync(oldDraft, oldPresentation, TestContext.Current.CancellationToken)), TestContext.Current.CancellationToken);
         repeatedOldMail.HtmlBody.Should().Be(oldMail.HtmlBody);
         repeatedOldMail.TextBody.Should().Be(oldMail.TextBody);
-        (await renderer.PresentationAsync(oldContent, default)).Hash.Should().Be(oldPresentation.Hash);
+        (await renderer.PresentationAsync(oldContent, TestContext.Current.CancellationToken)).Hash.Should().Be(oldPresentation.Hash);
     }
 
     [Fact]
@@ -70,8 +70,7 @@ public sealed partial class AnnouncementTests
             .Returns(AccessServiceResult<EnsureAccessUserResult>.Success(new(user, null, false, false)));
         var service = new AnnouncementService(null!, new AnnouncementRenderer(options), access, options, NullLogger<AnnouncementService>.Instance);
         AnnouncementContent input = FinalContent() with { BannerRevision = "", TemplateRevision = "oco-table-v3", Subject = "", Description = "<script>inert</script>" };
-        AnnouncementOutcome preview = await service.ExecuteAsync(new ClaimsPrincipal(), new("synthetic", "test", null),
-            Guid.Empty, 0, "live", input, 1, 25, default);
+        AnnouncementOutcome preview = await service.ExecuteAsync(new ClaimsPrincipal(), new("synthetic", "test", null), Guid.Empty, 0, "live", input, 1, 25, TestContext.Current.CancellationToken);
         preview.Error.Should().BeNull();
         preview.Fields.Should().Contain("Subject").And.Contain("BannerRevision");
         preview.Html.Should().Contain("Taslak önizleme").And.Contain("&lt;script&gt;").And.NotContain("<script>").And.NotContain("<img");

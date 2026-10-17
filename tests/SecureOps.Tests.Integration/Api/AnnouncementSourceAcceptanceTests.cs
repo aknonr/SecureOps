@@ -10,7 +10,6 @@ using SecureOps.Domain.Announcements;
 using SecureOps.Infrastructure.Announcements.Sources;
 using SecureOps.Shared.Contracts.Announcements;
 using SecureOps.Tests.Integration.Sql;
-using Xunit.Abstractions;
 
 namespace SecureOps.Tests.Integration.Api;
 
@@ -203,7 +202,8 @@ public sealed class AnnouncementSourceAcceptanceTests(ITestOutputHelper output)
 
 public sealed class SourceHostFactAttribute : FactAttribute
 {
-    public SourceHostFactAttribute()
+    public SourceHostFactAttribute([System.Runtime.CompilerServices.CallerFilePath] string? sourceFilePath = null, [System.Runtime.CompilerServices.CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (Environment.GetEnvironmentVariable("SECUREOPS_SOURCE_HOST_ACCEPTANCE") != "1")
         { Skip = "Explicit isolated API/Worker process acceptance opt-in required."; }

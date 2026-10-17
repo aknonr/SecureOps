@@ -5,25 +5,16 @@ using SecureOps.Shared.Configuration;
 namespace SecureOps.Ui.Services;
 
 /// <summary>Relays the current browser session's server-held OIDC access token to the API.</summary>
-public sealed class OidcApiAccessTokenHandler : DelegatingHandler
+public sealed class OidcApiAccessTokenHandler(
+    IApiSessionStore sessions,
+    IOptions<OidcOptions> options,
+    TimeProvider timeProvider,
+    IOidcBackchannelClient backchannel) : DelegatingHandler
 {
-    private readonly IApiSessionStore _sessions;
-    private readonly OidcOptions _options;
-    private readonly TimeProvider _timeProvider;
-    private readonly IOidcBackchannelClient _backchannel;
-
-    /// <summary>Initializes the token relay.</summary>
-    public OidcApiAccessTokenHandler(
-        IApiSessionStore sessions,
-        IOptions<OidcOptions> options,
-        TimeProvider timeProvider,
-        IOidcBackchannelClient backchannel)
-    {
-        _sessions = sessions;
-        _options = options.Value;
-        _timeProvider = timeProvider;
-        _backchannel = backchannel;
-    }
+    private readonly IApiSessionStore _sessions = sessions;
+    private readonly OidcOptions _options = options.Value;
+    private readonly TimeProvider _timeProvider = timeProvider;
+    private readonly IOidcBackchannelClient _backchannel = backchannel;
 
     /// <inheritdoc />
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)

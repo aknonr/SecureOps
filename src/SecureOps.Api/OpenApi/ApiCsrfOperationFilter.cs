@@ -1,4 +1,4 @@
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using SecureOps.Api.Security;
 using SecureOps.Shared.Contracts.Api;
 using Swashbuckle.AspNetCore.SwaggerGen;
@@ -23,8 +23,9 @@ public sealed class ApiCsrfOperationFilter : IOperationFilter
             In = ParameterLocation.Header,
             Required = true,
             Description = "Required value: 1. Not authentication. Browser origins must be explicitly allowed; cross-site Fetch Metadata is rejected (ADR-0029).",
-            Schema = new OpenApiSchema { Type = "string", Enum = [new Microsoft.OpenApi.Any.OpenApiString(ApiCsrf.HeaderValue)] }
+            Schema = new OpenApiSchema { Type = JsonSchemaType.String, Enum = [ApiCsrf.HeaderValue] }
         });
-        operation.Responses.TryAdd("403", new OpenApiResponse { Description = "Access denied or ApiCsrfRejected (ProblemDetails)." });
+        OpenApiResponses responses = operation.Responses ??= [];
+        responses.TryAdd("403", new OpenApiResponse { Description = "Access denied or ApiCsrfRejected (ProblemDetails)." });
     }
 }

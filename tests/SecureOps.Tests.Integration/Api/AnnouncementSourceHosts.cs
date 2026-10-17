@@ -114,7 +114,7 @@ internal sealed class AnnouncementSourceHosts : IAsyncDisposable
         { WorkingDirectory = Root, UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
         string? payload = Environment.GetEnvironmentVariable("SECUREOPS_SOURCE_PAYLOAD_ROOT");
         string assembly = string.IsNullOrWhiteSpace(payload)
-            ? Path.Combine(repository, "src", project, "bin", "Release", "net8.0", project + ".dll")
+            ? Path.Combine(repository, "src", project, "bin", "Release", "net10.0", project + ".dll")
             : Path.Combine(Path.GetFullPath(payload), project["SecureOps.".Length..].ToLowerInvariant(), project + ".dll");
         if (!File.Exists(assembly))
         { throw new FileNotFoundException("Explicit source acceptance payload is missing.", assembly); }

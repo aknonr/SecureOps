@@ -6,21 +6,12 @@ namespace SecureOps.Ui.Services;
 /// <summary>
 /// Computes the effective shell mode from configuration and environment.
 /// </summary>
-public sealed class DemoModeState : IDemoModeState
+/// <param name="environment">Current host environment.</param>
+/// <param name="options">Shell options.</param>
+public sealed class DemoModeState(IHostEnvironment environment, IOptions<DemoModeOptions> options) : IDemoModeState
 {
-    private readonly IHostEnvironment _environment;
-    private readonly DemoModeOptions _options;
-
-    /// <summary>
-    /// Initializes a new shell mode service.
-    /// </summary>
-    /// <param name="environment">Current host environment.</param>
-    /// <param name="options">Shell options.</param>
-    public DemoModeState(IHostEnvironment environment, IOptions<DemoModeOptions> options)
-    {
-        _environment = environment;
-        _options = options.Value;
-    }
+    private readonly IHostEnvironment _environment = environment;
+    private readonly DemoModeOptions _options = options.Value;
 
     /// <inheritdoc />
     public bool Enabled => _options.Enabled && IsAllowedInterimEnvironment;

@@ -4,7 +4,8 @@ namespace SecureOps.Tests.Integration;
 public sealed class WindowsFactAttribute : FactAttribute
 {
     /// <summary>Never skips on Windows; native failures must fail the test.</summary>
-    public WindowsFactAttribute()
+    public WindowsFactAttribute([System.Runtime.CompilerServices.CallerFilePath] string? sourceFilePath = null, [System.Runtime.CompilerServices.CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (!OperatingSystem.IsWindows())
         {
@@ -17,7 +18,8 @@ public sealed class WindowsFactAttribute : FactAttribute
 public sealed class WindowsTheoryAttribute : TheoryAttribute
 {
     /// <summary>Never skips on Windows.</summary>
-    public WindowsTheoryAttribute()
+    public WindowsTheoryAttribute([System.Runtime.CompilerServices.CallerFilePath] string? sourceFilePath = null, [System.Runtime.CompilerServices.CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (!OperatingSystem.IsWindows())
         {

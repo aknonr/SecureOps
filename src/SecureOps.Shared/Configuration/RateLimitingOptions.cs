@@ -30,6 +30,12 @@ public sealed class RateLimitingOptions
     public OperationRateLimitOptions JiraCreate { get; set; } = new(6, 60);
     /// <summary>Workflow retry policy.</summary>
     public OperationRateLimitOptions WorkflowRetry { get; set; } = new(6, 60);
+
+    /// <summary>Per-actor ceiling across every API request, in addition to the operation policies.</summary>
+    public OperationRateLimitOptions Global { get; set; } = new(600, 60);
+
+    /// <summary>Session revocation and access decisions: approve, reject, role changes, disable, role definitions.</summary>
+    public OperationRateLimitOptions AccessAdministration { get; set; } = new(30, 60);
 }
 
 /// <summary>One fixed-window operation limit.</summary>

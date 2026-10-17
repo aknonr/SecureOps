@@ -180,7 +180,8 @@ public sealed partial class ResourceSqlTests
 
 public sealed class LocalResourceSqlFactAttribute : FactAttribute
 {
-    public LocalResourceSqlFactAttribute()
+    public LocalResourceSqlFactAttribute([System.Runtime.CompilerServices.CallerFilePath] string? sourceFilePath = null, [System.Runtime.CompilerServices.CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SECUREOPS_SQL_TEST_CONNECTION")))
         {

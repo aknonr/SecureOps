@@ -5,7 +5,7 @@
 @inject ServiceAccountApiClient Api
 @inject ILogger<SaPersonPicker> Logger
 
-<MudAutocomplete T="PersonView" Label="@Label" Value="_value" ValueChanged="ChangedAsync" SearchFuncWithCancel="SearchAsync" ToStringFunc="@(p => p?.DisplayName)"
+<MudAutocomplete T="PersonView" Label="@Label" Value="_value" ValueChanged="ChangedAsync" SearchFunc="SearchAsync" ToStringFunc="@(p => p?.DisplayName)"
                  Clearable="true" ResetValueOnEmptyText="true" MinCharacters="2" DebounceInterval="300" Variant="Variant.Outlined" MaxItems="20">
     <ItemTemplate>
         @context.DisplayName

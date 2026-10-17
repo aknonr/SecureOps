@@ -21,7 +21,7 @@ public sealed class InUseDisplayTests
     [Fact]
     public async Task OldSnapshots_KeepIdentityHashAndRawEvidence_WhilePreviewAndXlsxAgree()
     {
-        InUseSource source = (await new LocalInUseSourceClient().DiscoverAsync(default)).Records[0];
+        InUseSource source = (await new LocalInUseSourceClient().DiscoverAsync(TestContext.Current.CancellationToken)).Records[0];
         source = source with
         {
             Requester = new("G&#246;zlem &amp; Kontrol", "TuruncuHat: KEY.p_rel_requester"),
@@ -76,7 +76,7 @@ public sealed class InUseDisplayTests
     [InlineData("&amp;lt;b&amp;gt;", "&lt;b&gt;")]
     public async Task Reporter_CurrentAndRetained_UseSamePlainTextInNewExcel_WithoutRewritingSnapshots(string raw, string expected)
     {
-        InUseSource source = (await new LocalInUseSourceClient().DiscoverAsync(default)).Records[0];
+        InUseSource source = (await new LocalInUseSourceClient().DiscoverAsync(TestContext.Current.CancellationToken)).Records[0];
         DateTimeOffset now = DateTimeOffset.UtcNow;
         source = source with
         {

@@ -18,7 +18,7 @@ public sealed class JiraIssueDraftServiceTests
     [InlineData(OperationalRecordClassification.ServerRetirement)]
     public async Task BuildReview_ConfirmedTypes_RemainDeclarationsWithoutEligibilityOrIdentityLookup(OperationalRecordClassification type)
     {
-        OperationalRecord record = await TestRecord.SeedEligibleAsync(new InMemoryOperationalRecordRepository());
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(new InMemoryOperationalRecordRepository(), TestContext.Current.CancellationToken);
         record = record with
         {
             JiraEligible = false,
@@ -52,7 +52,7 @@ public sealed class JiraIssueDraftServiceTests
     [Fact]
     public async Task BuildAsync_InstallationEvenWhenEligible_DoesNotFallBackToServerLabels()
     {
-        OperationalRecord record = await TestRecord.SeedEligibleAsync(new InMemoryOperationalRecordRepository());
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(new InMemoryOperationalRecordRepository(), TestContext.Current.CancellationToken);
         JiraIssueDraftService service = CreateService(new StubResolver(RequesterResolutionResult.Found("synthetic")), "Block");
         OperationalRecordResult<JiraIssueDraft> result = await service.BuildAsync(record with
         { Classification = OperationalRecordClassification.SoftwareInstallation }, "synthetic", CancellationToken.None);
@@ -67,7 +67,7 @@ public sealed class JiraIssueDraftServiceTests
     [InlineData(" ")]
     public async Task BuildAsync_MissingRequester_BlockPolicyFailsClosed(string? requester)
     {
-        OperationalRecord record = await TestRecord.SeedEligibleAsync(new InMemoryOperationalRecordRepository());
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(new InMemoryOperationalRecordRepository(), TestContext.Current.CancellationToken);
         var resolver = new StubResolver(RequesterResolutionResult.Found("jira-requester"));
         OperationalRecordResult<JiraIssueDraft> result = await CreateService(resolver, "Block").BuildAsync(record with { Requester = requester }, "test:operator", CancellationToken.None);
         result.Failure!.Code.Should().Be(OperationalErrorCodes.RequesterResolutionFailed);
@@ -77,7 +77,7 @@ public sealed class JiraIssueDraftServiceTests
     [Fact]
     public async Task BuildAsync_EmptyResolvedIdentity_BlockPolicyFailsClosed()
     {
-        OperationalRecord record = await TestRecord.SeedEligibleAsync(new InMemoryOperationalRecordRepository());
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(new InMemoryOperationalRecordRepository(), TestContext.Current.CancellationToken);
         OperationalRecordResult<JiraIssueDraft> result = await CreateService(new StubResolver(RequesterResolutionResult.Found("")), "Block")
             .BuildAsync(record, "test:operator", CancellationToken.None);
         result.Failure!.Code.Should().Be(OperationalErrorCodes.RequesterResolutionFailed);
@@ -87,7 +87,7 @@ public sealed class JiraIssueDraftServiceTests
     public async Task BuildAsync_SourceRefreshAfterPreview_CannotAcquireCreateWithChangedContent()
     {
         var repository = new InMemoryOperationalRecordRepository();
-        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository, TestContext.Current.CancellationToken);
         JiraIssueDraftService service = CreateService(new StubResolver(RequesterResolutionResult.Found("jira-requester")), "Block");
         JiraIssueDraft first = (await service.BuildAsync(record, "test:operator", CancellationToken.None)).Value!;
         await repository.MarkPreviewedAsync(record.Id, first.MappingVersion, first.IdempotencyKey, "test:operator", "synthetic", CancellationToken.None);
@@ -105,7 +105,7 @@ public sealed class JiraIssueDraftServiceTests
     public async Task BuildAsync_WithExactRequesterMatch_ReturnsConfiguredPreview()
     {
         InMemoryOperationalRecordRepository repository = new();
-        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository, TestContext.Current.CancellationToken);
         JiraIssueDraftService service = CreateService(new StubResolver(RequesterResolutionResult.Found("jira-account-100")), "Block");
 
         OperationalRecordResult<JiraIssueDraft> result = await service.BuildAsync(record, "test:operator", CancellationToken.None);
@@ -127,7 +127,7 @@ public sealed class JiraIssueDraftServiceTests
     public async Task BuildAsync_WithAmbiguousRequester_FailsClosed()
     {
         InMemoryOperationalRecordRepository repository = new();
-        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository, TestContext.Current.CancellationToken);
         JiraIssueDraftService service = CreateService(new StubResolver(RequesterResolutionResult.Ambiguous()), "ProceedUnassigned");
 
         OperationalRecordResult<JiraIssueDraft> result = await service.BuildAsync(record, "test:operator", CancellationToken.None);
@@ -139,7 +139,7 @@ public sealed class JiraIssueDraftServiceTests
     public async Task BuildAsync_WhenPolicyAllowsUnassigned_AddsSafeWarning()
     {
         InMemoryOperationalRecordRepository repository = new();
-        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository, TestContext.Current.CancellationToken);
         JiraIssueDraftService service = CreateService(new StubResolver(RequesterResolutionResult.NotFound()), "ProceedUnassigned");
 
         OperationalRecordResult<JiraIssueDraft> result = await service.BuildAsync(record, "test:operator", CancellationToken.None);
@@ -154,7 +154,7 @@ public sealed class JiraIssueDraftServiceTests
     public async Task BuildAsync_WithProjectDefaultAssignment_DoesNotInferAssignee()
     {
         InMemoryOperationalRecordRepository repository = new();
-        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository, TestContext.Current.CancellationToken);
         JiraIssueDraftService service = CreateService(
             new StubResolver(RequesterResolutionResult.Found("jira-requester")),
             "Block");
@@ -172,7 +172,7 @@ public sealed class JiraIssueDraftServiceTests
     public async Task BuildAsync_WithAuthenticatedOperator_ResolvesExactServerActorAsReporter()
     {
         InMemoryOperationalRecordRepository repository = new();
-        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository, TestContext.Current.CancellationToken);
         StubResolver resolver = new(
             RequesterResolutionResult.Found("jira-requester"),
             RequesterResolutionResult.Found("jira-operator"));
@@ -204,7 +204,7 @@ public sealed class JiraIssueDraftServiceTests
             new Claim("loginname", "operator.oidc")
         ], "synthetic-oidc"))).Principal!;
         InMemoryOperationalRecordRepository repository = new();
-        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository, TestContext.Current.CancellationToken);
         StubResolver resolver = new(
             RequesterResolutionResult.Found("jira-requester"),
             RequesterResolutionResult.Found("jira-operator"));
@@ -228,7 +228,7 @@ public sealed class JiraIssueDraftServiceTests
         bool retryable)
     {
         InMemoryOperationalRecordRepository repository = new();
-        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository, TestContext.Current.CancellationToken);
         RequesterResolutionResult operatorResult = status switch
         {
             RequesterResolutionStatus.NotFound => RequesterResolutionResult.NotFound(),
@@ -255,7 +255,7 @@ public sealed class JiraIssueDraftServiceTests
     public async Task BuildAsync_WithVerifiedExactOperatorMapping_SelectsOnlyMappedAssignee()
     {
         InMemoryOperationalRecordRepository repository = new();
-        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository, TestContext.Current.CancellationToken);
         JiraIssueDraftService service = CreateService(
             new StubResolver(RequesterResolutionResult.Found("jira-requester")),
             "Block",
@@ -285,7 +285,7 @@ public sealed class JiraIssueDraftServiceTests
     public async Task BuildAsync_WhenCreateMappingChanges_ChangesTransferFingerprint()
     {
         InMemoryOperationalRecordRepository repository = new();
-        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository);
+        OperationalRecord record = await TestRecord.SeedEligibleAsync(repository, TestContext.Current.CancellationToken);
         JiraIssueDraftService original = CreateService(
             new StubResolver(RequesterResolutionResult.Found("jira-requester")),
             "Block",

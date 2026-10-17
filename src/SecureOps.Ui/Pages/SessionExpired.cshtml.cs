@@ -9,19 +9,11 @@ namespace SecureOps.Ui.Pages;
 /// <summary>
 /// Shown when a session lapsed rather than being deliberately ended.
 /// </summary>
+/// <param name="shellMode">Effective shell mode.</param>
 [AllowAnonymous]
-public sealed class SessionExpiredModel : PageModel
+public sealed class SessionExpiredModel(IDemoModeState shellMode) : PageModel
 {
-    private readonly IDemoModeState _shellMode;
-
-    /// <summary>
-    /// Initializes a new session-expired page model.
-    /// </summary>
-    /// <param name="shellMode">Effective shell mode.</param>
-    public SessionExpiredModel(IDemoModeState shellMode)
-    {
-        _shellMode = shellMode;
-    }
+    private readonly IDemoModeState _shellMode = shellMode;
 
     /// <summary>
     /// Whether this host should name its environment at all.

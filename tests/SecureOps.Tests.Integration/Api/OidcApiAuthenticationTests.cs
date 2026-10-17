@@ -39,8 +39,8 @@ public sealed class OidcApiAuthenticationTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient client = Client(factory, Token("synthetic-subject-unknown", "operator.unknown", roleEvidence: "Administrator"));
 
-        CurrentAccessResponse access = (await client.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me"))!;
-        HttpResponseMessage protectedResponse = await client.GetAsync("/api/v1/access/users");
+        CurrentAccessResponse access = (await client.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me", cancellationToken: TestContext.Current.CancellationToken))!;
+        HttpResponseMessage protectedResponse = await client.GetAsync("/api/v1/access/users", TestContext.Current.CancellationToken);
 
         access.AccessStatus.Should().Be("Pending");
         access.Roles.Should().BeEmpty();
@@ -56,7 +56,7 @@ public sealed class OidcApiAuthenticationTests
         await SeedAdminAsync(factory, stableIdentifier, "oidc");
         using HttpClient client = Client(factory, Token(subject, "operator.authorized"));
 
-        CurrentAccessResponse access = (await client.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me"))!;
+        CurrentAccessResponse access = (await client.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me", cancellationToken: TestContext.Current.CancellationToken))!;
 
         access.AccessStatus.Should().Be("Approved");
         access.Roles.Should().ContainSingle("Admin");
@@ -69,7 +69,7 @@ public sealed class OidcApiAuthenticationTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient client = Client(factory, Token("synthetic-subject", new string('x', 1100)));
 
-        HttpResponseMessage response = await client.GetAsync("/api/v1/access/me");
+        HttpResponseMessage response = await client.GetAsync("/api/v1/access/me", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -86,8 +86,8 @@ public sealed class OidcApiAuthenticationTests
         AuthenticationScheme? defaultScheme = await schemes.GetDefaultAuthenticateSchemeAsync();
 
         defaultScheme!.Name.Should().Be(ExternalIdentityClaimTypes.CompositeApiScheme);
-        (await oidc.GetAsync("/api/v1/access/me")).StatusCode.Should().Be(HttpStatusCode.OK);
-        (await demo.GetAsync("/api/v1/access/me")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await oidc.GetAsync("/api/v1/access/me", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await demo.GetAsync("/api/v1/access/me", TestContext.Current.CancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public sealed class OidcApiAuthenticationTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient client = Client(factory, Token("synthetic-subject", "operator.one", audience: "wrong-audience"));
 
-        HttpResponseMessage response = await client.GetAsync("/api/v1/access/me");
+        HttpResponseMessage response = await client.GetAsync("/api/v1/access/me", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -110,7 +110,7 @@ public sealed class OidcApiAuthenticationTests
         using HttpClient client = Client(factory, Token(
             "synthetic-subject", "operator.one", issuer: "https://different-issuer.example.test"));
 
-        HttpResponseMessage response = await client.GetAsync("/api/v1/access/me");
+        HttpResponseMessage response = await client.GetAsync("/api/v1/access/me", TestContext.Current.CancellationToken);
 
         options.MetadataAddress.Should().Be(_issuer + "/idp/.well-known/openid-configurations");
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -122,7 +122,7 @@ public sealed class OidcApiAuthenticationTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient client = Client(factory, HmacToken());
 
-        HttpResponseMessage response = await client.GetAsync("/api/v1/access/me");
+        HttpResponseMessage response = await client.GetAsync("/api/v1/access/me", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -134,11 +134,11 @@ public sealed class OidcApiAuthenticationTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         using HttpClient first = Client(factory, Token(subject, "operator.one", displayName: "Operator One", mail: "one@example.test", uid: "uid-100"));
 
-        CurrentAccessResponse firstAccess = (await first.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me"))!;
+        CurrentAccessResponse firstAccess = (await first.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me", cancellationToken: TestContext.Current.CancellationToken))!;
         ApplicationUser persistedFirst = (await UsersAsync(factory)).Should().ContainSingle().Subject;
 
         using HttpClient second = Client(factory, Token(subject, "operator.one", displayName: "Updated Operator", mail: "updated@example.test", uid: "uid-100"));
-        CurrentAccessResponse secondAccess = (await second.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me"))!;
+        CurrentAccessResponse secondAccess = (await second.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me", cancellationToken: TestContext.Current.CancellationToken))!;
         ApplicationUser persistedSecond = (await UsersAsync(factory)).Should().ContainSingle().Subject;
 
         firstAccess.Profile.Should().Be(new AccessIdentityProfileResponse("Operator One", "operator.one", "one@example.test", null, null, "uid-100"));
@@ -163,9 +163,9 @@ public sealed class OidcApiAuthenticationTests
         }
 
         using HttpClient profileClient = Client(factory, Token(subject, "operator.backfill", displayName: "Backfilled User", mail: "backfill@example.test", uid: "uid-backfill"));
-        _ = await profileClient.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me");
+        _ = await profileClient.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me", cancellationToken: TestContext.Current.CancellationToken);
         using HttpClient missingClaimsClient = Client(factory, Token(subject, loginName: null));
-        _ = await missingClaimsClient.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me");
+        _ = await missingClaimsClient.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me", cancellationToken: TestContext.Current.CancellationToken);
 
         ApplicationUser user = (await UsersAsync(factory)).Should().ContainSingle().Subject;
         user.CorporateIdentity.Should().Be(stableIdentifier);
@@ -183,7 +183,7 @@ public sealed class OidcApiAuthenticationTests
         client.DefaultRequestHeaders.Add("X-SecureOps-DisplayName", "Browser Supplied Admin");
         client.DefaultRequestHeaders.Add("X-SecureOps-LoginName", "browser.admin");
 
-        _ = await client.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me");
+        _ = await client.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me", cancellationToken: TestContext.Current.CancellationToken);
 
         ApplicationUser user = (await UsersAsync(factory)).Should().ContainSingle().Subject;
         user.LoginName.Should().Be("operator.real");
@@ -198,13 +198,13 @@ public sealed class OidcApiAuthenticationTests
         using WebApplicationFactory<Program> factory = CreateFactory();
         await SeedAdminAsync(factory, OidcExternalIdentityNormalizer.StableIdentifier(_issuer, adminSubject), "oidc");
         using HttpClient user = Client(factory, Token(userSubject, "requester.one", displayName: "Requester One", mail: "requester@example.test", uid: "uid-requester"));
-        CurrentAccessResponse requester = (await user.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me"))!;
+        CurrentAccessResponse requester = (await user.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me", cancellationToken: TestContext.Current.CancellationToken))!;
         using HttpClient admin = Client(factory, Token(adminSubject, "admin.one", displayName: "Admin One", mail: "admin@example.test"));
-        _ = await admin.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me");
+        _ = await admin.GetFromJsonAsync<CurrentAccessResponse>("/api/v1/access/me", cancellationToken: TestContext.Current.CancellationToken);
 
-        AccessRequestResponse[] requests = (await admin.GetFromJsonAsync<AccessRequestResponse[]>("/api/v1/access/requests"))!;
-        AccessUserResponse[] users = (await admin.GetFromJsonAsync<AccessUserResponse[]>("/api/v1/access/users"))!;
-        ActiveApplicationSessionsResponse sessions = (await admin.GetFromJsonAsync<ActiveApplicationSessionsResponse>("/api/v1/sessions/active"))!;
+        AccessRequestResponse[] requests = (await admin.GetFromJsonAsync<AccessRequestResponse[]>("/api/v1/access/requests", cancellationToken: TestContext.Current.CancellationToken))!;
+        AccessUserResponse[] users = (await admin.GetFromJsonAsync<AccessUserResponse[]>("/api/v1/access/users", cancellationToken: TestContext.Current.CancellationToken))!;
+        ActiveApplicationSessionsResponse sessions = (await admin.GetFromJsonAsync<ActiveApplicationSessionsResponse>("/api/v1/sessions/active", cancellationToken: TestContext.Current.CancellationToken))!;
 
         requests.Single(item => item.UserId == requester.UserId).Profile.Should().Be(
             new AccessIdentityProfileResponse("Requester One", "requester.one", "requester@example.test", null, null, "uid-requester"));

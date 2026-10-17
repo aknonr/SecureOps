@@ -1,4 +1,4 @@
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using SecureOps.Shared.Contracts.Identity;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
@@ -8,10 +8,11 @@ namespace SecureOps.Api.OpenApi;
 public sealed class LegacyIdentityEventReferenceSchemaFilter : ISchemaFilter
 {
     /// <inheritdoc />
-    public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+    public void Apply(IOpenApiSchema schema, SchemaFilterContext context)
     {
-        if (context.Type != typeof(IdentityLookupRequest)
-            && context.Type != typeof(BulkIdentityLookupRequest))
+        // Swashbuckle also passes each use site as a $ref; only the component definition is annotated.
+        if ((context.Type != typeof(IdentityLookupRequest)
+            && context.Type != typeof(BulkIdentityLookupRequest)) || schema is OpenApiSchemaReference)
         {
             return;
         }
@@ -20,12 +21,13 @@ public sealed class LegacyIdentityEventReferenceSchemaFilter : ISchemaFilter
         MarkDeprecated(schema, "turuncuhatEvtId");
     }
 
-    private static void MarkDeprecated(OpenApiSchema schema, string propertyName)
+    private static void MarkDeprecated(IOpenApiSchema schema, string propertyName)
     {
-        if (schema.Properties.TryGetValue(propertyName, out OpenApiSchema? property))
+        if (schema.Properties?.TryGetValue(propertyName, out IOpenApiSchema? property) == true)
         {
-            property.Deprecated = true;
-            property.Description = "Deprecated optional legacy event reference. New read-only clients should omit it.";
+            OpenApiSchema concrete = OpenApiModel.Concrete(property);
+            concrete.Deprecated = true;
+            concrete.Description = "Deprecated optional legacy event reference. New read-only clients should omit it.";
         }
     }
 }

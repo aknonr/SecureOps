@@ -6,7 +6,11 @@ namespace SecureOps.Infrastructure.Reporting;
 public sealed record ReportingWindow(
     string Selection,
     DateTimeOffset FromInclusiveUtc,
-    DateTimeOffset ToExclusiveUtc);
+    DateTimeOffset ToExclusiveUtc)
+{
+    /// <summary>Whether an instant falls in the half-open window [from, to).</summary>
+    public bool Contains(DateTimeOffset instant) => instant >= FromInclusiveUtc && instant < ToExclusiveUtc;
+}
 
 /// <summary>Result of deterministic report-window validation.</summary>
 public sealed record ReportingWindowResolution(ReportingWindow? Window, string? ErrorCode)

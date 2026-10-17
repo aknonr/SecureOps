@@ -31,6 +31,10 @@ public interface IAccessAdminApiClient
     public Task<AccessRoleImpact> PreviewRoleAsync(AccessRoleChange change, CancellationToken cancellationToken);
     /// <summary>Saves only a matching reviewed role impact.</summary>
     public Task<AccessRoleImpact> SaveRoleAsync(AccessRoleChange change, CancellationToken cancellationToken);
+    /// <summary>Reads the read-only module view: actions per module and the roles that grant them.</summary>
+    public Task<AccessModuleOverviewResponse> ModulesAsync(CancellationToken cancellationToken);
+    /// <summary>Reads the server explanation of one user's effective actions per module.</summary>
+    public Task<AccessEffectiveResponse> EffectiveAsync(Guid userId, CancellationToken cancellationToken);
     /// <summary>
     /// Lists authoritative access-user records.
     /// </summary>

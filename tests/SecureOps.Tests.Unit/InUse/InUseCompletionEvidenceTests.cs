@@ -20,7 +20,7 @@ public sealed class InUseCompletionEvidenceTests
         using var handler = new EvidenceHandler(count);
         using ServiceProvider provider = Create(handler);
         var client = (TuruncuHatOperationalRecordClient)provider.GetRequiredService<IOperationalRecordClient>();
-        JsonElement result = await client.DiagnoseCompletionAsync("000100", default);
+        JsonElement result = await client.DiagnoseCompletionAsync("000100", TestContext.Current.CancellationToken);
         handler.Paths.Should().Equal("/api/login", "/api/query", "/api/query");
         result.GetProperty("ActivitySelection").GetString().Should().Be(expected);
         result.GetProperty("WritesPerformed").GetBoolean().Should().BeFalse();

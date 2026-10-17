@@ -40,7 +40,7 @@
                 @if (Can(Capabilities.OperationalRecordsView))
                 {
                     <MudNavLink Href="operational-records" Icon="@Icons.Material.Filled.Assignment">
-                        Operasyonel Kayıtlar
+                        Operasyonel Kayıtlar (OR)
                     </MudNavLink>
                 }
 
@@ -141,6 +141,18 @@
                         <MudNavLink Href="access/users" Icon="@Icons.Material.Filled.Group">
                             Kullanıcılar
                         </MudNavLink>
+                    }
+
+                    @* Same gate as the server: any one access-administration capability. *@
+                    @if (Can(Capabilities.AccessManageUsers) || Can(Capabilities.AccessAssignRoles) || Can(Capabilities.AccessApproveRequests))
+                    {
+                        <MudNavLink Href="access/modules" Icon="@Icons.Material.Filled.GridView">
+                            Yetki Haritası
+                        </MudNavLink>
+                    }
+
+                    @if (Can(Capabilities.AccessManageUsers))
+                    {
 
                         <MudNavLink Href="admin/sessions" Icon="@Icons.Material.Filled.Devices">
                             Aktif Oturumlar
@@ -179,7 +191,7 @@
     private AccessSnapshot? _snapshot;
     private bool _adminExpanded;
 
-    private static readonly string[] _adminRoutes = ["admin/", "access/requests", "access/users", "access/roles"];
+    private static readonly string[] _adminRoutes = ["admin/", "access/requests", "access/users", "access/roles", "access/modules"];
 
     protected override async Task OnInitializedAsync()
     {

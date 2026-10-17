@@ -16,7 +16,7 @@ public sealed partial class InUseTests
     [InlineData("PROD", "", "PROD")]
     public async Task RequiredEnvironment_DoesNotTreatUnknownAsNonProduction(string first, string second, string? expected)
     {
-        InUseSource source = (await new LocalInUseSourceClient().DiscoverAsync(default)).Records[0];
+        InUseSource source = (await new LocalInUseSourceClient().DiscoverAsync(TestContext.Current.CancellationToken)).Records[0];
         source = source with
         {
             Servers = new[] { first, second }.Select((value, index) => new InUseServer(index.ToString(),

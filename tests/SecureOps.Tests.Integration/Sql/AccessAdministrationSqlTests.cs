@@ -66,7 +66,8 @@ public sealed class AccessAdministrationSqlTests
 
 public sealed class AccessGuardSqlFactAttribute : FactAttribute
 {
-    public AccessGuardSqlFactAttribute()
+    public AccessGuardSqlFactAttribute([System.Runtime.CompilerServices.CallerFilePath] string? sourceFilePath = null, [System.Runtime.CompilerServices.CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SECUREOPS_ACCESS_GUARD_CONNECTION")))
         {

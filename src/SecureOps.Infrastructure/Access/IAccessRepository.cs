@@ -1,4 +1,5 @@
 using SecureOps.Domain.Access;
+using SecureOps.Shared.Contracts.Access;
 
 namespace SecureOps.Infrastructure.Access;
 
@@ -25,6 +26,8 @@ public interface IAccessRepository
     public Task<AccessMutationResult> ReplaceRolesAsync(Guid userId, IReadOnlyCollection<string> roles, long expectedVersion, string actor, CancellationToken cancellationToken, IReadOnlyDictionary<string, long>? roleVersions = null);
     /// <summary>Disables application access and revokes active roles.</summary>
     public Task<AccessMutationResult> DisableUserAsync(Guid userId, long expectedVersion, string actor, string reason, CancellationToken cancellationToken);
+    /// <summary>Reads the current business role definitions (code, name, version, protection, capabilities).</summary>
+    public Task<IReadOnlyList<AccessRoleDefinition>> GetRoleDefinitionsAsync(CancellationToken cancellationToken);
 }
 
 /// <summary>Result of first-seen user reconciliation.</summary>

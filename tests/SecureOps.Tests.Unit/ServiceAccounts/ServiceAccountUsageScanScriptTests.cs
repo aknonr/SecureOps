@@ -11,7 +11,8 @@ namespace SecureOps.Tests.Unit.ServiceAccounts;
 /// <summary>Runs only where the collector cannot read Windows sources, so a test never enumerates the developer's own machine.</summary>
 public sealed class NonWindowsFactAttribute : FactAttribute
 {
-    public NonWindowsFactAttribute()
+    public NonWindowsFactAttribute([System.Runtime.CompilerServices.CallerFilePath] string? sourceFilePath = null, [System.Runtime.CompilerServices.CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (OperatingSystem.IsWindows())
         {

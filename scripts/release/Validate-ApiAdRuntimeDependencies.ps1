@@ -152,9 +152,9 @@ try
         'System.DirectoryServices.AccountManagement.dll' = 'System.DirectoryServices.AccountManagement'
         'System.DirectoryServices.dll' = 'System.DirectoryServices'
         'System.DirectoryServices.Protocols.dll' = 'System.DirectoryServices.Protocols'
-        'runtimes/win/lib/net8.0/System.DirectoryServices.AccountManagement.dll' = 'System.DirectoryServices.AccountManagement'
-        'runtimes/win/lib/net8.0/System.DirectoryServices.dll' = 'System.DirectoryServices'
-        'runtimes/win/lib/net8.0/System.DirectoryServices.Protocols.dll' = 'System.DirectoryServices.Protocols'
+        'runtimes/win/lib/net10.0/System.DirectoryServices.AccountManagement.dll' = 'System.DirectoryServices.AccountManagement'
+        'runtimes/win/lib/net10.0/System.DirectoryServices.dll' = 'System.DirectoryServices'
+        'runtimes/win/lib/net10.0/System.DirectoryServices.Protocols.dll' = 'System.DirectoryServices.Protocols'
     }
     foreach ($relativePath in $importantAssemblies.Keys)
     {
@@ -175,9 +175,9 @@ try
     $runtimeConfigPath = Join-Path $PublishDirectory 'SecureOps.Api.runtimeconfig.json'
     $deps = Get-Content -LiteralPath $depsPath -Raw | ConvertFrom-Json
     $runtimeConfig = Get-Content -LiteralPath $runtimeConfigPath -Raw | ConvertFrom-Json
-    if ($deps.runtimeTarget.name -ne '.NETCoreApp,Version=v8.0' -or $runtimeConfig.runtimeOptions.tfm -ne 'net8.0')
+    if ($deps.runtimeTarget.name -ne '.NETCoreApp,Version=v10.0' -or $runtimeConfig.runtimeOptions.tfm -ne 'net10.0')
     {
-        throw 'The deps.json and runtimeconfig.json target frameworks are inconsistent with net8.0.'
+        throw 'The deps.json and runtimeconfig.json target frameworks are inconsistent with net10.0.'
     }
 
     $frameworkNames = @($runtimeConfig.runtimeOptions.frameworks | ForEach-Object Name)
@@ -208,8 +208,8 @@ try
         throw 'System.DirectoryServices.AccountManagement is not represented exactly once in deps.json.'
     }
 
-    $expectedRuntimeAsset = 'lib/net8.0/System.DirectoryServices.AccountManagement.dll'
-    $expectedWindowsAsset = 'runtimes/win/lib/net8.0/System.DirectoryServices.AccountManagement.dll'
+    $expectedRuntimeAsset = 'lib/net10.0/System.DirectoryServices.AccountManagement.dll'
+    $expectedWindowsAsset = 'runtimes/win/lib/net10.0/System.DirectoryServices.AccountManagement.dll'
     $accountManagementRuntime = $accountManagementTarget.Value.PSObject.Properties['runtime'].Value
     $accountManagementRuntimeTargets = $accountManagementTarget.Value.PSObject.Properties['runtimeTargets'].Value
     if ($null -eq $accountManagementRuntime -or
@@ -268,7 +268,7 @@ try
 
     $assemblyPath = Join-Path $PublishDirectory 'System.DirectoryServices.AccountManagement.dll'
     $assemblyName = [System.Reflection.AssemblyName]::GetAssemblyName($assemblyPath)
-    if ($assemblyName.Name -ne 'System.DirectoryServices.AccountManagement' -or $assemblyName.Version -lt [version]'8.0.0.1')
+    if ($assemblyName.Name -ne 'System.DirectoryServices.AccountManagement' -or $assemblyName.Version -lt [version]'10.0.0.0')
     {
         throw "Unexpected Active Directory runtime assembly identity: $($assemblyName.FullName)"
     }

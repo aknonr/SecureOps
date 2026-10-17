@@ -46,9 +46,9 @@ public sealed class ServiceAccountMailHintsApiTests
                 using HttpClient client = factory.CreateApiClient();
                 client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", actor);
                 using StringContent content = new(body, Encoding.UTF8, "application/json");
-                using HttpResponseMessage response = await client.PostAsync(_route, content);
+                using HttpResponseMessage response = await client.PostAsync(_route, content, TestContext.Current.CancellationToken);
                 ((int)response.StatusCode).Should().BeOneOf([400, 403, 413, 503], $"{actor}: the disabled module never answers 200");
-                responses.Add(await response.Content.ReadAsStringAsync());
+                responses.Add(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
             }
         }
 
@@ -58,9 +58,9 @@ public sealed class ServiceAccountMailHintsApiTests
             plain.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
             plain.DefaultRequestHeaders.Add("Origin", "https://evil.example");
             using StringContent content = new(valid, Encoding.UTF8, "application/json");
-            using HttpResponseMessage response = await plain.PostAsync(_route, content);
+            using HttpResponseMessage response = await plain.PostAsync(_route, content, TestContext.Current.CancellationToken);
             response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-            responses.Add(await response.Content.ReadAsStringAsync());
+            responses.Add(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         }
 
         responses.Should().NotContain(r => r.Contains(_marker, StringComparison.Ordinal) || r.Contains("Abc12345", StringComparison.Ordinal));
@@ -79,7 +79,7 @@ public sealed class ServiceAccountMailHintsApiTests
         await ApproveAsync(factory, "demo:platform-admin", "Admin");
         using HttpClient client = factory.CreateApiClient();
         client.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
-        string json = await client.GetStringAsync("/swagger/v1/swagger.json");
+        string json = await client.GetStringAsync("/swagger/v1/swagger.json", TestContext.Current.CancellationToken);
         json.Should().Contain("/api/v1/service-accounts/accounts/{id}/events/mail-hints").And.Contain("MailHintsRequest").And.Contain("MailHints");
     }
 

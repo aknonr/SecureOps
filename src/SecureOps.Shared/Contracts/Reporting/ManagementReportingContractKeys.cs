@@ -28,4 +28,6 @@ public static class ManagementReportingLimitationCodes
     public const string ElapsedDurationsNotActiveEffort = "ElapsedDurationsNotActiveEffort";
     /// <summary>The requested interval begins before authoritative persisted evidence.</summary>
     public const string HistoryBeforePersistenceUnavailable = "HistoryBeforePersistenceUnavailable";
+    /// <summary>At least one evidence stream is held in process memory and is lost on restart.</summary>
+    public const string NonDurableReportingSource = "NonDurableReportingSource";
 }

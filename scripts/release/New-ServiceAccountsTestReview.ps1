@@ -187,8 +187,8 @@ try {
             $deps = Get-Content -LiteralPath (Join-Path $destination "payload/$lower/SecureOps.$component.deps.json") -Raw | ConvertFrom-Json
             $library = @($deps.libraries.PSObject.Properties.Name | Where-Object { $_ -like 'Microsoft.AspNetCore.Authentication.Negotiate/*' })
             $version = (Get-Item -LiteralPath $dll).VersionInfo.ProductVersion
-            if ($library.Count -ne 1 -or $library[0] -cne 'Microsoft.AspNetCore.Authentication.Negotiate/8.0.32' -or !$version.StartsWith('8.0.32+', [StringComparison]::Ordinal)) {
-                throw "$component does not ship Negotiate 8.0.32."
+            if ($library.Count -ne 1 -or $library[0] -cne 'Microsoft.AspNetCore.Authentication.Negotiate/10.0.13' -or !$version.StartsWith('10.0.13+', [StringComparison]::Ordinal)) {
+                throw "$component does not ship Negotiate 10.0.13."
             }
             [ordered]@{ component=$component; package=$library[0]; productVersion=$version; sha256=(Get-FileHash -LiteralPath $dll).Hash }
         }

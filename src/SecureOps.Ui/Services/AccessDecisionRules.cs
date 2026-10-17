@@ -42,9 +42,7 @@ public static class AccessDecisionRules
     /// shown as prose guidance, and the effective capability list always comes from the API's
     /// response to a real call.
     /// </remarks>
-    public static IReadOnlyList<string> AssignableRoles { get; } = AccessRoleCatalog.RoleCodes
-        .OrderBy(role => role, StringComparer.Ordinal)
-        .ToArray();
+    public static IReadOnlyList<string> AssignableRoles { get; } = [.. AccessRoleCatalog.RoleCodes.OrderBy(role => role, StringComparer.Ordinal)];
 
     /// <summary>
     /// Validates a justification.
@@ -80,9 +78,7 @@ public static class AccessDecisionRules
             return $"En fazla {MaxRoles} rol atanabilir.";
         }
 
-        string[] unknown = roles
-            .Where(role => !AccessRoleCatalog.IsKnownRole(role))
-            .ToArray();
+        string[] unknown = [.. roles.Where(role => !AccessRoleCatalog.IsKnownRole(role))];
 
         return unknown.Length == 0
             ? null

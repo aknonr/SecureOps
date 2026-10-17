@@ -19,19 +19,19 @@ public sealed class OperationalRecordBrowsingTests
         var repository = new InMemoryOperationalRecordRepository();
         for (int i = 0; i < 12; i++)
         {
-            await repository.UpsertImportedAsync(TestRecord.SourceItem($"synthetic-{i:D2}", $"SYN-{i:D2}") with { Title = "Synthetic [literal]%" }, "synthetic", default);
+            await repository.UpsertImportedAsync(TestRecord.SourceItem($"synthetic-{i:D2}", $"SYN-{i:D2}") with { Title = "Synthetic [literal]%" }, "synthetic", TestContext.Current.CancellationToken);
         }
         IOperationalRecordClient source = Substitute.For<IOperationalRecordClient>();
         var audit = new InMemoryAuditWriter();
         var service = new OperationalRecordService(source, new ManualReviewOperationalRecordClassifier(), repository,
             audit, Options.Create(new OperationalRecordsOptions()), NullLogger<OperationalRecordService>.Instance);
-        OperationalRecordPage first = await service.BrowseAsync(new() { Search = "[literal]%", Sort = "code", PageSize = 10 }, default);
-        OperationalRecordPage second = await service.BrowseAsync(new() { Search = "[literal]%", Sort = "code", Page = 2, PageSize = 10 }, default);
+        OperationalRecordPage first = await service.BrowseAsync(new() { Search = "[literal]%", Sort = "code", PageSize = 10 }, TestContext.Current.CancellationToken);
+        OperationalRecordPage second = await service.BrowseAsync(new() { Search = "[literal]%", Sort = "code", Page = 2, PageSize = 10 }, TestContext.Current.CancellationToken);
         first.Total.Should().Be(12);
         second.Items.Should().HaveCount(2);
         first.Items.Select(r => r.Id).Intersect(second.Items.Select(r => r.Id)).Should().BeEmpty();
-        (await service.BrowseAsync(new() { State = OperationalRecordWorkflowState.Completed }, default)).Total.Should().Be(0);
-        (await repository.BrowseAsync(new(), true, default)).Total.Should().Be(0);
+        (await service.BrowseAsync(new() { State = OperationalRecordWorkflowState.Completed }, TestContext.Current.CancellationToken)).Total.Should().Be(0);
+        (await repository.BrowseAsync(new(), true, TestContext.Current.CancellationToken)).Total.Should().Be(0);
         audit.Events.Should().BeEmpty();
         source.ReceivedCalls().Should().BeEmpty();
     }
@@ -40,12 +40,12 @@ public sealed class OperationalRecordBrowsingTests
     public async Task Browse_CountsUnknownSourceDates_AndSortsThemLastForOldest()
     {
         var repository = new InMemoryOperationalRecordRepository();
-        await repository.UpsertImportedAsync(TestRecord.SourceItem("source-a", "OR-A") with { CreatedAt = null }, "synthetic", default);
-        await repository.UpsertImportedAsync(TestRecord.SourceItem("source-b", "OR-B") with { CreatedAt = new DateTimeOffset(2026, 9, 2, 0, 0, 0, TimeSpan.Zero) }, "synthetic", default);
-        await repository.UpsertImportedAsync(TestRecord.SourceItem("source-c", "OR-C") with { CreatedAt = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero) }, "synthetic", default);
+        await repository.UpsertImportedAsync(TestRecord.SourceItem("source-a", "OR-A") with { CreatedAt = null }, "synthetic", TestContext.Current.CancellationToken);
+        await repository.UpsertImportedAsync(TestRecord.SourceItem("source-b", "OR-B") with { CreatedAt = new DateTimeOffset(2026, 9, 2, 0, 0, 0, TimeSpan.Zero) }, "synthetic", TestContext.Current.CancellationToken);
+        await repository.UpsertImportedAsync(TestRecord.SourceItem("source-c", "OR-C") with { CreatedAt = new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero) }, "synthetic", TestContext.Current.CancellationToken);
 
-        OperationalRecordPage oldest = await repository.BrowseAsync(new() { Sort = "oldest" }, false, default);
-        OperationalRecordPage dated = await repository.BrowseAsync(new() { Search = "OR-B" }, false, default);
+        OperationalRecordPage oldest = await repository.BrowseAsync(new() { Sort = "oldest" }, false, TestContext.Current.CancellationToken);
+        OperationalRecordPage dated = await repository.BrowseAsync(new() { Search = "OR-B" }, false, TestContext.Current.CancellationToken);
 
         oldest.Items.Select(r => r.OrCode).Should().Equal("OR-C", "OR-B", "OR-A");
         oldest.UnknownSourceCreatedAtCount.Should().Be(1);

@@ -28,7 +28,7 @@ public sealed class AnnouncementForm
     /// <summary>One service per line; API enforces item and aggregate bounds.</summary>
     public string ServicesText { get; set; } = "";
     /// <summary>Ordered, manually entered affected services; no source attestation.</summary>
-    public string[] Services => ServicesText.Split('\n').Select(s => s.Trim()).Where(s => s.Length > 0).ToArray();
+    public string[] Services => [.. ServicesText.Split('\n').Select(s => s.Trim()).Where(s => s.Length > 0)];
     /// <summary>One stable UI row; not an identity.</summary>
     public sealed class Recipient(string kind, string address)
     {

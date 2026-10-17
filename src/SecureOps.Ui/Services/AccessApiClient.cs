@@ -41,6 +41,26 @@ public sealed class AccessApiClient : IAccessApiClient
     }
 
     /// <inheritdoc />
+    public async Task<AccessEffectiveResponse> GetMyEffectiveAsync(CancellationToken cancellationToken)
+    {
+        HttpResponseMessage response;
+
+        try
+        {
+            response = await _httpClient.GetAsync("api/v1/access/me/effective", cancellationToken);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or OperationCanceledException)
+        {
+            throw ApiResponseReader.ToTransportException(ex, cancellationToken);
+        }
+
+        using (response)
+        {
+            return await ApiResponseReader.ReadOrThrowAsync<AccessEffectiveResponse>(response, cancellationToken);
+        }
+    }
+
+    /// <inheritdoc />
     public async Task<LogoutResponse> LogoutAsync(CancellationToken cancellationToken)
     {
         HttpResponseMessage response;

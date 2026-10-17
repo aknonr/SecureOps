@@ -5,7 +5,6 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using SecureOps.Domain.Access;
 using SecureOps.Infrastructure.Access;
-using Xunit.Abstractions;
 
 namespace SecureOps.Tests.Integration.Sql;
 
@@ -116,7 +115,8 @@ public sealed partial class AccessRegistrationSqlTests(ITestOutputHelper output)
 
 public sealed class AccessRegistrationSqlFactAttribute : FactAttribute
 {
-    public AccessRegistrationSqlFactAttribute()
+    public AccessRegistrationSqlFactAttribute([System.Runtime.CompilerServices.CallerFilePath] string? sourceFilePath = null, [System.Runtime.CompilerServices.CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("SECUREOPS_ACCESS_REGISTRATION_CONNECTION")))
         {

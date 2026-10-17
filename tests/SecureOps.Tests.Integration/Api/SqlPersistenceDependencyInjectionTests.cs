@@ -65,11 +65,13 @@ public sealed class SqlPersistenceDependencyInjectionTests
         scope.ServiceProvider.GetRequiredService<IManagementReportingRepository>().Should().BeOfType<SqlManagementReportingRepository>();
     }
 
+    // ADR-0011 Amendment 1: each reporting stream is read from where it is configured; access is not a stream.
     [Theory]
-    [InlineData("Audit:Provider")]
-    [InlineData("Access:RepositoryProvider")]
-    [InlineData("OperationalRecords:RepositoryProvider")]
-    public void PartialSqlProviderSelection_DoesNotFallBackToInMemoryReporting(string nonSqlSetting)
+    [InlineData("Audit:Provider", "InMemory", typeof(FactManagementReportingRepository))]
+    [InlineData("OperationalRecords:RepositoryProvider", "InMemory", typeof(FactManagementReportingRepository))]
+    [InlineData("Access:RepositoryProvider", "InMemory", typeof(SqlManagementReportingRepository))]
+    [InlineData("Audit:Provider", "File", typeof(UnavailableManagementReportingRepository))]
+    public void PartialSqlProviderSelection_ReadsEachStreamFromItsConfiguredSource(string setting, string provider, Type expected)
     {
         Dictionary<string, string?> settings = new()
         {
@@ -82,15 +84,15 @@ public sealed class SqlPersistenceDependencyInjectionTests
             ["Jira:Provider"] = "Disabled",
             ["ConnectionStrings:SecureOpsDb"] = "Server=sql.invalid;Database=SecureOps;Integrated Security=True;Connect Timeout=15"
         };
-        settings[nonSqlSetting] = "InMemory";
+        settings[setting] = provider;
         IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
         ServiceCollection registrations = new();
         registrations.AddSingleton(configuration);
         registrations.AddLogging();
         registrations.AddSecureOpsInfrastructure(configuration);
         using ServiceProvider services = registrations.BuildServiceProvider();
+        using IServiceScope scope = services.CreateScope();
 
-        services.GetRequiredService<IManagementReportingRepository>()
-            .Should().BeOfType<UnavailableManagementReportingRepository>();
+        scope.ServiceProvider.GetRequiredService<IManagementReportingRepository>().Should().BeOfType(expected);
     }
 }

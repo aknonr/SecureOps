@@ -35,7 +35,7 @@ if (Get-ChildItem -LiteralPath $tool -Recurse -File | Where-Object { $_.Name -eq
     throw 'Server-owned configuration is forbidden in the collector payload.'
 }
 $runtime = Get-Content -LiteralPath (Join-Path $tool 'InUseEvidence.runtimeconfig.json') -Raw | ConvertFrom-Json
-if ($runtime.runtimeOptions.tfm -ne 'net8.0' -or @($runtime.runtimeOptions.frameworks).Count -ne 2) { throw 'Unexpected runtime requirements.' }
+if ($runtime.runtimeOptions.tfm -ne 'net10.0' -or @($runtime.runtimeOptions.frameworks).Count -ne 2) { throw 'Unexpected runtime requirements.' }
 $deps = Get-Content -LiteralPath (Join-Path $tool 'InUseEvidence.deps.json') -Raw | ConvertFrom-Json
 if ($deps.runtimeTarget.name -notlike '*/win-x64') { throw 'Expected Windows x64 dependency graph.' }
 foreach ($name in @('README.md', 'operator-completion-tr.md', 'operator-reporter-tr.md', 'dictionary.json', 'candidate-dictionary.json', 'rfc-contract.template.json', 'server-config.example.json')) {

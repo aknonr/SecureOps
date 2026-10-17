@@ -15,9 +15,9 @@ public sealed partial class InUseService
                 || query.Version is < 1 || query.Status is not (null or "Current" or "Superseded" or "Discarded")
                 || (query.From is not null && query.To is not null && query.From >= query.To))
             { return InUseResult<InUseReportPage>.Fail("InUseInvalid"); }
-            if (reports is null || repository is not SqlInUseRepository)
+            if ((reports, repository) is not ({ } reportReader, SqlInUseRepository))
             { return InUseResult<InUseReportPage>.Fail("PersistenceUnavailable"); }
-            InUseReportPage? page = await reports.CatalogueAsync(user, query, context.CorrelationId, token);
+            InUseReportPage? page = await reportReader.CatalogueAsync(user, query, context.CorrelationId, token);
             return page is null ? InUseResult<InUseReportPage>.Fail("AccessDenied") : new(page);
         }, token);
 
@@ -25,10 +25,10 @@ public sealed partial class InUseService
     public Task<InUseResult<IndexInUseReportsResult>> IndexReportsAsync(ClaimsPrincipal principal, AccessOperationContext context,
         Guid id, IndexInUseReportsRequest request, CancellationToken token) => RunAsync(principal, context, Capabilities.InUseReview, async _ =>
         {
-            if (request.ExpectedVersion < 1 || request.Versions is null || request.Versions.Count is < 1 or > 25
+            if (request.ExpectedVersion < 1 || request.Versions is not { Count: >= 1 and <= 25 }
                 || request.Versions.Any(v => v < 1) || request.Versions.Distinct().Count() != request.Versions.Count)
             { return InUseResult<IndexInUseReportsResult>.Fail("InUseInvalid"); }
-            if (reports is null || repository is not SqlInUseRepository)
+            if ((reports, repository) is not (not null, SqlInUseRepository))
             { return InUseResult<IndexInUseReportsResult>.Fail("PersistenceUnavailable"); }
             List<long> indexed = [];
             foreach (long version in request.Versions)

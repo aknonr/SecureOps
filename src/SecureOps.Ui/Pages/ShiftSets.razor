@@ -225,7 +225,7 @@
 
     private async Task DeleteSetAsync(ShiftSetResponse set)
     {
-        bool? confirmed = await Dialogs.ShowMessageBox(
+        bool? confirmed = await Dialogs.ShowMessageBoxAsync(
             "Grubu sil",
             $"\"{set.Name}\" grubu ve kayıtlı tüm seçimleri silinecek. Bu işlem yalnızca sizin grubunuzu kaldırır; katalogdaki bağlantılar etkilenmez.",
             yesText: "Sil",
@@ -341,7 +341,7 @@
         };
 
         IDialogReference dialog = await Dialogs.ShowAsync<ShiftSetNameDialog>(
-            title, parameters, new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, DisableBackdropClick = true, CloseOnEscapeKey = false });
+            title, parameters, new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, BackdropClick = false, CloseOnEscapeKey = false });
         await dialog.Result;
     }
 

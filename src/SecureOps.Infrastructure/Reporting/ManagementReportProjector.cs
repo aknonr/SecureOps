@@ -126,7 +126,7 @@ public sealed class ManagementReportProjector
             security,
             _legacyLimitations,
             coverage,
-            Limitations(coverage));
+            Limitations(coverage, data.Sources));
     }
 
     /// <summary>Projects an already paged server aggregate.</summary>
@@ -228,7 +228,8 @@ public sealed class ManagementReportProjector
     }
 
     private static IReadOnlyList<DataLimitationResponse> Limitations(
-        ReportingEvidenceCoverageResponse coverage)
+        ReportingEvidenceCoverageResponse coverage,
+        ReportingSources sources)
     {
         var limitations = _limitationDefinitions
             .Select(item => new DataLimitationResponse(item.Code, item.Message))
@@ -238,6 +239,13 @@ public sealed class ManagementReportProjector
             limitations.Add(new DataLimitationResponse(
                 ManagementReportingLimitationCodes.HistoryBeforePersistenceUnavailable,
                 "Historical evidence before coverageFromUtc is unavailable."));
+        }
+
+        if (!sources.IsDurable)
+        {
+            limitations.Add(new DataLimitationResponse(
+                ManagementReportingLimitationCodes.NonDurableReportingSource,
+                $"In-memory evidence is lost on restart and is not authoritative history. Audit: {sources.Audit}; workflow: {sources.Workflow}."));
         }
 
         return limitations;

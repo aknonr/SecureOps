@@ -15,7 +15,7 @@ public sealed class OperationsDiagnosticsTests
         var defaults = new OperationsDiagnostics(new ConfigurationBuilder().Build());
         var values = new Dictionary<string, string?> { ["Hangfire:SchemaName"] = "HangFire", ["Hangfire:Queue"] = "announcement-source" };
         var explicitDefaults = new OperationsDiagnostics(new ConfigurationBuilder().AddInMemoryCollection(values).Build());
-        (await defaults.InspectAsync(default)).ConfigurationFingerprint.Should().Be((await explicitDefaults.InspectAsync(default)).ConfigurationFingerprint);
+        (await defaults.InspectAsync(TestContext.Current.CancellationToken)).ConfigurationFingerprint.Should().Be((await explicitDefaults.InspectAsync(TestContext.Current.CancellationToken)).ConfigurationFingerprint);
         values["ConnectionStrings:SecureOpsDb"] = "Server=synthetic;Database=synthetic;User ID=secret-user;Password=secret-password";
         values["TuruncuHat:Password"] = "another-secret";
         values["AnnouncementMail:Password"] = "mail-password";
@@ -31,7 +31,7 @@ public sealed class OperationsDiagnosticsTests
         using var report = JsonDocument.Parse(json);
         report.RootElement.GetProperty("Settings").EnumerateArray().Single(x => x.GetProperty("Key").GetString() == "AnnouncementMail:SelfTestEnabled")
             .GetProperty("Value").GetString().Should().Be("True");
-        (await diagnostic.SourceAsync(default)).State.Should().Be("Disabled");
+        (await diagnostic.SourceAsync(TestContext.Current.CancellationToken)).State.Should().Be("Disabled");
     }
 
     [Fact]
@@ -39,7 +39,7 @@ public sealed class OperationsDiagnosticsTests
     {
         IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         { ["Announcements:Enabled"] = "true", ["AnnouncementSource:Enabled"] = "true" }).Build();
-        AnnouncementSourceReadiness readiness = await new OperationsDiagnostics(configuration).SourceAsync(default);
+        AnnouncementSourceReadiness readiness = await new OperationsDiagnostics(configuration).SourceAsync(TestContext.Current.CancellationToken);
         readiness.State.Should().Be("ConfigurationMissing");
         readiness.Missing.Should().Contain("ConnectionStrings:SecureOpsDb").And.Contain("AnnouncementSource:Profiles");
         readiness.WorkerState.Should().Be("NotChecked");

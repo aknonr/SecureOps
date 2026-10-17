@@ -42,7 +42,7 @@ public sealed class FileAuditEventSinkTests
                 CancellationToken.None);
 
             string file = Directory.GetFiles(directory, "test-audit-*.jsonl").Should().ContainSingle().Subject;
-            string content = await File.ReadAllTextAsync(file);
+            string content = await File.ReadAllTextAsync(file, TestContext.Current.CancellationToken);
 
             content.Should().Contain("IdentityLookupSucceeded");
             content.Should().Contain("pam12356");

@@ -38,7 +38,7 @@ const out = path.resolve(process.argv[6]);
     async function detail(record) {
         await navigate(page, ui, 'operational-records/' + record.id);
         await page.getByRole('heading', { name: record.orCode, exact: true }).waitFor();
-        await page.getByRole('heading', { name: 'Talep incelemesi', exact: true }).waitFor();
+        await page.getByRole('heading', { name: 'Talep', exact: true }).waitFor();
     }
     async function previewAndConfirm(record, name, confirm = true) {
         await detail(record);
@@ -150,7 +150,7 @@ const out = path.resolve(process.argv[6]);
         checks.push('Explicit UI source refresh; stored search/sort/paging do not mutate source or workflow versions');
         await detail(blocked);
         for (const [label, name] of [['Sunucu Talebi', 'server'], ['Uygulama Kurulumu', 'installation'], ['Sunucu İadesi/Emekliliği', 'retirement']]) {
-            const select = page.getByRole('combobox', { name: 'Talep türü (operatör beyanı)', exact: true });
+            const select = page.getByRole('combobox', { name: 'Talep türü', exact: true });
             await select.focus();
             assert.equal(await select.evaluate(e => e === document.activeElement), true);
             await select.selectOption({ label });
@@ -169,7 +169,7 @@ const out = path.resolve(process.argv[6]);
         query(database, `UPDATE ops.OperationalRecords SET UpdatedAt=DATEADD(second,1,UpdatedAt) WHERE OperationalRecordId='${blocked.id}'`);
         await page.getByRole('button', { name: 'İnceleme taslağı hazırla', exact: true }).click();
         await page.getByText('Kaynak kayıt değişmiş', { exact: true }).waitFor();
-        assert.equal(await page.getByRole('combobox', { name: 'Talep türü (operatör beyanı)', exact: true }).inputValue(), 'ServerRetirement');
+        assert.equal(await page.getByRole('combobox', { name: 'Talep türü', exact: true }).inputValue(), 'ServerRetirement');
         await capture(page, out, 'review-version-conflict');
         await page.getByRole('button', { name: 'İnceleme taslağı hazırla', exact: true }).click();
         await page.getByText('Bu inceleme taslağı yayımlanamaz.', { exact: true }).waitFor();

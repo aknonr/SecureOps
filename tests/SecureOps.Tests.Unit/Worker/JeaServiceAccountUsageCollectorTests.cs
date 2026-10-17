@@ -117,7 +117,7 @@ public sealed class JeaServiceAccountUsageCollectorTests
 
         await run.Should().ThrowAsync<OperationCanceledException>();
         int startedAtCancel = recorder.Started.Count;
-        await Task.Delay(200);
+        await Task.Delay(200, TestContext.Current.CancellationToken);
         recorder.Started.Should().HaveCount(startedAtCancel, "no server starts after cancellation");
         recorder.Completed.Count.Should().BeLessThan(servers.Length);
         recorder.Completed.Select(r => r.ServerName).Should().OnlyHaveUniqueItems();
