@@ -5,6 +5,7 @@
 @inject IAccessAdminApiClient AccessAdmin
 @inject IDialogService Dialogs
 @inject NavigationManager Navigation
+@inject IJSRuntime Js
 
 <PageTitle>Kullanıcı erişimi · @WasasBrand.Name</PageTitle>
 <div class="so-page so-page--wide so-user-workspace">
@@ -19,15 +20,21 @@
     else if (!_access.Can(Capabilities.AccessManageUsers)) { <MudAlert Severity="Severity.Warning">Kullanıcı yönetimi yetkiniz yok.</MudAlert> }
     else if (_user is not null)
     {
-        @if (_result is not null) { <MudAlert Severity="Severity.Success" role="status">@_result</MudAlert> }
-        @if (_actionProblem is not null) { <SoProblemPanel Problem="_actionProblem" OnRetry="() => LoadAsync(clearAction: false)" RetryLabel="Güncel durumu yükle" /> }
+        @if (_result is not null || _actionProblem is not null)
+        {
+            @* Landing point after a dialog action: the re-read replaces the buttons, so focus goes to the outcome. *@
+            <div class="user-outcome" tabindex="-1" @ref="_outcome">
+                @if (_result is not null) { <MudAlert Severity="Severity.Success" role="status">@_result</MudAlert> }
+                @if (_actionProblem is not null) { <SoProblemPanel Problem="_actionProblem" OnRetry="() => LoadAsync(clearAction: false)" RetryLabel="Güncel durumu yükle" /> }
+            </div>
+        }
         @if (_loadProblem is not null) { <SoProblemPanel Problem="_loadProblem" OnRetry="() => LoadAsync(clearAction: false)" /> }
         <section class="user-summary" aria-label="Kullanıcı özeti">
             <div><SoStatusBadge Label="@AccessUserView.StatusLabel(_user)" Tone="@AccessUserView.StatusTone(_user)" /><p>@_user.Profile?.Account</p><p>@_user.Profile?.Email</p></div>
             <div><span class="user-caption">Son oturum</span><p>@_user.LastAuthenticatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</p><span class="user-caption">Kayıt sürümü @_user.Version</span></div>
             <div class="user-actions">
-                @if (_access.Can(Capabilities.AccessAssignRoles)) { <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ManageAccounts" Disabled="@(_busy || !AccessUserView.IsApproved(_user))" OnClick="ReplaceRolesAsync">Rolleri değiştir</MudButton> }
-                <MudButton Variant="Variant.Text" Color="Color.Error" StartIcon="@Icons.Material.Filled.Block" Disabled="@(_busy || !AccessUserView.IsApproved(_user))" OnClick="DisableAsync">Erişimi kapat</MudButton>
+                @if (_access.Can(Capabilities.AccessAssignRoles)) { <MudButton id="@ReplaceRolesButtonId" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.ManageAccounts" Disabled="@(_busy || !AccessUserView.IsApproved(_user))" OnClick="ReplaceRolesAsync">Rolleri değiştir</MudButton> }
+                <MudButton id="@DisableButtonId" Variant="Variant.Text" Color="Color.Error" StartIcon="@Icons.Material.Filled.Block" Disabled="@(_busy || !AccessUserView.IsApproved(_user))" OnClick="DisableAsync">Erişimi kapat</MudButton>
             </div>
         </section>
         @if (AccessUserView.IsRejected(_user)) { <MudAlert Severity="Severity.Warning">Son erişim talebi reddedildi. Bekleyen talep yok; yeniden giriş yeni talep oluşturmaz.</MudAlert> }
@@ -89,6 +96,8 @@
     private bool _loading;
     private bool _busy;
     private CancellationTokenSource _read = new();
+    private ElementReference _outcome;
+    private bool _focusOutcome;
     private Guid _requestedUserId;
     private AccessActionDialog.Result? _attempted;
     private IReadOnlyList<AccessRoleDefinition> _roleDefinitions = [];
@@ -161,8 +170,12 @@
         }
     }
 
+    private const string ReplaceRolesButtonId = "access-user-replace-roles";
+    private const string DisableButtonId = "access-user-disable";
+
     private Task ReplaceRolesAsync() => RunAsync(
         AccessActionDialog.AccessAction.ReplaceRoles,
+        ReplaceRolesButtonId,
         async (confirmed, target) =>
         {
             await AccessAdmin.ReplaceRolesAsync(
@@ -173,6 +186,7 @@
 
     private Task DisableAsync() => RunAsync(
         AccessActionDialog.AccessAction.Disable,
+        DisableButtonId,
         async (confirmed, target) =>
         {
             await AccessAdmin.DisableAsync(
@@ -183,6 +197,7 @@
 
     private async Task RunAsync(
         AccessActionDialog.AccessAction action,
+        string openerId,
         Func<AccessActionDialog.Result, AccessUserResponse, Task<string>> execute)
     {
         if (_busy || _user is null)
@@ -214,6 +229,7 @@
 
         if (outcome is null || outcome.Canceled || outcome.Data is not AccessActionDialog.Result confirmed)
         {
+            await FocusOpenerAsync(openerId);
             return;
         }
 
@@ -242,10 +258,37 @@
         // Always re-read, success or failure. On a conflict this is the whole remedy: the version
         // that was submitted is stale, so the administrator must see the current record before
         // deciding whether the action is still wanted. Nothing is re-sent automatically.
+        _focusOutcome = true;
         await LoadAsync(clearAction: false);
 
         // The administrator may have changed their own authority.
         await AccessProvider.RefreshAsync(CancellationToken.None);
+    }
+
+    // MudBlazor 6.16 does not restore focus when a dialog closes; without this a cancelled dialog leaves the keyboard on <body>.
+    private async Task FocusOpenerAsync(string id)
+    {
+        try
+        {
+            await using IJSObjectReference module = await Js.InvokeAsync<IJSObjectReference>("import", "./js/so-focus.js");
+            await module.InvokeVoidAsync("focusById", id);
+        }
+        catch (JSException) { }
+        catch (InvalidOperationException) { }
+        catch (JSDisconnectedException) { }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Keyboard users otherwise land on <body> once the re-read swaps the page for the loading state.
+        // Only once the outcome block is on the screen: a lost permission or failed re-read renders something else.
+        if (_focusOutcome && !_loading && _user is not null && (_result is not null || _actionProblem is not null))
+        {
+            _focusOutcome = false;
+            try { await _outcome.FocusAsync(); }
+            catch (InvalidOperationException) { }
+            catch (JSDisconnectedException) { }
+        }
     }
 
     private static SoStatusBadge.BadgeTone RequestTone(string status) => status switch
