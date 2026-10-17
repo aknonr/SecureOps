@@ -10,6 +10,7 @@ Short claim register for collaborators. It does **not** replace the owner's coor
 | 2026-10-14 | nurseliii | fix/ui-access-screens-responsive-20261014 | #67 | src/SecureOps.Ui/Pages/{Sessions,AccessUsers,AccessRequests}.razor(.css), tests/SecureOps.Tests.Unit (UI), tests/browser/access-screens-responsive.cjs, src/SecureOps.Ui/README.md, docs/26-ui-backend-contract-gaps.md | bitti (#68) |
 | 2026-10-17 | nurseliii | claude/server-local-access-proposal-20261017-639187 | #80 | docs/contracts/server-local-access-proposal.md (new), docs/26-ui-backend-contract-gaps.md (G-43 only); docs only, no code | PR #81 açık |
 | 2026-10-17 | nurseliii | claude/ui-access-dialog-detail-20261017-c9857e | #79 | src/SecureOps.Ui/Shared/Components/AccessActionDialog.razor(.css), Pages/AccessUserDetail.razor(.css), wwwroot/js/so-focus.js, tests (UI render, tests/browser/access-dialog-detail.cjs), src/SecureOps.Ui/README.md, docs/26 (G-42) | PR açık |
+| 2026-10-17 | nurseliii | claude/ui-sa-list-person-filter-20261017-ac9dee | #84 | src/SecureOps.Ui/Pages/ServiceAccounts/ServiceAccountList.razor(.css), SaPersonPicker.razor (additive `Selected` callback), tests (UI, tests/browser/service-accounts.cjs), docs/26 (new row), docs/service-accounts/PROGRESS.md | PR açık |
 
 ## Number requests
 
@@ -18,3 +19,4 @@ Ask here and wait for the owner to write the number back. Never use an unconfirm
 | Date | Kind (migration / ADR / gap id) | Requested by | Purpose | Number (owner fills) |
 |---|---|---|---|---|
 | 2026-10-14 | gap id | nurseliii | #67: paged access lists (`users/page`, `requests/page`) are SQL-only, 503 on InMemory; new row in `docs/26` | G-40 verildi |
+| 2026-10-17 | nurseliii | gap id | #84: list DTO lacks `passwordLastSet` (+ source, observation date), no "last source" filter, no person lookup by id; row "G-?" in `docs/26` | (owner fills) |

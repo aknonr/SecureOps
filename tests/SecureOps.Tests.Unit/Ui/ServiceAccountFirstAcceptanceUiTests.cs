@@ -72,6 +72,45 @@ public sealed class ServiceAccountFirstAcceptanceUiTests
     }
 
     [Fact]
+    public async Task PersonFilterInTheLink_IsSentToTheListAndShownAsARemovableChip_AndTheOthersStayCleared()
+    {
+        await using Fixture fixture = await Fixture.StartAsync();
+        string person = "5a1e0000-0000-4000-8000-0000000000b1";
+
+        await fixture.NavigateAsync(null, false, person);
+
+        fixture.Calls.Last(c => c.StartsWith("/accounts?", StringComparison.Ordinal)).Should().Contain("personId=" + person);
+        string html = fixture.Html();
+        html.Should().Contain("Etkin süzgeçler").And.Contain("Süzgeci kaldır: Kişi (sahip ya da açık işin takipçisi)")
+            .And.Contain("ad gösterilemiyor", "a name is never invented when only the id is known").And.Contain("kişi süzgeci hesabın sahibi ya da açık bir işin takipçisi");
+
+        await fixture.NavigateAsync(null, false);
+        fixture.Calls.Last(c => c.StartsWith("/accounts?", StringComparison.Ordinal)).Should().NotContain("personId=");
+        fixture.Html().Should().NotContain("Etkin süzgeçler");
+    }
+
+    [Fact]
+    public async Task InvalidPersonInTheLink_IsIgnored_NotSentToTheServer()
+    {
+        await using Fixture fixture = await Fixture.StartAsync();
+
+        await fixture.NavigateAsync(null, false, "not-a-guid");
+
+        fixture.Calls.Where(c => c.StartsWith("/accounts?", StringComparison.Ordinal)).Should().OnlyContain(c => !c.Contains("personId=", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ListPage_SendsPersonToListAndExport_AndLabelsItWithTheServerMeaning()
+    {
+        string page = File.ReadAllText(UiFile("Pages", "ServiceAccounts", "ServiceAccountList.razor"));
+
+        page.Should().Contain("\"personId=\" + person", "ListQuery feeds both the list and the Excel export");
+        page.Should().Contain("/accounts/export?\" + string.Join('&', ListQuery(1))");
+        page.Should().Contain("Kişi (sahip ya da açık işin takipçisi)").And.Contain("Süzgeçleri temizle");
+        page.Should().NotContain("PasswordLastSet", "the list DTO carries no password date; none is shown");
+    }
+
+    [Fact]
     public async Task SameQueryRendered_AgainDoesNotRefetch()
     {
         await using Fixture fixture = await Fixture.StartAsync();
@@ -191,11 +230,14 @@ public sealed class ServiceAccountFirstAcceptanceUiTests
 
         [Parameter] public bool Team { get; set; }
 
+        [Parameter] public string? Person { get; set; }
+
         public override Task SetParametersAsync(ParameterView parameters)
         {
             parameters.TryGetValue(nameof(Status), out string? status);
             parameters.TryGetValue(nameof(Team), out bool team);
-            (StatusQuery, MyTeamQuery) = (status, team);
+            parameters.TryGetValue(nameof(Person), out string? person);
+            (StatusQuery, MyTeamQuery, PersonQuery) = (status, team, person);
             return base.SetParametersAsync(parameters);
         }
     }
@@ -213,6 +255,8 @@ public sealed class ServiceAccountFirstAcceptanceUiTests
 
         public bool Team { get; set; }
 
+        public string? Person { get; set; }
+
         protected override void OnInitialized() => Handle.Host = this;
 
         protected override void BuildRenderTree(RenderTreeBuilder builder)
@@ -220,12 +264,13 @@ public sealed class ServiceAccountFirstAcceptanceUiTests
             builder.OpenComponent<QueryList>(0);
             builder.AddAttribute(1, nameof(QueryList.Status), Status);
             builder.AddAttribute(2, nameof(QueryList.Team), Team);
+            builder.AddAttribute(3, nameof(QueryList.Person), Person);
             builder.CloseComponent();
         }
 
-        public void Navigate(string? status, bool team)
+        public void Navigate(string? status, bool team, string? person = null)
         {
-            (Status, Team) = (status, team);
+            (Status, Team, Person) = (status, team, person);
             StateHasChanged();
         }
     }
@@ -270,10 +315,10 @@ public sealed class ServiceAccountFirstAcceptanceUiTests
         public string Html() => WebUtility.HtmlDecode(Regex.Replace(_renderer.Dispatcher.InvokeAsync(() => _root()).GetAwaiter().GetResult(), " b-[a-z0-9]{10}", string.Empty));
 
         /// <summary>Simulates a shortcut link: the same page gets a new query string.</summary>
-        public async Task NavigateAsync(string? status, bool team)
+        public async Task NavigateAsync(string? status, bool team, string? person = null)
         {
             int before = _api.Calls.Count;
-            await _renderer.Dispatcher.InvokeAsync(() => _handle.Host!.Navigate(status, team));
+            await _renderer.Dispatcher.InvokeAsync(() => _handle.Host!.Navigate(status, team, person));
             // The re-read (if any) runs after the parameter update; give it a moment to finish, then require quiet.
             for (int i = 0; i < 100; i++)
             {

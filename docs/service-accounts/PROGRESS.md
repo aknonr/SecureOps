@@ -17,6 +17,11 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
 - Push on the owner's workstation: Git Credential Manager holds two GitHub accounts, so name the owner's:
   `git -c credential.https://github.com.username=aknonr push origin <branch>`.
 
+## List filters, issue #84 (branch `claude/ui-sa-list-person-filter-20261017-ac9dee`, UI only, PR open, not merged)
+
+- `/service-accounts`: person filter (`personId`, via `SaPersonPicker`, shown with the Work capability) sent to the list and the Excel export; active-filter chips (each a button, removes only its filter) and one "Süzgeçleri temizle"; all filters live in the URL query. **Assumption (not an owner decision, #84):** the person filter keeps the server's meaning "owner or follow-up person of an open work item". No password date is shown (not in the list DTO; gaps in `docs/26`, number pending).
+- Verified on Mac only (Demo/InMemory-style unit rendering). The SQL list with `personId` and the browser journey step run on Windows/LocalDB only.
+
 ## Guided tour follow-up, REHBER-2 (branch `fix/service-accounts-guided-tour-followup-20261017`, from master `2874072`, PR open, not merged)
 
 - Tours for "Ekibimin işleri" (5 steps) and the four "Modül yönetimi" tabs (3–4 steps each, own start button/id per tab); `data-tour` marks only in SA pages
