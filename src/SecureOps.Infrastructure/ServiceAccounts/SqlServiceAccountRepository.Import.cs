@@ -98,6 +98,12 @@ public sealed partial class SqlServiceAccountRepository
     {
         await using SqlConnection connection = await OpenAsync(cancellationToken);
         await using SqlTransaction transaction = await BeginWriteAsync(connection, cancellationToken);
+        // Queue behind any other staging; a wait past the gate timeout writes nothing and is reported as persistence unavailable.
+        await connection.ExecuteAsync(Cmd("""
+            DECLARE @result int;
+            EXEC @result = sp_getapplock @Resource = @resource, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = @timeout;
+            IF @result < 0 THROW 51313, 'Service Accounts import staging in progress.', 1;
+            """, new { resource = _importStageLock, timeout = _writeGateTimeoutMilliseconds }, transaction, cancellationToken));
         await connection.ExecuteAsync(Cmd("""
             INSERT INTO svcacct.ImportBatches(Id, Profile, FileName, ContentType, Sha256, Content, SourceReportDate, SourceDateProvenance, DeclaredScope,
                 DeclaredDomain, MappingJson, MappingVersion, PreviewVersion, DecisionVersion, Status, ReplayKey, SummaryJson, UploadedBy, UploadedAt)
