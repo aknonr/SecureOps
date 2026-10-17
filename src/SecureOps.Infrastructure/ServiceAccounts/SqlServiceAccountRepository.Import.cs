@@ -247,7 +247,7 @@ public sealed partial class SqlServiceAccountRepository
     /// </summary>
     public async Task<SaResult<ImportCommitOutcome>> CommitAsync(Guid batchId, ImportCommitRequest request, string idempotencyKey, SaActor actor,
         ServiceAccountScope scope, Func<ImportBatchRecord, ImportContext, IReadOnlyDictionary<int, ImportRowDecision>, ImportPlanResult> plan,
-        CancellationToken cancellationToken)
+        Func<ImportBatchRecord, bool> twinReachable, CancellationToken cancellationToken)
     {
         await using SqlConnection connection = await OpenAsync(cancellationToken);
         await using SqlTransaction transaction = await BeginAsync(connection, cancellationToken, IsolationLevel.Serializable);
@@ -272,6 +272,12 @@ public sealed partial class SqlServiceAccountRepository
             BatchSelect(false) + " WHERE ReplayKey = @ReplayKey AND Status = 'Committed';", new { batch.ReplayKey }, transaction, cancellationToken));
         if (twin is not null)
         {
+            if (!twinReachable(twin))
+            {
+                // A twin of another scope (only possible for a batch keyed before the boundary joined the key) is never revealed: stage again.
+                return SaResult<ImportCommitOutcome>.Fail(SaErrors.PreviewStale, "previewVersion");
+            }
+
             return SaResult<ImportCommitOutcome>.Fail(SaErrors.AlreadyImported, current: JsonSerializer.Deserialize<ImportResultView>(twin.ResultJson!));
         }
 

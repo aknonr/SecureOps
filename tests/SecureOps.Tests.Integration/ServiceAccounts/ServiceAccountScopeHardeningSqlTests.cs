@@ -155,6 +155,42 @@ public sealed class ServiceAccountScopeHardeningSqlTests
     }
 
     [ServiceAccountSqlFact]
+    public async Task ImportBatches_ReplayedImportCommitRespectsScope()
+    {
+        ServiceAccountSqlFixture fx = new();
+        string nameA = "SYN IMP A " + fx.Suffix, nameB = "SYN IMP B " + fx.Suffix;
+        Guid orgA = await fx.OrganizationAsync(nameA), orgB = await fx.OrganizationAsync(nameB);
+        SynUser importerA = await fx.UserAsync(_importer), importerB = await fx.UserAsync(_importer);
+        await fx.GrantAsync(importerA, ScopeKind.Organization, orgA);
+        await fx.GrantAsync(importerB, ScopeKind.Organization, orgB);
+        StageImportRequest request = new(ServiceAccountImportProfiles.CoordinationList, new DateOnly(2026, 9, 14), "Sentetik beyan: kaynak rapor tarihi test verisidir");
+        byte[] file = List(nameA, $"SYN{fx.Suffix}_TWIN");
+
+        ImportBatchView first = Ok(await fx.Service.StageImportAsync(importerA.Principal, fx.Context, request, "liste.xlsx", "application/octet-stream", file, _token));
+        ImportBatchView firstDone = Ok(await fx.Service.CommitImportAsync(importerA.Principal, fx.Context, first.Id,
+            new ImportCommitRequest(first.PreviewVersion, first.DecisionVersion), "k-" + Guid.NewGuid().ToString("N"), _token));
+        firstDone.Status.Should().Be("Committed");
+
+        // Another scope stages and commits the same file and parameters: it gets its own batch, never the first scope's result.
+        ImportBatchView second = Ok(await fx.Service.StageImportAsync(importerB.Principal, fx.Context, request, "baska.xlsx", "application/octet-stream", file, _token));
+        second.Id.Should().NotBe(first.Id);
+        SaResult<ImportBatchView> secondCommit = await fx.Service.CommitImportAsync(importerB.Principal, fx.Context, second.Id,
+            new ImportCommitRequest(second.PreviewVersion, second.DecisionVersion), "k-" + Guid.NewGuid().ToString("N"), _token);
+        secondCommit.ErrorCode.Should().NotBe(SaErrors.AlreadyImported);
+        secondCommit.Current.Should().BeNull();
+        Ok(secondCommit).Status.Should().Be("Committed");
+        Ok(secondCommit).Id.Should().Be(second.Id);
+
+        // Each scope still replays only its own committed batch, and neither can read the other's.
+        Ok(await fx.Service.StageImportAsync(importerA.Principal, fx.Context, request, "liste.xlsx", "application/octet-stream", file, _token))
+            .Id.Should().Be(first.Id);
+        Ok(await fx.Service.StageImportAsync(importerB.Principal, fx.Context, request, "baska.xlsx", "application/octet-stream", file, _token))
+            .Id.Should().Be(second.Id);
+        (await fx.Service.ImportAsync(importerA.Principal, fx.Context, second.Id, _token)).ErrorCode.Should().Be(SaErrors.NotFound);
+        (await fx.Service.ImportAsync(importerB.Principal, fx.Context, first.Id, _token)).ErrorCode.Should().Be(SaErrors.NotFound);
+    }
+
+    [ServiceAccountSqlFact]
     public async Task Mutation_UsesTheGrantsThatAreCurrentInsideTheTransaction()
     {
         ServiceAccountSqlFixture fx = new();

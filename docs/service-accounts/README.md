@@ -104,6 +104,9 @@ their uploader (and to `All`); organization-scoped coordinators no longer see th
 stored outside the caller's scope is refused with the dedicated code `ServiceAccountProviderMessageIdUnavailable` (field
 `communication.providerMessageIdUnavailable`, or `providerMessageIdUnavailable` on a plain communication); the UI says "Bu mail kimliği
 bu kayıtta kullanılamıyor." and does not blame the length.
+Import replay is scope-aware: the replay key now includes the stager's scope boundary, so the same file imported from another scope is a
+separate batch (and the commit-time twin lookup never returns another scope's result). Batches keyed before this change are still
+replayed by the plain key, only to callers who cover them. No migration.
 Concurrency: every module write transaction takes the application lock `svcacct:import-commit`
 in Shared mode first; the import commit holds it exclusively (see PROGRESS, VerifyAction deadlock).
 
