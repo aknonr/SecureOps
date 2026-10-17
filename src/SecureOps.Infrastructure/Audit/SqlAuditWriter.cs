@@ -1,5 +1,3 @@
-using System.Data;
-using Dapper;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 
@@ -10,7 +8,6 @@ namespace SecureOps.Infrastructure.Audit;
 /// </summary>
 public sealed class SqlAuditWriter : IAuditEventSink
 {
-    private const int _commandTimeoutSeconds = 15;
     private readonly string _connectionString;
 
     /// <summary>
@@ -27,38 +24,12 @@ public sealed class SqlAuditWriter : IAuditEventSink
     /// <inheritdoc />
     public async Task WriteBatchAsync(IReadOnlyCollection<AuditEvent> events, CancellationToken cancellationToken)
     {
-        const string sql = """
-            INSERT INTO audit.AuditLog
-                (OccurredAt, Actor, Action, AlertId, ServerName, CorrelationId, DetailsJson, SourceIp)
-            VALUES
-                (@OccurredAt, @Actor, @Action, @AlertId, @ServerName, @CorrelationId, @DetailsJson, @SourceIp);
-            """;
-
         await using SqlConnection connection = new(_connectionString);
         await connection.OpenAsync(cancellationToken);
 
         foreach (AuditEvent auditEvent in events)
         {
-            CommandDefinition command = new(
-                sql,
-                new
-                {
-                    auditEvent.OccurredAt,
-                    auditEvent.Actor,
-                    auditEvent.Action,
-                    auditEvent.AlertId,
-                    auditEvent.ServerName,
-                    auditEvent.CorrelationId,
-                    DetailsJson = auditEvent.Details is null
-                        ? null
-                        : System.Text.Json.JsonSerializer.Serialize(auditEvent.Details, AuditJson.SerializerOptions),
-                    auditEvent.SourceIp
-                },
-                commandTimeout: _commandTimeoutSeconds,
-                commandType: CommandType.Text,
-                cancellationToken: cancellationToken);
-
-            await connection.ExecuteAsync(command);
+            await SqlAuditRow.InsertAsync(connection, null, auditEvent, cancellationToken);
         }
     }
 }

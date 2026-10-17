@@ -619,7 +619,7 @@ have to be invented.
 | `/reporting/operators` | Management reporting view | `Reporting.ManagementView` |
 | `/audit-compliance`, `/diagnostics-readonly` | Future-phase placeholders | authenticated |
 
-Interim auth endpoints: `POST /auth/sign-in`, `GET /auth/sign-out`. They establish identity only.
+Interim auth endpoints: `POST /auth/sign-in`, `POST /auth/sign-out` (antiforgery; the `/sign-out` page confirms, GET changes nothing). They establish identity only.
 When an identity provider is approved they become a challenge/callback pair and `/login` is unchanged.
 
 **Do not add a nav entry before its route exists** — the menu must never offer a dead link.
@@ -706,7 +706,7 @@ closed.
 because a call failed. `WorkflowConflict` at `stage: "jira-reconciliation"` is mapped to a dedicated
 non-retryable presentation, never to the generic conflict message.
 
-**No polling.** `GET /operational-records` is a rate-limited source refresh, not a passive read.
+**No polling.** `POST /api/v1/operational-records/refresh` is a rate-limited source refresh; `GET /api/v1/operational-records` is read-only.
 Refresh is a deliberate operator action, plus an automatic re-read after every write.
 
 ### Jira-only submission states (UI, 2026-09-28)
@@ -1990,7 +1990,7 @@ and `before-links-*`, `after-links-*`, `after-groups-*`. 720 CSS-pixel reflow
 was checked; native managed-browser 200% zoom is not claimed.
 
 Persisted browsing now uses `GET /api/v1/operational-records/stored`; only
-**Kaynağı yenile** calls the bounded source refresh. Search, stable sort, status,
+**Kaynağı yenile** calls the bounded source refresh (`POST .../operational-records/refresh`). Search, stable sort, status,
 page and bottom page-size controls use actual persisted totals. Review starts
 with source summary, unselected type, authoritative blockers, then supported
 preview/actions. Retirement is explicitly outside the two confirmed types;

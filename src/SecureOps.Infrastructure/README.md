@@ -38,6 +38,11 @@ EvidenceSheets. See `docs/post-rc626-repair-tr.md` and ADR-0020.
 
 External integrations and data access.
 
+Enabled Turuncu Hat announcement sources validate the shared HTTPS endpoint and
+HTTP bounds at registration without requiring operational-record credentials or
+mappings. Bounded JSON response reads enforce each provider's configured request
+timeout, preserving the caller's existing timeout and cancellation handling.
+
 Combined announcement persistence requires reviewed migrations 014-018 and separately
 provisioned Hangfire. See `docs/contracts/planned-announcement-integration.md` for grants.
 

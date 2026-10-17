@@ -165,7 +165,8 @@ public sealed class OperationalRecordsJiraContractTests
     {
         public Task<OperationalRecordPage> BrowseAsync(OperationalRecordQuery query, CancellationToken cancellationToken) =>
             Task.FromResult(new OperationalRecordPage([record], 1, unknownDates));
-        public Task<OperationalRecordResult<IReadOnlyList<OperationalRecord>>> ListAsync(OperationalRecordCommandContext context, CancellationToken cancellationToken) =>
+        public Task<IReadOnlyList<OperationalRecord>> ListAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<OperationalRecord>>([record]);
+        public Task<OperationalRecordResult<IReadOnlyList<OperationalRecord>>> RefreshAsync(OperationalRecordCommandContext context, CancellationToken cancellationToken) =>
             Task.FromResult(OperationalRecordResult<IReadOnlyList<OperationalRecord>>.Success([record]));
         public Task<OperationalRecordResult<OperationalRecord>> GetAsync(Guid id, CancellationToken cancellationToken) =>
             Task.FromResult(OperationalRecordResult<OperationalRecord>.Success(record));

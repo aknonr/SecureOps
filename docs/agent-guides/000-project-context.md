@@ -4,7 +4,7 @@ Background for a first task in the repo; binding rules are in `AGENTS.md`.
 
 ## The project in one paragraph
 
-An internal Windows operations platform for a shift team at CONTOSO (placeholder name). It ingests monitoring alarms and operational records (SolarWinds → HPE OpsBridge / monthly.thy.com → Turuncuhat ITSM; Jira), runs **read-only** diagnostics on Windows servers through a JEA-constrained PowerShell endpoint, keeps an append-only audit trail in SQL Server, and gives shift engineers a Blazor Server UI. Later phases add rule-based analysis (6), self-hosted AI (7) and approval-based remediation (8). It is **not** a SIEM, APM, PAM replacement, people-search tool, remediation tool (before Phase 8), AI product, or employee-monitoring system.
+An internal Windows operations platform for a shift team at CONTOSO (placeholder name). It ingests monitoring alarms and operational records (SolarWinds → HPE OpsBridge (corporate monitoring portal) → Turuncuhat ITSM; Jira), runs **read-only** diagnostics on Windows servers through a JEA-constrained PowerShell endpoint, keeps an append-only audit trail in SQL Server, and gives shift engineers a Blazor Server UI. Later phases add rule-based analysis (6), self-hosted AI (7) and approval-based remediation (8). It is **not** a SIEM, APM, PAM replacement, people-search tool, remediation tool (before Phase 8), AI product, or employee-monitoring system.
 
 ## Fixed decisions (details in `docs/adr/`)
 
@@ -23,7 +23,7 @@ Other decided areas (identity lookup, operational records/Jira, sessions, OIDC, 
 
 ## Systems around the platform
 
-- **SolarWinds** — alarm source. **HPE OpsBridge / monthly.thy.com** — event-detail layer. **Turuncuhat** — central ITSM + IVR workflow. **Jira** — operational-record target (ADR-0009, ADR-0012). **BeyondTrust** — PAM (read-only correlation). Existing Ansible/AWX is not touched.
+- **SolarWinds** — alarm source. **HPE OpsBridge (corporate monitoring portal)** — event-detail layer. **Turuncuhat** — central ITSM + IVR workflow. **Jira** — operational-record target (ADR-0009, ADR-0012). **BeyondTrust** — PAM (read-only correlation). Existing Ansible/AWX is not touched.
 - The platform runs on top of these systems, never inside them; it does not modify their configuration. Current map and open questions: `docs/15-system-landscape.md`.
 
 ## Pilot scope

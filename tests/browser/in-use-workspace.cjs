@@ -122,7 +122,7 @@ async function tour(page, surface) {
         } else {
             await navigate(page, ui, 'operational-records');
             await page.getByRole('button', { name: 'Kaynağı yenile', exact: true }).click();
-            await page.getByText('Sınırlı kaynak yenilemesi tamamlandı.', { exact: false }).waitFor();
+            await page.getByText('Sınırlı kaynak yenilemesi tamamlandı', { exact: false }).waitFor();
             const operational = await json(client, '/api/v1/operational-records/stored');
             const requester = operational.items.find(r => r.requester)?.requester;
             assert.ok(requester);

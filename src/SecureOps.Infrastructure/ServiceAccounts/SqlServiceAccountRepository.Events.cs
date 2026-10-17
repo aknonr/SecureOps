@@ -52,7 +52,9 @@ public enum AccountEventStatus
     /// <summary>The account or the linked request changed (or the request is no longer open); nothing was written.</summary>
     Stale,
     /// <summary>The request cannot be closed after these records; nothing was written.</summary>
-    CloseRefused
+    CloseRefused,
+    /// <summary>The mail is already recorded outside the caller's scope; nothing was written.</summary>
+    CommunicationRefused
 }
 
 /// <summary>Result of an event commit; <see cref="Gaps"/> lists the missing close conditions of <see cref="AccountEventStatus.CloseRefused"/>.</summary>
@@ -172,6 +174,12 @@ public sealed partial class SqlServiceAccountRepository
             string? provider = ServiceAccountText.Clean(communication.Request.ProviderMessageId);
             Guid? existing = provider is null ? null : await connection.QuerySingleOrDefaultAsync<Guid?>(Cmd(
                 "SELECT Id FROM svcacct.Communications WITH (UPDLOCK, HOLDLOCK) WHERE ProviderMessageId = @provider;", new { provider }, transaction, cancellationToken));
+            if (existing is { } known && !await CommunicationVisibleAsync(connection, transaction,
+                await LockedScopeAsync(connection, transaction, actor.UserId, cancellationToken), known, cancellationToken))
+            {
+                return new AccountEventOutcome(AccountEventStatus.CommunicationRefused, null, [], []);
+            }
+
             communicationId = existing ?? Guid.NewGuid();
             if (existing is null)
             {

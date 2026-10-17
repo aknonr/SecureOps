@@ -70,7 +70,7 @@ internal sealed class TuruncuHatItsmQueryClient(
                 }
 
                 using JsonDocument document = await BoundedJsonHttpContent.ReadAsync(
-                    response.Content, wire.MaxResponseBytes, timeout.Token);
+                    response.Content, wire.MaxResponseBytes, timeout.Token, TimeSpan.FromSeconds(wire.RequestTimeoutSeconds));
                 return TuruncuHatItsmRecordRowReader.Read(document.RootElement, selects, optionalSelects);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)

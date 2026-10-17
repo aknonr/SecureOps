@@ -67,7 +67,7 @@ The shift pattern creates several design pressures:
 | System | Role | Integration approach |
 |---|---|---|
 | SolarWinds | Source of CPU, disk, and service alarms | Source system in the existing alarm chain; possible SWIS API later |
-| monthly.thy.com / HPE OpsBridge | Event-detail viewer layer between SolarWinds and Turuncuhat | No SecureOps integration yet identified |
+| the corporate monitoring portal (HPE OpsBridge) | Event-detail viewer layer between SolarWinds and Turuncuhat | No SecureOps integration yet identified |
 | Turuncuhat | Central ITSM + IVR system; creates EVT records, opens PR/OR/OCO records, sends mail/IVR, and owns acknowledge/close workflow | Bidirectional SecureOps integration under review |
 | BeyondTrust | Privileged access management for human operators via LDAP credentials | Read-only session correlation (Phase 4); Worker connection model pending stakeholder input |
 | Dynatrace | Existing APM platform | Usage in this project unclear; no integration yet |
@@ -86,7 +86,7 @@ The shift pattern creates several design pressures:
 The real operator workflow is centered on **Turuncuhat**, not only on the original alarm source:
 
 1. **SolarWinds** detects CPU, disk, service, or similar conditions.
-2. **monthly.thy.com / HPE OpsBridge** exposes event-detail context between the monitoring source and the ITSM workflow.
+2. **the corporate monitoring portal (HPE OpsBridge)** exposes event-detail context between the monitoring source and the ITSM workflow.
 3. **Turuncuhat** receives the alarm, creates an `EVT-XXXXX` record, may open `PR` / `OR` / `OCO` records, sends mail, and places IVR calls to on-call engineers.
 4. The on-call engineer receives mail or IVR from Turuncuhat, opens the EVT, follows the event-detail link, and manually investigates through SolarWinds and/or BeyondTrust.
 5. The engineer returns to Turuncuhat to close the EVT with `Çözüldü` status, `Kapanış açıklaması`, and the answer to `Aksiyon alındı mı?`.

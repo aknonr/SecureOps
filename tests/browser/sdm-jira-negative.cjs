@@ -57,7 +57,7 @@ const out = path.resolve(process.argv[7]);
         await page.waitForFunction(value => document.querySelector('[data-jira-submission]')?.getAttribute('data-jira-submission') === value, expected);
     }
     try {
-        const records = await json(admin, '/api/v1/operational-records');
+        const records = await json(admin, '/api/v1/operational-records/refresh', { method: 'POST' });
         const fixture = code => {
             const record = records.find(r => r.orCode === code);
             assert.ok(record?.simulationMode && !record.jiraIssueKey && !record.reconciliationRequired, code + ' must be a fresh synthetic fixture');

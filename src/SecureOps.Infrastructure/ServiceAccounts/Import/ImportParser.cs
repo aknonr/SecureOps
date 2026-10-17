@@ -208,6 +208,7 @@ public static class ImportParser
 
             string workbookSha = Text(root, "reportWorkbookSha256") is { Length: 64 } sha && sha.All(Uri.IsHexDigit)
                 ? sha : throw new ImportFileException("PackageWorkbookHashMissing");
+            EnforcePackageBudget(root, limits);
             Dictionary<string, string[]> links = Links(root);
             List<StagedRow> rows = [];
             List<string> warnings = [];
@@ -262,6 +263,100 @@ public static class ImportParser
 
             DateOnly? suggested = ImportValues.TryDate(Text(root, "sourceReportDate"), out DateOnly? declared) ? declared : null;
             return new StagedFile(rows, [], warnings, formulas, 0, aliases, suggested);
+        }
+    }
+
+    private const int _maxLinksPerMail = 1000;
+    private const int _maxLinkEntries = 200_000;
+
+    /// <summary>
+    /// Applies the spreadsheet row, column and cell limits (and aggregate caps for aliases and mail links) to a package by counting its
+    /// structure before any row, array copy or staged object is built.
+    /// </summary>
+    private static void EnforcePackageBudget(JsonElement root, SpreadsheetLimits limits)
+    {
+        long rows = 0;
+        if (root.TryGetProperty("records", out JsonElement records) && records.ValueKind == JsonValueKind.Object)
+        {
+            foreach (JsonProperty section in records.EnumerateObject().Where(s => s.Value.ValueKind == JsonValueKind.Array))
+            {
+                CountRows(section.Value.GetArrayLength(), limits, ref rows);
+                foreach (JsonElement item in section.Value.EnumerateArray())
+                {
+                    if (item.ValueKind == JsonValueKind.Object && item.TryGetProperty("fields", out JsonElement fields) && fields.ValueKind == JsonValueKind.Object)
+                    {
+                        int columns = 0;
+                        foreach (JsonProperty field in fields.EnumerateObject())
+                        {
+                            CheckCell(field.Value, ++columns, limits);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (root.TryGetProperty("sourceRows", out JsonElement sources) && sources.ValueKind == JsonValueKind.Object)
+        {
+            foreach (JsonProperty table in sources.EnumerateObject().Where(t => t.Value.ValueKind == JsonValueKind.Array))
+            {
+                CountRows(table.Value.GetArrayLength(), limits, ref rows);
+                foreach (JsonElement row in table.Value.EnumerateArray().Where(r => r.ValueKind == JsonValueKind.Array))
+                {
+                    int columns = 0;
+                    foreach (JsonElement value in row.EnumerateArray())
+                    {
+                        CheckCell(value, ++columns, limits);
+                    }
+                }
+            }
+        }
+
+        if (root.TryGetProperty("personAliases", out JsonElement aliases) && aliases.ValueKind == JsonValueKind.Array && aliases.GetArrayLength() > limits.MaxRowsPerSheet)
+        {
+            throw new ImportFileException("TooManyRows");
+        }
+
+        if (root.TryGetProperty("communicationLinks", out JsonElement mailLinks) && mailLinks.ValueKind == JsonValueKind.Array)
+        {
+            if (mailLinks.GetArrayLength() > limits.MaxRowsPerSheet)
+            {
+                throw new ImportFileException("TooManyRows");
+            }
+
+            long entries = 0;
+            foreach (JsonElement link in mailLinks.EnumerateArray())
+            {
+                if (link.ValueKind == JsonValueKind.Object && link.TryGetProperty("accounts", out JsonElement accounts) && accounts.ValueKind == JsonValueKind.Array)
+                {
+                    entries += accounts.GetArrayLength();
+                    if (accounts.GetArrayLength() > _maxLinksPerMail || entries > _maxLinkEntries)
+                    {
+                        throw new ImportFileException("TooManyRows");
+                    }
+                }
+            }
+        }
+    }
+
+    private static void CountRows(int count, SpreadsheetLimits limits, ref long total)
+    {
+        total += count;
+        if (count > limits.MaxRowsPerSheet || total > 4L * limits.MaxRowsPerSheet)
+        {
+            throw new ImportFileException("TooManyRows");
+        }
+    }
+
+    private static void CheckCell(JsonElement value, int column, SpreadsheetLimits limits)
+    {
+        if (column > limits.MaxColumns)
+        {
+            throw new ImportFileException("TooManyColumns");
+        }
+
+        if (value.ValueKind == JsonValueKind.String && value.GetString()!.Length > limits.MaxCellChars)
+        {
+            throw new ImportFileException("CellTooLong");
         }
     }
 

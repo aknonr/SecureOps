@@ -7,7 +7,7 @@
 ## Context
 
 The system integrates with multiple external systems:
-- Monitoring chain (SolarWinds, monthly.thy.com / HPE OpsBridge, Turuncuhat)
+- Monitoring chain (SolarWinds, the corporate monitoring portal (HPE OpsBridge), Turuncuhat)
 - PAM (BeyondTrust)
 - Active Directory
 - Microsoft Teams

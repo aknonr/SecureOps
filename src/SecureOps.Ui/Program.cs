@@ -1,6 +1,8 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -220,7 +222,7 @@ app.MapPost(
     })
     .AllowAnonymous();
 
-// Sign-out lands on a page that confirms the outcome rather than back on the sign-in form, so a
+// Sign-out (antiforgery-protected POST from the /sign-out confirmation page) lands on a page that confirms the outcome rather than back on the sign-in form, so a
 // deliberate exit is never mistaken for a failed attempt. Anonymous because an already-lapsed session
 // must still be able to complete a clean sign-out instead of being challenged.
 //
@@ -228,7 +230,7 @@ app.MapPost(
 // application's cookie; the SecureOps application session lives in the API and would stay open,
 // still listed on the Active Sessions page, until it idled out. Ending it first means "oturumu
 // kapat" means what the operator thinks it means.
-app.MapGet(
+app.MapPost(
     "/auth/sign-out",
     async (
         HttpContext httpContext,
@@ -238,6 +240,12 @@ app.MapGet(
         ILoggerFactory loggerFactory,
         IOptions<OidcOptions> oidcOptions) =>
     {
+        // The antiforgery middleware only records its verdict for an endpoint that binds no form; enforce it here.
+        if (httpContext.Features.Get<IAntiforgeryValidationFeature>() is not { IsValid: true })
+        {
+            return Results.BadRequest();
+        }
+
         string? browserSessionKey = sessionContext.BrowserSessionKey;
         string? idTokenHint = browserSessionKey is null
             ? null
@@ -291,6 +299,12 @@ app.MapGet(
         await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return RedirectToTrusted(httpContext, "signed-out?provider=managed");
     })
+    .WithMetadata(new RequireAntiforgeryTokenAttribute())
+    .AllowAnonymous();
+
+// A GET never ends the session: it only forwards to the confirmation page, so a link or navigation
+// from another site cannot sign the operator out.
+app.MapGet("/auth/sign-out", (HttpContext httpContext) => RedirectToTrusted(httpContext, "sign-out"))
     .AllowAnonymous();
 
 app.MapBlazorHub();

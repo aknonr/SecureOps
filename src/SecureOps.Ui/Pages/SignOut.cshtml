@@ -1,0 +1,44 @@
+﻿@page "/sign-out"
+@model SignOutModel
+@{
+    Layout = "LoginLayout";
+    ViewData["Title"] = "Oturumu kapat";
+    string BrandMarkHref = Url.Content("~/brand/secureops-mark.svg") + "#mark";
+}
+
+@*
+    Confirmation before sign-out. GET only shows this page and changes nothing; the sign-out itself is
+    an antiforgery-protected POST, so a link or navigation from another site cannot end the session.
+*@
+
+<div class="so-auth">
+    <section class="so-auth-card" aria-labelledby="sign-out-heading">
+        <div class="so-auth-brand">
+            <span class="so-auth-mark" aria-hidden="true">
+                <svg viewBox="0 0 32 32" width="26" height="26" role="presentation">
+                    <use href="@BrandMarkHref" />
+                </svg>
+            </span>
+            <span class="so-auth-brand-text">
+                @WasasBrand.ShortName
+                <small>Operasyon Platformu</small>
+            </span>
+        </div>
+
+        <h1 id="sign-out-heading" class="so-auth-title">Oturumu kapatmak istiyor musunuz?</h1>
+        <p class="so-auth-lead">Bu tarayıcıdaki WASAS oturumu sonlandırılır.</p>
+
+        <form method="post" action="@Url.Content("~/auth/sign-out")" class="so-auth-form">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="so-auth-submit">
+                <span class="so-auth-submit-label">Oturumu kapat</span>
+            </button>
+        </form>
+        <p class="so-auth-foot-link"><a href="@Url.Content("~/")">Vazgeç</a></p>
+    </section>
+
+    @if (Model.ShowEnvironmentMarker)
+    {
+        <p class="so-auth-foot">@Model.EnvironmentName ortamı</p>
+    }
+</div>

@@ -47,6 +47,8 @@
 
     <!-- PowerShell / JEA -->
     <PackageReference Include="Microsoft.PowerShell.SDK" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
+    <PackageReference Include="System.Security.Cryptography.Xml" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
 
     <!-- AD lookup -->

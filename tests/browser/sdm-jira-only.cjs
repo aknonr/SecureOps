@@ -64,7 +64,7 @@ const out = path.resolve(process.argv[6]);
     try {
         const records = process.argv[7] === '--verify-presentation'
             ? (await json(admin, '/api/v1/operational-records/stored?pageSize=100')).items
-            : await json(admin, '/api/v1/operational-records');
+            : await json(admin, '/api/v1/operational-records/refresh', { method: 'POST' });
         if (process.argv[7] === '--prepare-walkthrough') {
             const ready = records.find(r => r.orCode === 'SIM-OR-100');
             assert.ok(ready?.simulationMode && ready.classification === 0 && !ready.jiraIssueKey);
@@ -134,7 +134,7 @@ const out = path.resolve(process.argv[6]);
         await role(['Operator']);
         await navigate(page, ui, 'operational-records');
         await page.getByRole('button', { name: 'Kaynağı yenile', exact: true }).click();
-        await page.getByText('Sınırlı kaynak yenilemesi tamamlandı.', { exact: false }).waitFor();
+        await page.getByText('Sınırlı kaynak yenilemesi tamamlandı', { exact: false }).waitFor();
         const beforeBrowse = query(database, "SELECT CHECKSUM_AGG(BINARY_CHECKSUM(SourceRecordId,UpdatedAt)) FROM ops.OperationalRecords");
         await page.getByRole('combobox', { name: 'Sayfa boyutu', exact: true }).selectOption('10');
         await page.getByRole('button', { name: 'Sonraki', exact: true }).click();

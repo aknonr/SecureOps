@@ -34,7 +34,7 @@ The mock is the default in development and integration tests. The real adapter i
 The real alarm chain at CONTOSO is:
 
 1. **SolarWinds** detects the alarm condition.
-2. **monthly.thy.com / HPE OpsBridge** appears to provide event-detail viewing between systems.
+2. **the corporate monitoring portal (HPE OpsBridge)** appears to provide event-detail viewing between systems.
 3. **Turuncuhat** receives the alarm, creates the `EVT-XXXXX` record, opens PR/OR/OCO records as needed, sends mail, places IVR calls, and owns acknowledgment/closure workflow.
 
 For reusable architecture language, this is still the **monitoring platform chain**. In our environment, Turuncuhat is the durable operational workflow system, not merely a generic ticketing tool.

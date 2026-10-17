@@ -61,7 +61,8 @@ public sealed class ServiceAccountUsageScanScriptTests
         collector.Should().NotContain("Invoke-Command").And.NotContain("Set-Content").And.NotContain("Out-File").And.NotContain("WriteAllText")
             .And.NotContain("Export-");
         string[] remoting = [.. combine.Split('\n').Where(l => l.Contains("Invoke-Command -", StringComparison.Ordinal))];
-        remoting.Should().ContainSingle().Which.Should().Contain("-ConfigurationName $ConfigurationName", "only the dormant JEA mode connects");
+        remoting.Should().ContainSingle().Which.Should().Contain("-ConfigurationName $ConfigurationName").And.Contain("-Authentication Kerberos", "only the dormant JEA mode connects");
+        combine.Should().Contain("[ValidateSet('SecureOpsServiceAccountUsage')]", "no other endpoint, such as the default one, may be named");
         combine.Should().Contain("[switch]$UseJeaEndpoint");
     }
 

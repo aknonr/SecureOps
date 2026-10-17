@@ -10,7 +10,8 @@
       1. refuses the placeholder account and anything that is not a gMSA (DOMAIN\name$); there is no password parameter at all;
       2. checks, when the ActiveDirectory module is present, that this host may use the gMSA (Test-ADServiceAccount);
       3. refuses when the service already exists (use the upgrade procedure instead) or the data directory is missing;
-      4. creates the service with StartupType Manual, then sets its log-on account to the gMSA (sc.exe config obj=, no password);
+      4. creates the service Disabled, sets its log-on account to the gMSA (sc.exe config obj=, no password), then Manual start; when
+         that fails the new registration is deleted again, so no service is left behind under LocalSystem;
       5. creates the Application event log source SecureOps.Worker if missing (the Worker writes fixed-text lifecycle entries there and
          never creates the source itself).
     It does NOT start the service, set recovery or delayed start, grant "Log on as a service", change ACLs or touch SQL: those stay
@@ -61,11 +62,21 @@ if (Microsoft.PowerShell.Core\Get-Module -ListAvailable -Name ActiveDirectory) {
 
 if ($PSCmdlet.ShouldProcess($serviceName, "Create the service as $ServiceAccount (Manual start, not started)")) {
     $binaryPath = '"' + $ExecutablePath + '" --environment ' + $Environment
-    $null = Microsoft.PowerShell.Management\New-Service -Name $serviceName -DisplayName 'WASAS Worker' -BinaryPathName $binaryPath -StartupType Manual `
+    # Created Disabled: until the log-on account is set it would run as LocalSystem, so it cannot be started by accident.
+    $null = Microsoft.PowerShell.Management\New-Service -Name $serviceName -DisplayName 'WASAS Worker' -BinaryPathName $binaryPath -StartupType Disabled `
         -Description 'SecureOps Worker: Hangfire job server (read-only JEA calls as the read gMSA).'
-    # A gMSA has no password: sc.exe takes the account alone.
-    & "$env:SystemRoot\System32\sc.exe" config $serviceName obj= $ServiceAccount | Microsoft.PowerShell.Core\Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "sc.exe config obj= failed with exit code $LASTEXITCODE; the service exists with LocalSystem and must not be started. Run Uninstall-SecureOpsWorkerService.ps1." }
+    try {
+        # A gMSA has no password: sc.exe takes the account alone.
+        & "$env:SystemRoot\System32\sc.exe" config $serviceName obj= $ServiceAccount | Microsoft.PowerShell.Core\Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "sc.exe config obj= failed with exit code $LASTEXITCODE." }
+        & "$env:SystemRoot\System32\sc.exe" config $serviceName start= demand | Microsoft.PowerShell.Core\Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "sc.exe config start= failed with exit code $LASTEXITCODE." }
+    }
+    catch {
+        # Do not leave a registration under the wrong identity behind.
+        & "$env:SystemRoot\System32\sc.exe" delete $serviceName | Microsoft.PowerShell.Core\Out-Null
+        throw "The service was not configured as $ServiceAccount and its registration was removed (sc.exe delete exit code $LASTEXITCODE). $($_.Exception.Message)"
+    }
 
     if (-not [Diagnostics.EventLog]::SourceExists($eventSource)) {
         [Diagnostics.EventLog]::CreateEventSource($eventSource, 'Application')

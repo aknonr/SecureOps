@@ -55,7 +55,7 @@ public sealed class IdentityControllerAuditTests
     {
         DefaultHttpContext httpContext = new();
         httpContext.TraceIdentifier = "trace-controller-test";
-        httpContext.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("10.4.22.18");
+        httpContext.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("198.51.100.18");
 
         return new IdentityController(
             service,

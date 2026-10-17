@@ -33,7 +33,7 @@ public sealed class WhereUsedTests
     [Fact]
     public void Normalize_IpAddressAndFreeText_AreNotHostNames()
     {
-        WhereUsedServerNames.Normalize("10.1.2.3")!.Value.IsHostName.Should().BeFalse();
+        WhereUsedServerNames.Normalize("192.0.2.3")!.Value.IsHostName.Should().BeFalse();
         WhereUsedServerNames.Normalize("SRV01 (eski)")!.Value.IsHostName.Should().BeFalse();
         WhereUsedServerNames.Normalize("a..b")!.Value.IsHostName.Should().BeFalse();
         WhereUsedServerNames.Normalize("syn-app01.corp.example")!.Value.IsHostName.Should().BeTrue();
@@ -61,10 +61,10 @@ public sealed class WhereUsedTests
     [Fact]
     public void Merge_NeverJoinsByPrefixOrIpOrFreeText()
     {
-        IReadOnlyDictionary<string, string> map = WhereUsedServerNames.Merge(Names("syn-app1", "syn-app10.corp.example", "10.0.0.1", "10.0.0.1.corp.example"));
+        IReadOnlyDictionary<string, string> map = WhereUsedServerNames.Merge(Names("syn-app1", "syn-app10.corp.example", "192.0.2.1", "192.0.2.1.corp.example"));
 
         map["syn-app1"].Should().Be("syn-app1");
-        map["10.0.0.1"].Should().Be("10.0.0.1");
+        map["192.0.2.1"].Should().Be("192.0.2.1");
     }
 
     [Theory]

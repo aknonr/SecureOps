@@ -41,6 +41,7 @@
             </p>
         }
         <p class="so-panel-text so-panel-text--sm">Kayıtlı veriler gösterilir. Kaynağı yenile, sınırlı bir içe aktarım yapar; aşağıdaki sayı Turuncu Hat toplamı değildir.</p>
+        @if (_refreshing) { <SoLoading Message="Kaynak yenileniyor…" /> }
         @if (_refreshNotice is not null) { <p role="status">@_refreshNotice</p> }
         @if (_refreshProblem is not null) { <SoProblemPanel Problem="_refreshProblem" /> }
         @if (_problem is not null) { <SoProblemPanel Problem="_problem" OnRetry="LoadAsync" RetryLabel="Kayıtlı listeyi yükle" /> }
@@ -132,9 +133,10 @@
         _refreshNotice = null;
         try
         {
-            await Records.ListAsync(_lifetime.Token);
-            _refreshNotice = "Sınırlı kaynak yenilemesi tamamlandı. Kayıtlı liste güncellendi; kaynak toplamı bilinmiyor.";
+            await Records.RefreshAsync(_lifetime.Token);
+            _refreshNotice = "Sınırlı kaynak yenilemesi tamamlandı (sunucu onayladı); kaynak toplamı bilinmiyor.";
             await LoadAsync();
+            if (_problem is not null) _refreshNotice += " Kayıtlı liste yeniden okunamadı; aşağıdaki hataya bakın.";
         }
         catch (SecureOpsApiException ex) { _refreshProblem = ex.Problem; }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }

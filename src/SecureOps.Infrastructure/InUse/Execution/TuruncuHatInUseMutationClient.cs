@@ -60,7 +60,8 @@ public sealed class TuruncuHatInUseMutationClient(IHttpClientFactory clients, IT
                 { sessions.Invalidate(session); return new("Unknown", "AuthenticationRejectedReconcileBeforeRetry"); }
                 if (!response.IsSuccessStatusCode)
                 { return new("Unknown", "HttpOutcomeRequiresReconciliation"); }
-                using JsonDocument json = await BoundedJsonHttpContent.ReadAsync(response.Content, source.Value.MaxResponseBytes, timeout.Token);
+                using JsonDocument json = await BoundedJsonHttpContent.ReadAsync(response.Content, source.Value.MaxResponseBytes,
+                    timeout.Token, TimeSpan.FromSeconds(source.Value.RequestTimeoutSeconds));
                 return TuruncuHatInUseWireContract.Acknowledgement(json.RootElement, step == "Upload");
             }
             catch (Exception) { return new("Unknown", "ResponseUnavailableReconcileBeforeRetry"); }

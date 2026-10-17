@@ -6,8 +6,8 @@ yeniden çalıştırılmaz. Bu devamda yeni migration yoktur. Windows Service ku
 
 ## Etkin Yapılandırma
 
-API `D:\Applications\api\wasasyonetimapi.thy.com`, UI
-`D:\Applications\ui\wasasyonetim.thy.com`, Worker `D:\secureops_worker` olarak
+API `D:\Applications\api\api.example.test`, UI
+`D:\Applications\ui\ui.example.test`, Worker `D:\secureops_worker` olarak
 kalır. Mevcut çalışma kimliklerini, sırları ve ayrı API/UI kalıcı ringlerini koruyun.
 UI'ye SQL, Turuncu Hat veya SMTP sırları eklemeyin. API'nin IIS `web.config`
 environmentVariables değerleri JSON'u geçersiz kılabilir. Worker bunları devralmaz.

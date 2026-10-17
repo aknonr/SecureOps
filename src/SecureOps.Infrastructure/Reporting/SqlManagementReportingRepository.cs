@@ -230,7 +230,7 @@ public sealed class SqlManagementReportingRepository : IManagementReportingRepos
               AND Action IN @AdoptionActions
               AND Actor <> 'anonymous' AND Actor NOT LIKE 'system:%'
             GROUP BY Actor
-            ORDER BY OperationCount DESC, Actor
+            ORDER BY Actor
             OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
             """;
 

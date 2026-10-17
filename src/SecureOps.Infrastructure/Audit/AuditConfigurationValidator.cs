@@ -61,6 +61,11 @@ public static class AuditConfigurationValidator
 
     private static void ValidateProduction(IConfiguration configuration, AuditOptions options)
     {
+        if (string.Equals(options.Provider, "File", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("File audit is not an approved Production store because retention of at least 36 months is not enforced; SqlServer is required.");
+        }
+
         if (string.Equals(options.Provider, "InMemory", StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("Audit:Provider=InMemory is not allowed in Production.");
@@ -99,11 +104,6 @@ public static class AuditConfigurationValidator
         if (options.MaxFileSizeMB <= 0)
         {
             throw new InvalidOperationException("Audit:File:MaxFileSizeMB must be greater than zero.");
-        }
-
-        if (options.RetainedFileCountLimit <= 0)
-        {
-            throw new InvalidOperationException("Audit:File:RetainedFileCountLimit must be greater than zero.");
         }
 
         string auditDirectory = Path.GetFullPath(options.Directory);
