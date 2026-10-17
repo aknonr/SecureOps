@@ -55,7 +55,9 @@
     box-sizing: border-box;
     width: min(380px, calc(100vw - 24px));
     max-height: calc(100vh - 24px);
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     padding: var(--so-space-3) var(--so-space-4);
     border: 2px solid var(--so-accent-strong);
     border-radius: 10px;
@@ -65,7 +67,15 @@
     overflow-wrap: anywhere;
 }
 
+/* Heading and buttons stay in view; only the explanation scrolls, so a low screen never hides the Geri / İleri row. */
+.so-tour-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
 .so-tour-count {
+    flex: none;
     display: flex;
     flex-wrap: wrap;
     gap: 4px var(--so-space-2);
@@ -78,6 +88,7 @@
 }
 
 .so-tour-title {
+    flex: none;
     margin: 0 0 var(--so-space-2);
     font-size: 1.05rem;
     font-weight: 700;
@@ -104,6 +115,7 @@
 }
 
 .so-tour-controls {
+    flex: none;
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
@@ -155,6 +167,13 @@
 
     .so-tour-button {
         flex: 1 1 auto;
+    }
+}
+
+/* Low and narrow (640x400 = 1280x800 at 200 %): leave more of the page above the box. */
+@media (max-width: 700px) and (max-height: 520px) {
+    .so-tour-box {
+        max-height: 42vh;
     }
 }
 

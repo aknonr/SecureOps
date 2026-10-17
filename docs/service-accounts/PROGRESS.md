@@ -17,6 +17,17 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
 - Push on the owner's workstation: Git Credential Manager holds two GitHub accounts, so name the owner's:
   `git -c credential.https://github.com.username=aknonr push origin <branch>`.
 
+## Guided tour follow-up, REHBER-2 (branch `fix/service-accounts-guided-tour-followup-20261017`, from master `2874072`, PR open, not merged)
+
+- Tours for "Ekibimin işleri" (5 steps) and the four "Modül yönetimi" tabs (3–4 steps each, own start button/id per tab); `data-tour` marks only in SA pages
+  and `SaPeopleAdmin`. The tour box folds its explanation ("Açıklamayı gizle/göster", in memory only) and `so-guided-tour.js` re-seats the area when the box
+  changes size; at ≤520 px height the box is at most 42 vh. No automatic opening (G-41), no backend/API/SQL, no global CSS. Design: GUIDED-TOUR-DESIGN §4b.
+- Verified on Windows (local Demo, SDK 9.0.317, synthetic LocalDB DB, dropped; processes stopped): `service-accounts-guided-tour.cjs` 9/9 (new: team work, admin
+  tabs with honest skips, 640×400 fold). The first run failed because the imports step started the tour before the page had loaded (journey wait added).
+  Unit: new GuidedTour/ServiceAccountGuidedTour tests; full suite and format per the PR body.
+- Not verified: screen reader, light/dark by eye on the new pages beyond the screenshots, real browser zoom (viewport emulation used), an area taller than the
+  space above the docked box (top stays visible, bottom may sit under it), IIS/corporate TEST.
+
 ## Browser journeys fixed, YOLCULUK-FIX (branch `fix/service-accounts-browser-journeys-20261017`, from master `d1eff85`)
 
 - Both red journeys were wrong journeys, not UI defects; no product code changed. `service-accounts-guided-tour.cjs`: pressed "Adım adım göster"

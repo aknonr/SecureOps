@@ -55,6 +55,29 @@ function place() {
     box.style.top = `${Math.max(12, Math.min(top, height - panel.height - 12))}px`;
 }
 
+// Docked box: keep room under the page for the box and keep the highlighted area above it. Runs when the box changes size (folding
+// the explanation, a longer step) and when a step is shown; never on scroll, so it does not fight the person's own scrolling.
+const topInset = 72;
+function reseat() {
+    if (!current || !matchMedia(narrowQuery).matches) return;
+    const { target, box } = current;
+    if (!box?.isConnected) return;
+    const boxTop = box.getBoundingClientRect().top;
+    if (current.padded) document.body.style.paddingBottom = `${Math.ceil(innerHeight - boxTop) + 16}px`;
+    if (!target?.isConnected) return;
+    const bounds = target.getBoundingClientRect();
+    if (bounds.bottom > boxTop - 8 || bounds.top < topInset - 8) {
+        // Area under the box (or above the app bar): put its top just below the app bar. A taller area than the free space keeps
+        // its top visible; folding the explanation gives it more room.
+        scrollBy({ top: bounds.top - topInset, behavior: 'instant' });
+    }
+}
+
+function settle() {
+    reseat();
+    schedule();
+}
+
 function schedule() {
     if (current && !current.frame) current.frame = requestAnimationFrame(place);
 }
@@ -82,20 +105,22 @@ export function show(name, box, ring) {
         if (narrow && box) {
             // Docked box covers the bottom of the screen: keep the area near the top, below the app bar, and give the page room
             // to scroll so an area at the very end can still rise above the box. Restored when the tour moves on or closes.
-            target.style.scrollMarginTop = '80px';
+            target.style.scrollMarginTop = `${topInset}px`;
             current.padded = true;
             current.padding = document.body.style.paddingBottom;
             document.body.style.paddingBottom = `${Math.ceil(box.getBoundingClientRect().height) + 16}px`;
         }
-        target.scrollIntoView({ block: narrow ? 'start' : 'center', inline: 'nearest', behavior: reducedMotion() ? 'instant' : 'smooth' });
+        // Docked layout scrolls at once so the area can be checked against the box straight away.
+        target.scrollIntoView({ block: narrow ? 'start' : 'center', inline: 'nearest', behavior: reducedMotion() || narrow ? 'instant' : 'smooth' });
     }
+    reseat();
     place();
     addEventListener('resize', schedule);
     addEventListener('scroll', schedule, true);
     window.visualViewport?.addEventListener('resize', schedule);
     window.visualViewport?.addEventListener('scroll', schedule);
     if (typeof ResizeObserver === 'function') {
-        current.resize = new ResizeObserver(schedule);
+        current.resize = new ResizeObserver(entries => (entries.some(entry => entry.target === box) ? settle : schedule)());
         current.resize.observe(box);
         if (target) current.resize.observe(target);
     }
