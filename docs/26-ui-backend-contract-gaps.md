@@ -1335,7 +1335,7 @@ A page "Sunucu Erişim Analizi" (exact server name → members of its local Admi
 | Filled Error button, dark (`SessionRevokeDialog`, any `Color.Error` filled) | white on `#FF8A80` (dark `Error`, white contrast text) | 2.28:1 | 14 px |
 
 Needed: darker chip text or a lighter chip tint in light; a darker dark-theme primary/Error fill or dark contrast text (`ErrorContrastText`) in `SecureOpsTheme.cs`.
-Until then `AccessActionDialog` overrides only its own dark-theme confirm text colour in scoped CSS (no token change); `SessionRevokeDialog` and the other filled buttons are unchanged.
+Until then nothing is overridden: `AccessActionDialog`'s dark confirm button for Reddet / Rolleri uygula / Erişimi kapat is 2.28:1, as is `SessionRevokeDialog`'s.
 
 ## Note: enums cross the wire as numbers
 
