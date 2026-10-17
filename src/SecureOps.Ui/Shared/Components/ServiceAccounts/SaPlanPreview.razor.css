@@ -62,3 +62,10 @@
 .sa-plan-preview ::deep .mud-table-cell {
     overflow-wrap: anywhere;
 }
+
+/* An account name is one token: keep it on one line instead of breaking it mid-name in a narrow column. */
+::deep td.sa-account-cell {
+    min-width: 10.5rem;
+    overflow-wrap: normal;
+    word-break: keep-all;
+}

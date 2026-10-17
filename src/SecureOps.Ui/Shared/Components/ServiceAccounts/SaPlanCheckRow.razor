@@ -92,7 +92,7 @@
 
     private string RowId => "sa-plan-row-" + Item.Id.ToString("N");
 
-    private string RowName => Item.ComponentName ?? "bileşen bilgisi yok";
+    private string RowName => string.Join(" · ", new[] { Item.ServerName, Item.ComponentName ?? "bileşen bilgisi yok" }.Where(p => !string.IsNullOrWhiteSpace(p)));
 
     private async Task SaveAsync()
     {

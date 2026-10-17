@@ -1,6 +1,8 @@
 @* Approval of exactly one preview: the person confirms they looked at this version and digest, gives the OCO number (format only, never
    looked up in ITSM) and the maintenance window with an explicit UTC offset, and a reason. The request carries the preview version and
-   SHA-256, so a changed plan is refused as stale. The page shows this form only when the server says the caller may approve. *@
+   SHA-256, so a changed plan is refused as stale. The page shows this form only when the server says the caller may approve.
+   A missing or unreadable field is marked on the field itself (aria-invalid + message under it), not only in one summary line. *@
+@using SecureOps.Domain.ServiceAccounts
 @using SecureOps.Shared.Contracts.ServiceAccounts
 @using SecureOps.Ui.Services.ServiceAccounts
 
@@ -8,21 +10,25 @@
     <MudGrid Spacing="2">
         <MudItem xs="12" md="4">
             <MudTextField T="string" @bind-Value="_oco" Label="OCO numarası" MaxLength="64" Immediate="true" Variant="Variant.Outlined" Required="true"
-                          Error="@(OcoError is not null)" ErrorText="@OcoError"
+                          Error="@(OcoError is not null || Has("oco"))" ErrorText="@(OcoError ?? Msg("oco"))"
                           HelperText="Sunucu doğrular ve BÜYÜK HARFE çevirip kaydeder (en çok 64 karakter; A–Z 0–9 - _ . /; harf veya rakamla başlar, en az bir rakam). ITSM'de sorgulanmaz." />
         </MudItem>
         <MudItem xs="12" md="4">
-            <MudTextField T="string" @bind-Value="_start" Label="Bakım penceresi başlangıcı" InputType="InputType.DateTimeLocal" Variant="Variant.Outlined" Required="true" />
+            <MudTextField T="string" @bind-Value="_start" Label="Bakım penceresi başlangıcı" InputType="InputType.DateTimeLocal" Variant="Variant.Outlined" Required="true"
+                          Error="@Has("start")" ErrorText="@Msg("start")" />
         </MudItem>
         <MudItem xs="12" md="4">
-            <MudTextField T="string" @bind-Value="_end" Label="Bakım penceresi bitişi" InputType="InputType.DateTimeLocal" Variant="Variant.Outlined" Required="true" />
+            <MudTextField T="string" @bind-Value="_end" Label="Bakım penceresi bitişi" InputType="InputType.DateTimeLocal" Variant="Variant.Outlined" Required="true"
+                          Error="@Has("end")" ErrorText="@Msg("end")" />
         </MudItem>
         <MudItem xs="12" md="4">
             <MudTextField T="string" @bind-Value="_offset" Label="UTC farkı" MaxLength="6" Immediate="true" Variant="Variant.Outlined"
-                          HelperText="Pencere saatleri bu farkla kaydedilir (ör. +03:00)." />
+                          Error="@Has("offset")" ErrorText="@Msg("offset")"
+                          HelperText="Varsayılan İstanbul (+03:00); pencere saatleri bu farkla kaydedilir." />
         </MudItem>
         <MudItem xs="12" md="8">
-            <MudTextField T="string" @bind-Value="_reason" Label="Onay gerekçesi" MaxLength="1000" Lines="2" Immediate="true" Variant="Variant.Outlined" Required="true" />
+            <MudTextField T="string" @bind-Value="_reason" Label="Onay gerekçesi" MaxLength="1000" Lines="2" Immediate="true" Variant="Variant.Outlined" Required="true"
+                          Error="@Has("reason")" ErrorText="@Msg("reason")" />
         </MudItem>
     </MudGrid>
     <div role="alert">
@@ -30,7 +36,8 @@
     </div>
     <SoConfirmStatement Text="@($"Önizleme sürüm {Plan.Preview!.Version} (özet {ChangePlanPresentation.ShortDigest(Plan.Preview.Sha256)}…) satırlarını ve işaret sayılarını inceledim; bu sürümü onaylıyorum.")"
                         Checked="_acknowledged" CheckedChanged="@(v => _acknowledged = v)" />
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-2" OnClick="SubmitAsync" Disabled="@(Busy || !_acknowledged)">Önizlemeyi onayla</MudButton>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-2" OnClick="SubmitAsync" Disabled="@(Busy || !_acknowledged)" aria-describedby="sa-approve-why">Önizlemeyi onayla</MudButton>
+    @if (!_acknowledged) { <p id="sa-approve-why" class="so-panel-text--sm mt-1">Düğme pasif: önce yukarıdaki “inceledim” onay kutusunu işaretleyin.</p> }
 </div>
 
 @code {
@@ -41,6 +48,7 @@
     private string _reason = string.Empty;
     private bool _acknowledged;
     private string? _error;
+    private readonly Dictionary<string, string> _fieldErrors = [];
 
     /// <summary>The previewed plan being approved.</summary>
     [Parameter, EditorRequired] public ChangePlanView Plan { get; set; } = default!;
@@ -54,38 +62,46 @@
     /// <summary>Sends the approval; the form keeps its values until the page confirms the save.</summary>
     [Parameter, EditorRequired] public EventCallback<ApproveChangePlanRequest> OnApprove { get; set; }
 
-    /// <summary>The server host's current UTC offset as a starting point; the person can change it.</summary>
+    /// <summary>Istanbul's offset as the starting point (these screens show Turkish time everywhere); the person can change it.</summary>
     private static string DefaultOffset()
     {
-        TimeSpan offset = TimeZoneInfo.Local.GetUtcOffset(DateTimeOffset.UtcNow);
+        TimeSpan offset = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, ReportCalendar.Istanbul).Offset;
         return (offset < TimeSpan.Zero ? "-" : "+") + offset.Duration().ToString(@"hh\:mm");
     }
+
+    private bool Has(string field) => _fieldErrors.ContainsKey(field);
+
+    private string? Msg(string field) => _fieldErrors.GetValueOrDefault(field);
 
     private async Task SubmitAsync()
     {
         _error = null;
+        _fieldErrors.Clear();
         if (Plan.Preview is not { } preview)
         {
             _error = "Önizleme yok; önce önizleme oluşturulmalı.";
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(_oco) || string.IsNullOrWhiteSpace(_reason))
-        {
-            _error = "OCO numarası ve onay gerekçesi gerekli.";
-            return;
-        }
+        if (string.IsNullOrWhiteSpace(_oco)) { _fieldErrors["oco"] = "OCO numarası gerekli."; }
+        if (string.IsNullOrWhiteSpace(_reason)) { _fieldErrors["reason"] = "Onay gerekçesi gerekli."; }
 
-        if (!AnnouncementTime.ValidOffset(_offset.Trim())
-            || !TryInstant(_start, _offset.Trim(), out DateTimeOffset start) || !TryInstant(_end, _offset.Trim(), out DateTimeOffset end))
-        {
-            _error = "Bakım penceresinin başlangıç ve bitişini tarih-saat olarak, UTC farkını +03:00 biçiminde girin.";
-            return;
-        }
+        string offset = _offset.Trim();
+        bool offsetOk = AnnouncementTime.ValidOffset(offset);
+        if (!offsetOk) { _fieldErrors["offset"] = "UTC farkını +03:00 biçiminde girin."; }
 
-        if (end <= start)
+        DateTimeOffset start = default, end = default;
+        bool startOk = offsetOk && TryInstant(_start, offset, out start);
+        bool endOk = offsetOk && TryInstant(_end, offset, out end);
+        if (string.IsNullOrWhiteSpace(_start)) { _fieldErrors["start"] = "Başlangıç tarih-saati gerekli."; }
+        else if (offsetOk && !startOk) { _fieldErrors["start"] = "Başlangıcı tarih-saat olarak girin."; }
+        if (string.IsNullOrWhiteSpace(_end)) { _fieldErrors["end"] = "Bitiş tarih-saati gerekli."; }
+        else if (offsetOk && !endOk) { _fieldErrors["end"] = "Bitişi tarih-saat olarak girin."; }
+        if (startOk && endOk && end <= start) { _fieldErrors["end"] = "Bitiş, başlangıçtan sonra olmalı."; }
+
+        if (_fieldErrors.Count > 0)
         {
-            _error = "Bakım penceresinin bitişi başlangıçtan sonra olmalı.";
+            _error = $"Onaylanmadı: {_fieldErrors.Count} alan eksik veya hatalı; mesajlar alanların altında.";
             return;
         }
 

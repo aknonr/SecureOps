@@ -46,8 +46,8 @@ public partial class ServiceAccountDetail
 
     /// <summary>Usage tab title with the rule state so an against-rule account stands out without opening the tab.</summary>
     private string UsageTabText => _detail?.Rule is { } rule && rule.Conformance == "Unplanned"
-        ? $"Kullanım ve kural ({(_detail.Usages ?? []).Count(u => !u.Removed)}) · kurala aykırı"
-        : $"Kullanım ve kural ({(_detail?.Usages ?? []).Count(u => !u.Removed)})";
+        ? $"Hangi sunucularda? ({(_detail.Usages ?? []).Count(u => !u.Removed)}) · kurala aykırı"
+        : $"Hangi sunucularda? ({(_detail?.Usages ?? []).Count(u => !u.Removed)})";
 
     /// <summary>Scan tab title with every attached scan and the matches still waiting for a decision (server totals, not the page).</summary>
     private string ScanTabText => _detail is not { UsageScans: not null, UsageScanTotal: > 0 } detail ? "Kullanım taraması"

@@ -67,7 +67,7 @@ else
             <MudTh>Tarama</MudTh>
         </HeaderContent>
         <RowTemplate>
-            <MudTd DataLabel="Hesap">@context.AccountName</MudTd>
+            <MudTd DataLabel="Hesap" Class="sa-account-cell">@context.AccountName</MudTd>
             <MudTd DataLabel="Sunucu">@(context.ServerName ?? "Bilgi yok")</MudTd>
             <MudTd DataLabel="Bileşen">
                 @if (context.ComponentName is null) { <span>—</span> }

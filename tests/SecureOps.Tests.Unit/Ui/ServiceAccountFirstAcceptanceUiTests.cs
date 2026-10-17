@@ -124,6 +124,14 @@ public sealed class ServiceAccountFirstAcceptanceUiTests
     }
 
     [Fact]
+    public void ListPage_PassesTheSearchedTextAsAnExpression_NotTheFieldName()
+    {
+        // A string parameter written as SearchedQuery="_directoryQuery" (no @) is the literal field name; UI-BULGULARI #1.
+        string page = File.ReadAllText(UiFile("Pages", "ServiceAccounts", "ServiceAccountList.razor"));
+
+        page.Should().Contain("SearchedQuery=\"@_directoryQuery\"").And.NotContain("SearchedQuery=\"_directoryQuery\"");
+    }
+    [Fact]
     public void DirectoryNameSearch_ExplainsItIsAboutPeople_NotTheAccountListFilter()
     {
         string panel = File.ReadAllText(UiFile("Shared", "Components", "ServiceAccounts", "SaDirectoryNameSearch.razor"));
@@ -153,7 +161,7 @@ public sealed class ServiceAccountFirstAcceptanceUiTests
     {
         string rows = File.ReadAllText(UiFile("Shared", "Components", "ServiceAccounts", "SaImportRows.razor"));
 
-        rows.Should().Contain("Excel satırı @context.RowNumber").And.Contain("Hata (@context.Sheet, satır @context.RowNumber): @error");
+        rows.Should().Contain("Excel satırı @context.RowNumber").And.Contain("Hata (@context.Sheet, satır @context.RowNumber): @ServiceAccountImportText.Error(error)");
         rows.Should().Contain("sistemdeki kayıtla çelişiyor").And.Contain("Satır doğrulamadan geçmedi ve aktarılmaz");
         rows.Should().Contain("Sunucu bu satır için ayrıntılı bir hata metni göndermedi", "a missing reason is said, not hidden");
     }

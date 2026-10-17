@@ -17,6 +17,17 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
 - Push on the owner's workstation: Git Credential Manager holds two GitHub accounts, so name the owner's:
   `git -c credential.https://github.com.username=aknonr push origin <branch>`.
 
+## UI findings from the user-guide review, UI-BULGULARI (branch `fix/service-accounts-ui-findings-20261017`, from master `fb968a2`, PR open, not merged)
+
+- 20 findings classified; UI side fixed: #1 directory search said `_directoryQuery` (a string parameter written without `@`), #2/#18 the usage tab is now "Hangi sunucularda?" and
+  next-step buttons say "… sekmesini aç", #3 import codes worded in Turkish (`ServiceAccountImportText`, accepted date formats named), #4 reason next to the disabled "Aktarımı onayla",
+  #7 no guide/tour for a caller without import permission, #8 approval form marks each field (`aria-invalid` + message) and defaults the UTC offset to Istanbul, #9 one time format
+  ("dd.MM.yyyy HH:mm (TR)") on every Service Accounts screen, #10 report numbers say what they count, #11 checklist row title carries the server name, #12 person picker explains
+  the search, #13 close note, #14 directory search split into short lead + folded detail, #19 account column keeps its name on one line.
+- Backend: G-44 … G-47 in `docs/26-ui-backend-contract-gaps.md`. Owner decisions (vocabulary table, verifier optional?, domain-less import, shared tour box covering the area #20): in the PR report.
+- Verified: full unit suite and `dotnet format --verify-no-changes` on Windows. **Not verified:** browser journeys (the LocalDB instance `SecureOpsResourcesV1` would not start in this
+  session), 390 px / 200 % zoom, screen reader, IIS/corporate TEST.
+
 ## Guided tour follow-up, REHBER-2 (branch `fix/service-accounts-guided-tour-followup-20261017`, from master `2874072`, PR open, not merged)
 
 - Tours for "Ekibimin işleri" (5 steps) and the four "Modül yönetimi" tabs (3–4 steps each, own start button/id per tab); `data-tour` marks only in SA pages

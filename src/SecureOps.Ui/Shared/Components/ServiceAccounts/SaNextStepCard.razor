@@ -26,7 +26,7 @@
                     </div>
                     <div class="sa-next-actions">
                         <MudButton Size="Size.Small" Variant="@(index == 0 ? Variant.Filled : Variant.Outlined)" Color="Color.Primary" OnClick="@(() => OnOpen.InvokeAsync((int)step.Tab))"
-                                   aria-label="@($"{step.Title}: {TabName(step.Tab)} sekmesini aç")">@TabName(step.Tab) sekmesi</MudButton>
+                                   aria-label="@($"{step.Title}: {TabName(step.Tab)} sekmesini aç")">@TabName(step.Tab) sekmesini aç</MudButton>
                         @if (EventAvailable && ServiceAccountNextStep.EventFor(step, Detail) is { } start)
                         {
                             <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Campaign" OnClick="@(() => OnReport.InvokeAsync(start))"
@@ -60,7 +60,7 @@
     private static string TabName(SaTab tab) => tab switch
     {
         SaTab.Work => "İşler",
-        SaTab.Usage => "Kullanım ve kural",
+        SaTab.Usage => "Hangi sunucularda?",
         SaTab.Scan => "Kullanım taraması",
         SaTab.Ownership => "Sahiplik",
         _ => "Devir ve gMSA"

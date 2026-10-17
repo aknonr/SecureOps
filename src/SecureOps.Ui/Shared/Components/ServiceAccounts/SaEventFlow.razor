@@ -324,7 +324,7 @@
             @if (preview.CloseReadiness is { } readiness)
             {
                 <h4 class="sa-event-sub">Talep kapatılabilir mi? (bilgi; kaydederken sunucu yeniden bakar)</h4>
-                @if (readiness.CanClose) { <p class="so-panel-text">Bu kayıtlardan sonra talep Tamamlandı olarak kapatılabilir@(_previewed?.CloseRequest is null ? "; kapatmayı seçmediniz, talep açık kalır." : ".")</p> }
+                @if (readiness.CanClose) { <p class="so-panel-text">Bu kayıtlardan sonra talep Tamamlandı olarak kapatılabilir@(_previewed?.CloseRequest is null ? "; kapatmayı seçmediniz, talep açık kalır." : ".") Talebin kapanması bildirilen işlemin doğrulandığı veya hesabın kapandığı anlamına gelmez; kapanış kuralını sunucu uygular.</p> }
                 else { <SaCloseMissingList Missing="readiness.Missing" /> }
             }
 

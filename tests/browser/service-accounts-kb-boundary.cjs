@@ -67,7 +67,7 @@ const routes = [
                 await step(`UI ${route} refuses without a module bundle`, async () => {
                     await navigate(page, ui, route);
                     await page.getByText(text, { exact: false }).first().waitFor({ timeout: 15000 });
-                    for (const hidden of ['Kullanım ve kural', 'gMSA yönlendirme ayarı', 'Nüsha karşılaştırma', 'Direktörlük görünümü']) {
+                    for (const hidden of ['Hangi sunucularda?', 'gMSA yönlendirme ayarı', 'Nüsha karşılaştırma', 'Direktörlük görünümü']) {
                         assert.equal(await page.getByText(hidden).count(), 0, `${route}: ${hidden} must not render`);
                     }
                     await capture(page, out, `kb-boundary-${name}`);

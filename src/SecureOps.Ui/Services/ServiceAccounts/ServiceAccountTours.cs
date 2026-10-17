@@ -64,7 +64,7 @@ public static class ServiceAccountTours
                 "Bildirilen işlemi aynı sekmede tarih, doğrulayan ve kanıtla doğrularsınız.",
                 "Hesap ancak doğrulanmış silme veya gMSA dönüşümüyle kapanır; bildirim tek başına yetmez.", permissions.Verify),
             new("sa-tab-usage", "Hangi sunucularda?",
-                "\"Kullanım ve kural\" sekmesi hesabın hangi sunucuda, hangi bileşende kullanıldığını ve kuralın önerisini gösterir.",
+                "Bu adımın sekmesi (\"Hangi sunucularda?\") hesabın hangi sunucuda, hangi bileşende kullanıldığını ve kuralın önerisini gösterir.",
                 "Parola değişikliği veya gMSA geçişinden önce neyin etkileneceğini bilmek için; \"bulunamadı\" kullanılmıyor demek değildir."),
             new("sa-tab-history", "Kaynak ve geçmiş",
                 "Hesabın hangi listeden geldiği ve kimin neyi ne zaman kaydettiği burada.",

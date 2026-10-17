@@ -220,7 +220,7 @@ public static class ServiceAccountEventText
         "Verify" => "Bildirilen işlemi doğrulama yetkisi olan kişi kanıtla doğrulamalı (İşler sekmesi → İşlem bildirimleri).",
         "CloseRequest" => "Talep açık kaldı; iş bittiğinde İşler sekmesinden kapatın.",
         "OpenPlan" => "Açık bir değişiklik planı varsa kontrol listesini plan sayfasında işaretleyin.",
-        "UsageTab" => "Taşınan servisin kullanımını Kullanım ve kural / Kullanım taraması sekmesinde güncelleyin. Bulunamadı, kullanılmıyor demek değildir.",
+        "UsageTab" => "Taşınan servisin kullanımını Hangi sunucularda? / Kullanım taraması sekmesinde güncelleyin. Bulunamadı, kullanılmıyor demek değildir.",
         "OwnershipDecision" => "Sahiplik önerisini teyit yetkisi olan kişi Sahiplik sekmesinde karara bağlamalı.",
         _ => kind
     };

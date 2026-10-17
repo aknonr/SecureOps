@@ -236,8 +236,8 @@ public static class ChangePlanPresentation
     /// <summary>First 12 characters of the digest, enough to recognise the preview the approver looked at.</summary>
     public static string ShortDigest(string sha) => sha.Length <= 12 ? sha : sha[..12];
 
-    /// <summary>Local wall time with an explicit offset, so the window is never read in another zone by accident.</summary>
-    public static string Instant(DateTimeOffset value) => value.ToString("dd.MM.yyyy HH:mm 'UTC'zzz", System.Globalization.CultureInfo.InvariantCulture);
+    /// <summary>One time format on every Service Accounts screen: Istanbul time with "(TR)" (same as <see cref="ServiceAccountUiText.Instant"/>).</summary>
+    public static string Instant(DateTimeOffset value) => ServiceAccountUiText.Instant(value);
 
     /// <summary>
     /// The 409 body carries the plan view the caller may already read; null when the response has none or it does not parse
