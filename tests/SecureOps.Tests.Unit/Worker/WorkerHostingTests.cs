@@ -197,6 +197,29 @@ public sealed class WorkerHostingTests : IDisposable
     }
 
     [Fact]
+    public void WorkerInfrastructureComposition_UsesDirectWriterEvenWhenQueueConfigured()
+    {
+        HostApplicationBuilder builder = WorkerHosting.CreateBuilder(["--environment", "Test"], _root);
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Audit:Provider"] = "SqlServer",
+            ["Audit:Queue:Enabled"] = "true",
+            ["ConnectionStrings:SecureOpsDb"] = "Server=.;Database=x;Integrated Security=true"
+        });
+        WorkerHosting.AddInfrastructure(builder);
+        using IHost host = builder.Build();
+        host.Services.GetRequiredService<IAuditWriter>().Should().BeOfType<DirectAuditWriter>();
+    }
+
+    [Fact]
+    public void WorkerProgram_ComposesInfrastructureOnlyThroughTheDirectWriterEntryPoint()
+    {
+        string program = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "src", "SecureOps.Worker", "Program.cs"));
+        program.Should().Contain("WorkerHosting.AddInfrastructure(builder);")
+            .And.NotContain("AddSecureOpsInfrastructure(");
+    }
+
+    [Fact]
     public async Task WorkerAuditComposition_SinkFailureFailsTheWriteInsteadOfWaiting()
     {
         IAuditEventSink sink = Substitute.For<IAuditEventSink>();
@@ -206,6 +229,17 @@ public sealed class WorkerHostingTests : IDisposable
         var auditEvent = new AuditEvent { Actor = "system:worker", Action = "worker.test" };
         Func<Task> write = () => provider.GetRequiredService<IAuditWriter>().WriteAsync(auditEvent, CancellationToken.None);
         await write.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Directory.Build.props")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new DirectoryNotFoundException("Repository root was not found.");
     }
 
     public void Dispose() => Directory.Delete(_root, recursive: true);

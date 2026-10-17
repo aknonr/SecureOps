@@ -75,8 +75,9 @@ public sealed partial class ServiceAccountService
                 CoverageOrganizationIds = [.. (request.CoverageOrganizationIds ?? []).Distinct().Order()]
             };
             string replayKey = ReplayKey(normalized, sha);
-            if (await repository!.FindCommittedReplayAsync(replayKey, cancellationToken) is { } committed)
+            if (await repository!.FindCommittedReplayAsync(replayKey, cancellationToken) is { } committed && BatchReachable(caller, committed))
             {
+                // A committed batch from a scope the caller does not cover is treated as unseen: it is never revealed.
                 return View(committed, replay: true);
             }
 
@@ -123,7 +124,7 @@ public sealed partial class ServiceAccountService
                 return SaResult<IReadOnlyList<ImportHistoryItem>>.Fail(SaErrors.Forbidden, "scope");
             }
 
-            IReadOnlyList<ImportBatchRecord> batches = await repository!.ListBatchesAsync(500, cancellationToken);
+            IReadOnlyList<ImportBatchRecord> batches = await repository!.ListBatchesAsync(100, caller.Scope.All, [.. caller.Scope.Organizations], caller.User.Id, cancellationToken);
             return new SaResult<IReadOnlyList<ImportHistoryItem>>([.. batches.Where(b => BatchReachable(caller, b)).Take(100).Select(b => new ImportHistoryItem(b.Id, b.Profile, b.FileName, b.SourceReportDate,
                 b.Status, b.UploadedAt, b.CommittedAt, b.SummaryJson is null ? 0 : JsonSerializer.Deserialize<ImportSummary>(b.SummaryJson)!.TotalRows))]);
         }, cancellationToken);

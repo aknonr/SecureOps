@@ -118,13 +118,22 @@ public sealed partial class SqlServiceAccountRepository
             BatchSelect(includeContent) + " WHERE Id = @id;", new { id }, null, cancellationToken));
     }
 
-    /// <summary>Lists recent batches.</summary>
-    public async Task<IReadOnlyList<ImportBatchRecord>> ListBatchesAsync(int take, CancellationToken cancellationToken)
+    /// <summary>Lists recent batches the caller's scope covers; the scope filter runs before the limit so other scopes' volume cannot hide history.</summary>
+    public async Task<IReadOnlyList<ImportBatchRecord>> ListBatchesAsync(int take, bool all, IReadOnlyCollection<Guid> organizations, Guid userId,
+        CancellationToken cancellationToken)
     {
         await using SqlConnection connection = await OpenAsync(cancellationToken);
+        string reachable = all ? string.Empty : """
+             WHERE ISJSON(MappingJson) = 1 AND (
+                (JSON_QUERY(MappingJson, '$.Boundary') IS NULL AND UploadedBy = @userId)
+                OR (JSON_QUERY(MappingJson, '$.Boundary') IS NOT NULL AND JSON_VALUE(MappingJson, '$.Boundary.All') = 'false'
+                    AND EXISTS (SELECT 1 FROM OPENJSON(MappingJson, '$.Boundary.Organizations'))
+                    AND NOT EXISTS (SELECT 1 FROM OPENJSON(MappingJson, '$.Boundary.Organizations') o
+                        WHERE NOT EXISTS (SELECT 1 FROM OPENJSON(@organizations) WITH (Id uniqueidentifier '$') c WHERE c.Id = TRY_CAST(o.value AS uniqueidentifier)))))
+            """;
         return [.. await connection.QueryAsync<ImportBatchRecord>(Cmd(
-            BatchSelect(false).Replace("SELECT Id,", "SELECT TOP (@take) Id,", StringComparison.Ordinal) + " ORDER BY UploadedAt DESC, Id;",
-            new { take }, null, cancellationToken))];
+            BatchSelect(false).Replace("SELECT Id,", "SELECT TOP (@take) Id,", StringComparison.Ordinal) + reachable + " ORDER BY UploadedAt DESC, Id;",
+            new { take, userId, organizations = JsonSerializer.Serialize(organizations) }, null, cancellationToken))];
     }
 
     /// <summary>Pages preview rows with stable ordering.</summary>

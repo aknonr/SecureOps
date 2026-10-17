@@ -605,16 +605,20 @@ environment, token, parola veya anahtar içeriği paylaşılmaz:
 ```powershell
 $Api = 'D:\Applications\api\api.example.test'
 $Worker = 'D:\secureops_worker'
-$Ui = '<mevcut onayli UI fiziksel yolu>'
+$Ui = '<mevcut onayli UI fiziksel yolu>'   # ZORUNLU: gerçek yolla değiştirin; yer tutucuyla komut durur
+if ($Ui -match '[<>]' -or -not (Test-Path -LiteralPath $Ui -PathType Container)) {
+    throw 'UI fiziksel yolu girilmedi veya bulunamadı: durun, hosting sahibinden doğrulatın.'
+}
 foreach ($dll in @("$Api\SecureOps.Api.dll","$Ui\SecureOps.Ui.dll","$Worker\SecureOps.Worker.dll")) {
-    if (Test-Path -LiteralPath $dll) {
-        (Get-Item -LiteralPath $dll).VersionInfo | Select-Object FileName,ProductVersion,FileVersion
-        Get-FileHash -LiteralPath $dll -Algorithm SHA256
-    }
+    if (-not (Test-Path -LiteralPath $dll)) { throw "Beklenen DLL bulunamadı: $dll. Durun; sürüm/hash doğrulaması yapılmadı." }
+    (Get-Item -LiteralPath $dll).VersionInfo | Select-Object FileName,ProductVersion,FileVersion
+    Get-FileHash -LiteralPath $dll -Algorithm SHA256
 }
 dotnet --list-runtimes
 whoami
 ```
+
+Blok bir `throw` verirse (yer tutucu, eksik yol veya DLL) durun: bloğun kalanını ve sonuçlarını geçerli saymayın; yolu düzeltip bloğu baştan çalıştırın.
 
 API/UI için .NET 8 NETCore.App + AspNetCore.App ve IIS Hosting Bundle,
 Worker için .NET 8 NETCore.App gerekir. SDK gerekmez. Mevcut IIS auth,

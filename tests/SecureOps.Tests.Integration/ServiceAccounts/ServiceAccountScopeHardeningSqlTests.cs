@@ -69,9 +69,16 @@ public sealed class ServiceAccountScopeHardeningSqlTests
         SaResult<EventPreview> preview = await fx.Service.PreviewEventAsync(coordA.Principal, fx.Context, accA, draft, _token);
         preview.ErrorCode.Should().Be(SaErrors.Invalid);
         preview.Field.Should().Be("communication.providerMessageId");
-        SaResult<EventCommitResult> commit = await fx.Service.CommitEventAsync(coordA.Principal, fx.Context, accA,
-            draft with { IdempotencyKey = Guid.NewGuid(), PreviewDigest = "x" }, _token);
-        commit.IsSuccess.Should().BeFalse();
+
+        // The service refuses at planning; a commit that gets past it (the mail stored after the preview) must still be refused by the
+        // repository's own visibility check inside the write transaction. The write below carries a version the account really has.
+        AccountEventWrite write = new(accA, AccountEventKind.OwnerReplied, _on, AccountEventChannel.Mail, Guid.NewGuid(), "syn-draft-" + fx.Suffix,
+            account.Summary.Version, null, null,
+            new EventCommunicationWrite(CommunicationDirection.Incoming, CommunicationKind.Reply,
+                new CreateCommunicationRequest("Incoming", "Reply", [accA], _on, Summary: "SYN özet", ProviderMessageId: provider)),
+            null, [], false, null, null, false);
+        AccountEventOutcome outcome = await fx.Repository.CommitAccountEventAsync(write, new SaActor(coordA.User.Id, fx.Context.CorrelationId), _token);
+        outcome.Status.Should().Be(AccountEventStatus.CommunicationRefused);
         (await fx.CountAsync("SELECT COUNT(*) FROM svcacct.CommunicationAccounts WHERE AccountId = @accA", new { accA })).Should().Be(0);
         (await fx.CountAsync("SELECT COUNT(*) FROM svcacct.AccountEvents WHERE AccountId = @accA", new { accA })).Should().Be(0);
     }
@@ -111,6 +118,40 @@ public sealed class ServiceAccountScopeHardeningSqlTests
         await fx.GrantAsync(both, ScopeKind.Organization, orgA);
         await fx.GrantAsync(both, ScopeKind.Organization, orgB);
         Ok(await fx.Service.ImportRowsAsync(both.Principal, fx.Context, batch.Id, null, null, false, 1, 50, _token)).Total.Should().BeGreaterThan(0);
+    }
+
+    [ServiceAccountSqlFact]
+    public async Task ImportBatches_ReplayAndListAreFilteredByScope()
+    {
+        ServiceAccountSqlFixture fx = new();
+        string nameA = "SYN IMP A " + fx.Suffix, nameB = "SYN IMP B " + fx.Suffix;
+        Guid orgA = await fx.OrganizationAsync(nameA), orgB = await fx.OrganizationAsync(nameB);
+        SynUser importerA = await fx.UserAsync(_importer), importerB = await fx.UserAsync(_importer);
+        await fx.GrantAsync(importerA, ScopeKind.Organization, orgA);
+        await fx.GrantAsync(importerB, ScopeKind.Organization, orgB);
+        StageImportRequest request = new(ServiceAccountImportProfiles.CoordinationList, new DateOnly(2026, 9, 14), "Sentetik beyan: kaynak rapor tarihi test verisidir");
+        byte[] file = List(nameB, $"SYN{fx.Suffix}_REPLAY");
+
+        ImportBatchView committed = Ok(await fx.Service.StageImportAsync(importerB.Principal, fx.Context, request, "liste.xlsx", "application/octet-stream", file, _token));
+        Ok(await fx.Service.CommitImportAsync(importerB.Principal, fx.Context, committed.Id, new ImportCommitRequest(committed.PreviewVersion, committed.DecisionVersion),
+            "k-" + Guid.NewGuid().ToString("N"), _token));
+
+        // The same file and parameters from another scope is not answered with the committed batch of the first scope.
+        ImportBatchView other = Ok(await fx.Service.StageImportAsync(importerA.Principal, fx.Context, request, "baska.xlsx", "application/octet-stream", file, _token));
+        other.Id.Should().NotBe(committed.Id);
+        other.Replay.Should().BeFalse();
+        other.FileName.Should().Be("baska.xlsx");
+
+        // The same scope still gets its replay.
+        Ok(await fx.Service.StageImportAsync(importerB.Principal, fx.Context, request, "liste.xlsx", "application/octet-stream", file, _token))
+            .Id.Should().Be(committed.Id);
+
+        // The list is filtered before the limit: a newer batch of another scope cannot push this scope's batch out of a one-row page.
+        ImportBatchView newer = Ok(await fx.Service.StageImportAsync(importerA.Principal, fx.Context, request with { SourceReportDate = new DateOnly(2026, 9, 15) },
+            "yeni.xlsx", "application/octet-stream", List(nameA, $"SYN{fx.Suffix}_NEWER"), _token));
+        IReadOnlyList<ImportBatchRecord> page = await fx.Repository.ListBatchesAsync(1, false, [orgB], importerB.User.Id, _token);
+        page.Should().ContainSingle().Which.Id.Should().Be(committed.Id);
+        page.Should().NotContain(b => b.Id == newer.Id);
     }
 
     [ServiceAccountSqlFact]
