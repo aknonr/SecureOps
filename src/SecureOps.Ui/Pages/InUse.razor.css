@@ -54,3 +54,6 @@
 .so-inuse-inline > summary { display: inline; font-size: 14px; font-weight: 500; text-decoration: underline; }
 .so-inuse-inline > p { font-size: 14px; color: var(--so-text-muted); }
 .so-inuse-filters { margin-block: 1rem; }
+/* Filled action in navy-blue (info token), not brand red: red is for errors and chrome only. White on #2E5A86 is 7:1; the dark info token is light, so it takes dark text (about 7:1). */
+.so-inuse-primary ::deep .mud-button-root { background-color: var(--so-info); color: #fff; }
+.so-dark .so-inuse-primary ::deep .mud-button-root { color: #0C1421; }

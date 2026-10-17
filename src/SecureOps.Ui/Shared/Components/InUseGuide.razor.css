@@ -16,3 +16,5 @@
 .iug-steps p { margin: 0 0 var(--so-space-2); font-size: 15px; line-height: 1.5; }
 .iug-watch { color: var(--so-text-muted); }
 .iug-never { display: flex; gap: var(--so-space-2); align-items: flex-start; margin: var(--so-space-3) 0 0; font-size: 15px; color: var(--so-text-muted); }
+.iug-actions ::deep .so-tour-start { border-color: var(--so-info); color: var(--so-info); }
+.iug-actions ::deep .so-tour-start:hover { background: color-mix(in srgb, var(--so-info) 10%, var(--so-surface)); }

@@ -15,7 +15,7 @@
 <div class="so-page so-page--wide so-inuse">
     <SoPageHeader Title="Sunucu Kullanıma Alma Kontrolleri" Lead="@(Id.HasValue ? null : "Sunucuları inceleyin, eksik cevapları tamamlayın, Excel raporunu kontrol edin.")">
         <Actions>
-            @if (!Id.HasValue && Can(Capabilities.InUseRefresh)) { <span data-tour="inuse-refresh"><MudButton OnClick="RefreshAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.Sync" Variant="Variant.Filled" Color="Color.Primary">In Use kaynağını yenile</MudButton></span> }
+            @if (!Id.HasValue && Can(Capabilities.InUseRefresh)) { <span data-tour="inuse-refresh" class="so-inuse-primary"><MudButton OnClick="RefreshAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.Sync" Variant="Variant.Filled" Color="Color.Info">In Use kaynağını yenile</MudButton></span> }
             @if (!Id.HasValue && Can(Capabilities.InUseView)) { <span data-tour="inuse-closed"><MudButton Href="/in-use/closed" StartIcon="@Icons.Material.Filled.TaskAlt" Variant="Variant.Outlined">Kapalı / tamamlanan</MudButton></span> }
             @if (Can(Capabilities.InUseReview)) { <MudButton Href="/in-use/reports" StartIcon="@Icons.Material.Filled.History">Rapor geçmişi</MudButton> }
             @if (Id.HasValue) { <MudButton Href="@ListUrl" StartIcon="@Icons.Material.Filled.ArrowBack">Listeye dön</MudButton> }

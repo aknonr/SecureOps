@@ -141,6 +141,15 @@ public sealed partial class InUseRedesignTests
         }
     }
 
+    [Fact]
+    public void RefreshAndTourButtons_AreNotBrandRed()
+    {
+        // Brand red is chrome-only (UI README): the list's filled action uses the info token and the tour start button is re-coloured.
+        Ui("Pages", "InUse.razor").Should().Contain("Color=\"Color.Info\">In Use kaynağını yenile").And.NotContain("Color.Primary\">In Use kaynağını yenile");
+        Ui("Shared", "Components", "InUseGuide.razor.css").Should().Contain(".so-tour-start { border-color: var(--so-info); color: var(--so-info); }");
+        Ui("Pages", "InUse.razor.css").Should().Contain(".so-dark .so-inuse-primary");
+    }
+
     private static async Task<string> RenderAsync(InUseRecord record, bool first)
     {
         ServiceCollection collection = new();
