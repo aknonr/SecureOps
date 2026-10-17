@@ -54,7 +54,7 @@ automatic opening (G-41). Tests: `GuidedTourTests` (state + the real component t
 next/back, skipped target, Esc, focus return, hidden step), `ServiceAccountGuidedTourUiTests` (every target rendered by its page, permissions,
 one-sentence what/why, short guides, no storage, reduced motion). Local Linux only: module and CSS in headless Chromium on a staged page
 (1440 / 390 px / 640×400). At 640×400 (200 % of 1280×800) an area taller than the space above the docked box is partly under it. Not verified:
-real pages in a browser, `tests/browser/service-accounts-guided-tour.cjs`, screen reader, Windows/IIS, corporate TEST.
+screen reader, Windows/IIS, corporate TEST. Windows 2026-10-17: `tests/browser/service-accounts-guided-tour.cjs` 6/6 on the local Demo (the first run failed because the journey pressed the start button before the list had loaded; the tour reported that honestly, so the journey now waits for the areas; no UI change).
 ## Service accounts: report first page "Dönem içinde yapılan işlemler" (RAPOR-2), 2026-10-16
 
 `SaReportView` renders `Report.Activity` first (when present): a count strip (`SoMetric` per group + distinct acted accounts), then one `MudTable` per group (deleted, handed over with "Eski → yeni sorumlu ekip", moved to gMSA, changed,

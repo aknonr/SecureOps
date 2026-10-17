@@ -66,13 +66,16 @@ async function ringCovers(page, target) {
             await navigate(page, ui, 'service-accounts');
             const start = page.locator('#sa-list-tour-start');
             await start.waitFor();
+            // The tour looks for each area when it starts; the button exists before the summary and the list have loaded.
+            await page.locator('[data-tour="sa-work-summary"]').waitFor();
+            await page.locator('[data-tour="sa-results"]').waitFor();
             assert.equal(await box(page).count(), 0, 'no automatic tour');
             await start.focus();
             await page.keyboard.press('Enter');
             await box(page).waitFor();
             await page.waitForFunction(() => document.activeElement?.hasAttribute('data-tour-focus'));
             assert.equal(await focusedTitle(page), 'Takibinizdeki işler');
-            assert.match(await box(page).innerText(), /Adım 1 \/ \d/);
+            assert.match(await box(page).textContent(), /Adım 1 \/ \d/); // textContent: innerText returns the CSS upper-case form
             assert.ok(await ringCovers(page, 'sa-work-summary'), 'the frame covers the work summary');
             await capture(page, out, 'tour-list-first');
         });
@@ -117,7 +120,7 @@ async function ringCovers(page, target) {
             }
             assert.equal(title, 'Hangi sunucularda?');
             assert.ok(await ringCovers(page, 'sa-tab-usage'));
-            assert.equal(await page.locator('button.sa-tab-title[aria-current="true"]').innerText().then(t => t.startsWith('İşler')), true, 'the tour never switches tabs');
+            assert.equal(await page.locator('button.sa-tab-title[aria-current="true"]').textContent().then(t => t.startsWith('İşler')), true, 'the tour never switches tabs'); // textContent: MudTabs upper-cases the header with CSS
             await capture(page, out, 'tour-detail-usage');
             await page.keyboard.press('Escape');
         });

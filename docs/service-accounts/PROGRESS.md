@@ -17,6 +17,16 @@ Design: [README.md](README.md) · rules: [SPEC.md](SPEC.md) · Windows rows: [WI
 - Push on the owner's workstation: Git Credential Manager holds two GitHub accounts, so name the owner's:
   `git -c credential.https://github.com.username=aknonr push origin <branch>`.
 
+## Browser journeys fixed, YOLCULUK-FIX (branch `fix/service-accounts-browser-journeys-20261017`, from master `d1eff85`)
+
+- Both red journeys were wrong journeys, not UI defects; no product code changed. `service-accounts-guided-tour.cjs`: pressed "Adım adım göster"
+  before the summary and list had loaded (the tour looks for each area at start, skips the missing ones and says so), compared `innerText` with
+  "Adım 1 / n" and the tab name although CSS upper-cases both (now `textContent`). `service-accounts-report-periods.cjs`: MudSelect shows a
+  read-only input and then swaps it for the combobox div, and a click on the replaced input waits for ever (about 1 run in 3); `choose` now clicks
+  the current shape with a short, retried click. New proof: "Son 7 gün" / "Son 30 gün" fill Başlangıç and Bitiş (today) and the period.
+- Verified on Windows (local Demo, SDK 9.0.317, synthetic LocalDB database, dropped afterwards): tour 6/6 and report periods 5/5 steps, each run
+  5 to 8 times in a row without a failure. Not verified: corporate TEST, IIS.
+
 ## Guided tour, REHBER-UI (branch `feature/service-accounts-guided-tour-20261016`, from master `cf16a63`, not merged)
 
 - Owner feedback: "Nasıl kullanılır?" was a wall of text. Now an on-screen tour the person starts ("Adım adım göster" in `SaPageGuide`):
