@@ -2,6 +2,7 @@ using Dapper;
 using FluentAssertions;
 using Microsoft.Data.SqlClient;
 using SecureOps.Domain.ServiceAccounts;
+using SecureOps.Infrastructure.ServiceAccounts;
 using SecureOps.Shared.Contracts.ServiceAccounts;
 
 namespace SecureOps.Tests.Integration.ServiceAccounts;
