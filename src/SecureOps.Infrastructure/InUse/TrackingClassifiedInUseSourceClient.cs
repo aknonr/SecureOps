@@ -49,10 +49,50 @@ public sealed class TrackingClassifiedInUseSourceClient(IInUseSourceClient inner
     }
 
     /// <inheritdoc />
+    public async Task<InUseRecheckResult> RecheckAsync(IReadOnlyList<string> sourceIds, CancellationToken cancellationToken)
+    {
+        // One id at a time through the shared single-flight session: two source reads per record, no extra concurrency.
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        budget.CancelAfter(BatchBudget);
+        Dictionary<string, InUseEvidencePatch> patches = [];
+        int unproven = 0;
+        foreach (string id in sourceIds)
+        {
+            InUseEvidencePatch? patch = null;
+            if (!budget.IsCancellationRequested)
+            {
+                try
+                {
+                    patch = Patch(await tracking.ClassifyAsync(id, budget.Token));
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    // Budget spent: this record and the rest stay unchecked.
+                }
+            }
+
+            if (patch is null || patch.IsEmpty)
+            {
+                unproven++;
+            }
+            else
+            {
+                patches[id] = patch;
+            }
+        }
+
+        return new(patches, unproven);
+    }
+
+    /// <inheritdoc />
     public Task<System.Text.Json.JsonElement> DiagnoseAsync(string sourceId, CancellationToken token) => inner.DiagnoseAsync(sourceId, token);
 
     /// <summary>Maps a classification onto the source evidence; unknown classes keep what the source already carried.</summary>
-    public static InUseSource Apply(InUseSource source, ItsmWasasClassification classification)
+    public static InUseSource Apply(InUseSource source, ItsmWasasClassification classification) =>
+        Patch(classification).Apply(source);
+
+    /// <summary>The evidence a classification proves; unknown classes stay null.</summary>
+    public static InUseEvidencePatch Patch(ItsmWasasClassification classification)
     {
         InUseEvidence? activity = classification.Activity switch
         {
@@ -73,11 +113,6 @@ public sealed class TrackingClassifiedInUseSourceClient(IInUseSourceClient inner
             ItsmAssignmentClass.NotAssignedToWasas => new(InUseActivity.NotAssignedToWasas, AssignmentSource),
             _ => null
         };
-        return source with
-        {
-            WasasActivity = activity ?? source.WasasActivity,
-            Lifecycle = lifecycle ?? source.Lifecycle,
-            CurrentStage = stage ?? source.CurrentStage
-        };
+        return new(activity, lifecycle, stage);
     }
 }

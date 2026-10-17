@@ -125,6 +125,8 @@ public sealed record InUseQuery(string? Search = null, string View = "all", stri
 public sealed record InUseRefreshState(long Version, DateTimeOffset? LastAttemptAt, DateTimeOffset? LastSuccessfulAt,
     bool Complete, string? Issue)
 {
+    /// <summary>Known records the last refresh could not re-check against the source (over the bound or unreadable); they stay listed.</summary>
+    public int RecheckUnchecked { get; init; }
     /// <summary>Initial state before any operator-triggered refresh.</summary>
     public static InUseRefreshState Empty => new(0, null, null, false, "NotRefreshed");
     /// <summary>A local freshness indication, never proof that source state remains unchanged.</summary>

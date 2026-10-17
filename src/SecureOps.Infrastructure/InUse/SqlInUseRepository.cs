@@ -159,7 +159,7 @@ public sealed partial class SqlInUseRepository(IConfiguration configuration) : I
             .Select(Read<InUseRecord>).Where(r => !(batch?.Records.Any(s => s.Id == r.Source.Id) ?? false)).ToArray();
         foreach (InUseRecord old in retained)
         {
-            InUseRecord next = InUseState.RetainUnobserved(old);
+            InUseRecord next = InUseState.RetainUnobserved(old, batch?.Rechecked?.GetValueOrDefault(old.Source.Id));
             if (next.Version != old.Version)
             { await PersistAsync(connection, transaction, next, false, cancellationToken); }
         }
