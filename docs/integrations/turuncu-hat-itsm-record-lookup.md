@@ -146,17 +146,17 @@ with no id, code, person or comment text. Three independent questions, each Unkn
 
 | Class | Values | Rule |
 |---|---|---|
-| `Activity` | `Completed` | exactly ONE candidate row (`m_group` = `WasasGroupId` and task-model display text contains an `ActivityTaskModelContains` fragment, case-insensitive) with `m_completion_date` filled and `m_status` = `ActivityApprovedStatus` |
-| | `Pending` | the same single row with `m_completion_date` empty (its status code is not interpreted: the open-task code is not known) |
-| | `NotApproved` | the single row is completed but `m_status` differs: rejection, send-back or an unknown code. The meaning is not named |
-| | `Unknown` | no candidate (not found is not "none"), several candidates, filter or group not configured, activity part Unknown/incomplete/oversized/timeout/parse error, completed row without a status cell |
+| `Activity` | `Completed` | candidate rows are those with `m_group` = `WasasGroupId` and a task-model display text containing an `ActivityTaskModelContains` fragment (case-insensitive). No candidate is open and the NEWEST one (`m_created_dt`) has `m_completion_date` filled and `m_status` = `ActivityApprovedStatus` |
+| | `Pending` | ANY candidate row has `m_completion_date` empty: the action is still ours, also after a send-back and resubmission (its status code is not interpreted: the open-task code is not known) |
+| | `NotApproved` | the newest row is completed but `m_status` differs: rejection, send-back or an unknown code. The meaning is not named |
+| | `Unknown` | no candidate (not found is not "none"), several completed rows whose two newest creation times are equal or any is unreadable, filter or group not configured, activity part Unknown/incomplete/oversized/timeout/parse error, completed row without a status cell |
 | `Closure` | `Closed` | stage in `ClosedStageIds` or status in `ClosedStatusIds` |
 | | `Open` | every configured list was compared with a filled value and none matched |
 | | `Unknown` | nothing configured, a configured value is empty, or the OR was not read |
 | `Assignment` | `AssignedToWasas` / `NotAssignedToWasas` | the filled `OrAssignedGroupField` equals / differs from `WasasGroupId` |
 | | `Unknown` | field or group not configured, group empty (a closed OR has none), or the OR was not read |
 
-Fail closed: `Completed` needs a complete successful response, one candidate, the approved code and a completion
+Fail closed: `Completed` needs a complete successful response, no open candidate, a unique newest candidate carrying the approved code and a completion
 time. An OR that is not found, ambiguous or unreadable makes all three classes Unknown. `Assignment` is **not** proof
 of approval: send-back and reject change the group too, so `NotAssignedToWasas` alone says "not with WASAS", never
 "approved". Added reads: the `OrAssignedGroupField` cell of the OR row (group code only) and, only when an allow-list

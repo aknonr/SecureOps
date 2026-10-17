@@ -16,16 +16,16 @@ public interface IItsmWasasTracking
     public Task<ItsmWasasClassification> ClassifyAsync(string? sourceId, CancellationToken cancellationToken);
 }
 
-/// <summary>State of the one WASAS review activity row.</summary>
+/// <summary>State of the WASAS review activity (the newest of its rows when it was sent back and submitted again).</summary>
 public enum ItsmWasasActivityClass
 {
-    /// <summary>One WASAS-group row, completion time filled and status equal to the configured approved code.</summary>
+    /// <summary>No open WASAS row; the newest row has a completion time and the configured approved status code.</summary>
     Completed,
-    /// <summary>The same single row with no completion time yet.</summary>
+    /// <summary>A WASAS row has no completion time yet: the action is still ours.</summary>
     Pending,
-    /// <summary>The row is completed but its status is not the approved code (rejected, sent back or an unknown code).</summary>
+    /// <summary>The newest row is completed but its status is not the approved code (rejected, sent back or an unknown code).</summary>
     NotApproved,
-    /// <summary>Not proven: missing, several candidate rows, incomplete or failed read, or no activity filter configured.</summary>
+    /// <summary>Not proven: no candidate row, equal or unreadable creation times between completed rows, incomplete or failed read, or no activity filter configured.</summary>
     Unknown
 }
 
@@ -145,16 +145,33 @@ public static class ItsmWasasClassifier
                 && models.Any(fragment => label.Contains(fragment, StringComparison.OrdinalIgnoreCase)))
         ];
 
-        // Zero rows is not "no activity" (the source may simply not show it) and several rows are ambiguous.
-        if (candidates.Length != 1)
+        // Zero rows is not "no activity": the source may simply not show it.
+        if (candidates.Length == 0)
         {
             return (ItsmWasasActivityClass.Unknown, ItsmRecordLookupReason.IncompleteResponse);
         }
 
-        ItsmActivity row = candidates[0];
-        if (string.IsNullOrEmpty(row.CompletedText))
+        // Sent back and submitted again leaves several rows. An open row means WASAS still has to act; otherwise the
+        // newest row by creation time decides. Equal or unreadable creation times prove nothing.
+        if (candidates.Any(candidate => string.IsNullOrEmpty(candidate.CompletedText)))
         {
             return (ItsmWasasActivityClass.Pending, ItsmRecordLookupReason.None);
+        }
+
+        ItsmActivity row = candidates[0];
+        if (candidates.Length > 1)
+        {
+            (ItsmActivity Activity, DateTimeOffset? Created)[] dated =
+            [
+                .. candidates.Select(candidate => (candidate, Created: TryCreated(candidate.CreatedText)))
+                    .OrderByDescending(entry => entry.Created)
+            ];
+            if (dated.Any(entry => entry.Created is null) || dated[0].Created == dated[1].Created)
+            {
+                return (ItsmWasasActivityClass.Unknown, ItsmRecordLookupReason.InvalidResponse);
+            }
+
+            row = dated[0].Activity;
         }
 
         if (string.IsNullOrEmpty(row.RawStatus))
@@ -166,6 +183,10 @@ public static class ItsmWasasClassifier
             ? (ItsmWasasActivityClass.Completed, ItsmRecordLookupReason.None)
             : (ItsmWasasActivityClass.NotApproved, ItsmRecordLookupReason.None);
     }
+
+    private static DateTimeOffset? TryCreated(string? text) =>
+        DateTimeOffset.TryParse(text, System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AssumeUniversal, out DateTimeOffset value) ? value : null;
 
     private static string[] Ids(string[]? values) =>
         [.. (values ?? []).Select(value => value?.Trim() ?? string.Empty).Where(value => value.Length > 0)];

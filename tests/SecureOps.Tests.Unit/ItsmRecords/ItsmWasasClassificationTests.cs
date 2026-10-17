@@ -52,7 +52,7 @@ public sealed class ItsmWasasClassificationTests
         new("2026-01-05T02:30:00", status, stage, null, null, group);
 
     private static ItsmActivity Row(string id = "1", string? group = _wasasGroup, string? status = "4", string? completed = "2026-01-05T01:45:00",
-        string? label = _review) => new(id, group, status, "2026-01-05T01:00:00", completed, label);
+        string? label = _review, string? created = "2026-01-05T01:00:00") => new(id, group, status, created, completed, label);
 
     private static ItsmTrackingPart<IReadOnlyList<ItsmActivity>> Known(params ItsmActivity[] rows) =>
         ItsmTrackingPart<IReadOnlyList<ItsmActivity>>.Known(rows);
@@ -101,12 +101,45 @@ public sealed class ItsmWasasClassificationTests
     }
 
     [Fact]
-    public void Activity_SeveralMatchingRows_AreUnknown_NeverCompleted()
+    public void Activity_SentBackAndSubmittedAgain_AnOpenRowIsPending_EvenWhenAnOlderOneWasApproved()
     {
-        ItsmWasasClassification result = Classify(Options(), State(), Known(Row("1"), Row("2", completed: null)));
+        Classify(Options(), State(), Known(
+            Row("1", created: "2026-01-05T01:00:00"), Row("2", completed: null, created: "2026-01-06T01:00:00")))
+            .Activity.Should().Be(ItsmWasasActivityClass.Pending);
+        // An open row wins even over a newer completed one: the action is still ours.
+        Classify(Options(), State(), Known(
+            Row("1", completed: null, created: "2026-01-05T01:00:00"), Row("2", created: "2026-01-06T01:00:00")))
+            .Activity.Should().Be(ItsmWasasActivityClass.Pending);
+    }
+
+    [Fact]
+    public void Activity_SeveralCompletedRows_TheNewestCreationTimeDecides()
+    {
+        // Rejected first, approved after resubmission.
+        Classify(Options(), State(), Known(
+            Row("1", status: "5", created: "2026-01-05T01:00:00"), Row("2", status: "4", created: "2026-01-06T01:00:00")))
+            .Activity.Should().Be(ItsmWasasActivityClass.Completed);
+        // Approved first, newest rejected: the approval is no longer the answer. Row order does not matter.
+        Classify(Options(), State(), Known(
+            Row("2", status: "5", created: "2026-01-06T01:00:00"), Row("1", status: "4", created: "2026-01-05T01:00:00")))
+            .Activity.Should().Be(ItsmWasasActivityClass.NotApproved);
+        // Time zones are compared as instants.
+        Classify(Options(), State(), Known(
+            Row("1", status: "5", created: "2026-01-05T10:00:00+03:00"), Row("2", status: "4", created: "2026-01-05T08:00:00+00:00")))
+            .Activity.Should().Be(ItsmWasasActivityClass.Completed);
+    }
+
+    [Theory]
+    [InlineData("2026-01-05T01:00:00", "2026-01-05T01:00:00")]
+    [InlineData("2026-01-05T01:00:00", null)]
+    [InlineData("2026-01-05T01:00:00", "not a date")]
+    [InlineData(null, null)]
+    public void Activity_SeveralCompletedRows_EqualOrUnreadableCreationTimes_AreUnknown(string? first, string? second)
+    {
+        ItsmWasasClassification result = Classify(Options(), State(), Known(
+            Row("1", status: "4", created: first), Row("2", status: "5", created: second)));
 
         result.Activity.Should().Be(ItsmWasasActivityClass.Unknown);
-        result.ActivityReason.Should().Be(ItsmRecordLookupReason.IncompleteResponse);
     }
 
     [Theory]
@@ -202,11 +235,11 @@ public sealed class ItsmWasasClassificationTests
     ];
 
     private static (string Key, string? Value)[] ActivityRow(string id = "1", string group = _wasasGroup, string? status = "4",
-        string? completed = "2026-01-05T01:45:00", string? label = _review) =>
+        string? completed = "2026-01-05T01:45:00", string? label = _review, string? created = "2026-01-05T01:00:00") =>
     [
         ("SET.id", id), ("SET.m_group", group), ("KEY.m_group", "Synthetic Group Name"),
         ("SET.m_status", status), ("KEY.m_status", "Synthetic status text"),
-        ("SET.m_created_dt", "2026-01-05T01:00:00"), ("SET.m_completion_date", completed),
+        ("SET.m_created_dt", created), ("SET.m_completion_date", completed),
         ("SET.m_actvty_task_model", "103"), ("KEY.m_actvty_task_model", label),
         ("KEY.m_done_by", "Synthetic Person"), ("KEY.m_assignee", "Synthetic Person"), ("KEY.m_done_by_delegate", "Synthetic Person"),
         ("num", "1")
@@ -343,11 +376,15 @@ public sealed class ItsmWasasClassificationTests
     }
 
     [Fact]
-    public async Task Adapter_SeveralMatchingRows_AreUnknown()
+    public async Task Adapter_SeveralMatchingRows_FollowTheResubmissionRule()
     {
-        ScriptedHandler handler = new(Ok(Query(_header)), Ok(Query(ActivityRow("1"), ActivityRow("2", completed: null))));
-
-        (await Run(handler)).Activity.Should().Be(ItsmWasasActivityClass.Unknown);
+        (await Run(new ScriptedHandler(Ok(Query(_header)), Ok(Query(ActivityRow("1"), ActivityRow("2", completed: null, created: "2026-01-06T01:00:00"))))))
+            .Activity.Should().Be(ItsmWasasActivityClass.Pending);
+        (await Run(new ScriptedHandler(Ok(Query(_header)), Ok(Query(
+            ActivityRow("1", status: "5"), ActivityRow("2", status: "4", created: "2026-01-06T01:00:00"))))))
+            .Activity.Should().Be(ItsmWasasActivityClass.Completed);
+        (await Run(new ScriptedHandler(Ok(Query(_header)), Ok(Query(ActivityRow("1"), ActivityRow("2", status: "5"))))))
+            .Activity.Should().Be(ItsmWasasActivityClass.Unknown);
     }
 
     [Fact]

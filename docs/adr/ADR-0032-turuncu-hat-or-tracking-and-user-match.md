@@ -240,8 +240,10 @@ not known. The In Use closed/completed page (G-44) needs these as server-classif
    Activity (`Completed`, `Pending`, `NotApproved`, `Unknown`), Closure (`Closed`, `Open`, `Unknown`) and Assignment
    (`AssignedToWasas`, `NotAssignedToWasas`, `Unknown`). Rules and options:
    `docs/integrations/turuncu-hat-itsm-record-lookup.md`, section "WASAS classification". Fail closed: `Completed`
-   only for a complete successful response, one candidate row, the configured approved code and a filled completion
-   time; not found is never "none".
+   only for a complete successful response, no open candidate row, a unique newest row (by `m_created_dt`) with the
+   configured approved code and a filled completion time; any open row is `Pending`; equal or unreadable creation
+   times between completed rows are `Unknown`; not found is never "none" (rule extended 2026-10-17 for send-back and
+   resubmission, owner: the newest request decides).
 2. All codes (WASAS group id, approved status code with default `4`, closed stage and status ids, activity task-name
    allow-list, assigned-group field) are server configuration; none is committed. Reject, send-back and unknown codes
    are not named: a completed row with another code is only `NotApproved`. A group change is reported separately and is
