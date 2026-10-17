@@ -43,6 +43,8 @@ public sealed partial class SqlInUseRepository(IConfiguration configuration) : I
                 AND PATINDEX(@NonWhitespacePattern,COALESCE(JSON_VALUE(RecordJson,'$.Source.WasasActivity.Source'),N'') COLLATE Latin1_General_100_BIN2)>0) THEN 'Completed'
             WHEN JSON_VALUE(RecordJson,'$.Source.Lifecycle.Value')+N'#' COLLATE Latin1_General_100_BIN2=N'Closed#'
                 AND PATINDEX(@NonWhitespacePattern,COALESCE(JSON_VALUE(RecordJson,'$.Source.Lifecycle.Source'),N'') COLLATE Latin1_General_100_BIN2)>0 THEN 'OrClosed'
+            WHEN JSON_VALUE(RecordJson,'$.Source.CurrentStage.Value')+N'#' COLLATE Latin1_General_100_BIN2=N'NotAssignedToWasas#'
+                AND PATINDEX(@NonWhitespacePattern,COALESCE(JSON_VALUE(RecordJson,'$.Source.CurrentStage.Source'),N'') COLLATE Latin1_General_100_BIN2)>0 THEN 'NotAssigned'
             WHEN COALESCE(JSON_VALUE(RecordJson,'$.Discarded'),'false')<>'true'
                 AND COALESCE(JSON_VALUE(RecordJson,'$.SourceObservationMissing'),'false')<>'true'
                 AND execution.HasActiveExecution=0 AND JSON_VALUE(RecordJson,'$.Source.WasasActivity.Value')+N'#' COLLATE Latin1_General_100_BIN2=N'Pending#'
@@ -96,8 +98,8 @@ public sealed partial class SqlInUseRepository(IConfiguration configuration) : I
               OR (COALESCE(@Status,'')<>'Discarded' AND COALESCE(JSON_VALUE(RecordJson,'$.Discarded'),'false')='false'
                   AND (@Status IS NULL OR ReviewStatus = @Status)))
              AND (@View = 'all' OR (@View = 'mine' AND AssigneeId = @ActorId) OR (@View = 'unassigned' AND AssigneeId IS NULL)
-              OR (@View = 'tracking' AND workflow.ActivityStatus IN ('Completed','OrClosed'))
-              OR (@View = 'review' AND workflow.ActivityStatus NOT IN ('Completed','OrClosed'))
+              OR (@View = 'tracking' AND workflow.ActivityStatus IN ('Completed','OrClosed','NotAssigned'))
+              OR (@View = 'review' AND workflow.ActivityStatus NOT IN ('Completed','OrClosed','NotAssigned'))
               OR (@View = 'pending' AND workflow.ActivityStatus='Pending')
               OR (@View = 'verification' AND workflow.ActivityStatus='VerificationPending'))
             """;
@@ -157,7 +159,7 @@ public sealed partial class SqlInUseRepository(IConfiguration configuration) : I
             .Select(Read<InUseRecord>).Where(r => !(batch?.Records.Any(s => s.Id == r.Source.Id) ?? false)).ToArray();
         foreach (InUseRecord old in retained)
         {
-            InUseRecord next = InUseState.RetainUnobserved(old);
+            InUseRecord next = InUseState.RetainUnobserved(old, batch?.Rechecked?.GetValueOrDefault(old.Source.Id));
             if (next.Version != old.Version)
             { await PersistAsync(connection, transaction, next, false, cancellationToken); }
         }

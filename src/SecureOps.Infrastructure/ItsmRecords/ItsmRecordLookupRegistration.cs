@@ -38,13 +38,15 @@ public static class ItsmRecordLookupRegistration
                 serviceProvider.GetRequiredService<IOptions<ItsmRecordLookupOptions>>(),
                 serviceProvider.GetRequiredService<EnterpriseIntegrationTelemetry>(),
                 serviceProvider.GetRequiredService<ILogger<TuruncuHatItsmRecordLookup>>()));
-            services.AddSingleton<IItsmRecordTracking>(serviceProvider => new TuruncuHatItsmRecordTracking(
+            services.AddSingleton(serviceProvider => new TuruncuHatItsmRecordTracking(
                 serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("TuruncuHat"),
                 serviceProvider.GetRequiredService<ITuruncuHatSessionManager>(),
                 serviceProvider.GetRequiredService<IOptions<TuruncuHatOptions>>(),
                 serviceProvider.GetRequiredService<IOptions<ItsmRecordLookupOptions>>(),
                 serviceProvider.GetRequiredService<EnterpriseIntegrationTelemetry>(),
                 serviceProvider.GetRequiredService<ILogger<TuruncuHatItsmRecordTracking>>()));
+            services.AddSingleton<IItsmRecordTracking>(serviceProvider => serviceProvider.GetRequiredService<TuruncuHatItsmRecordTracking>());
+            services.AddSingleton<IItsmWasasTracking>(serviceProvider => serviceProvider.GetRequiredService<TuruncuHatItsmRecordTracking>());
             services.AddSingleton<IItsmUserMapping>(serviceProvider => new TuruncuHatItsmUserMapping(
                 serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("TuruncuHat"),
                 serviceProvider.GetRequiredService<ITuruncuHatSessionManager>(),
@@ -55,13 +57,17 @@ public static class ItsmRecordLookupRegistration
         else if (string.Equals(provider, FakeItsmRecordLookup.ProviderName, StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IItsmRecordLookup, FakeItsmRecordLookup>();
-            services.AddSingleton<IItsmRecordTracking, FakeItsmRecordTracking>();
+            services.AddSingleton<FakeItsmRecordTracking>();
+            services.AddSingleton<IItsmRecordTracking>(serviceProvider => serviceProvider.GetRequiredService<FakeItsmRecordTracking>());
+            services.AddSingleton<IItsmWasasTracking>(serviceProvider => serviceProvider.GetRequiredService<FakeItsmRecordTracking>());
             services.AddSingleton<IItsmUserMapping, FakeItsmUserMapping>();
         }
         else
         {
             services.AddSingleton<IItsmRecordLookup, DisabledItsmRecordLookup>();
-            services.AddSingleton<IItsmRecordTracking, DisabledItsmRecordTracking>();
+            services.AddSingleton<DisabledItsmRecordTracking>();
+            services.AddSingleton<IItsmRecordTracking>(serviceProvider => serviceProvider.GetRequiredService<DisabledItsmRecordTracking>());
+            services.AddSingleton<IItsmWasasTracking>(serviceProvider => serviceProvider.GetRequiredService<DisabledItsmRecordTracking>());
             services.AddSingleton<IItsmUserMapping, DisabledItsmUserMapping>();
         }
 
@@ -98,12 +104,20 @@ public static class ItsmRecordLookupRegistration
             throw new InvalidOperationException("ItsmRecordLookup:OrBaseObject and ItsmRecordLookup:OcoBaseObject are required identifiers for TuruncuHat.");
         }
 
-        if (!IsOptionalIdentifier(options.OrStatusField) || !IsOptionalIdentifier(options.OrStageField)
+        if (!IsOptionalIdentifier(options.OrStatusField) || !IsOptionalIdentifier(options.OrStageField) || !IsOptionalIdentifier(options.OrAssignedGroupField)
             || !IsOptionalIdentifier(options.CommentMainObject) || !IsOptionalIdentifier(options.ActivityMainObject)
             || !IsSafeIdentifier(options.CommentTimeField))
         {
             throw new InvalidOperationException(
-                "ItsmRecordLookup:OrStatusField, OrStageField, CommentMainObject, ActivityMainObject must be empty or identifiers, and CommentTimeField an identifier.");
+                "ItsmRecordLookup:OrStatusField, OrStageField, OrAssignedGroupField, CommentMainObject, ActivityMainObject must be empty or identifiers, and CommentTimeField an identifier.");
+        }
+
+        if (!IsOptionalDigits(options.WasasGroupId) || !IsOptionalDigits(options.ActivityApprovedStatus)
+            || !(options.ClosedStageIds ?? []).All(IsDigits) || !(options.ClosedStatusIds ?? []).All(IsDigits)
+            || (options.ActivityTaskModelContains ?? []).Any(fragment => string.IsNullOrWhiteSpace(fragment) || fragment.Length > 128))
+        {
+            throw new InvalidOperationException(
+                "ItsmRecordLookup:WasasGroupId, ActivityApprovedStatus, ClosedStageIds and ClosedStatusIds must be digits (the first two may be empty) and ActivityTaskModelContains entries non-empty text of at most 128 characters.");
         }
 
         ValidateTuruncuHatWire(configuration.GetSection(TuruncuHatOptions.SectionName).Get<TuruncuHatOptions>() ?? new());
@@ -141,6 +155,10 @@ public static class ItsmRecordLookupRegistration
 
     private static bool IsRuntimeSecret(string? value) =>
         !string.IsNullOrWhiteSpace(value) && value.Length <= 4096 && !value.Contains('\r') && !value.Contains('\n');
+
+    private static bool IsOptionalDigits(string? value) => string.IsNullOrEmpty(value) || IsDigits(value);
+
+    private static bool IsDigits(string? value) => value is { Length: > 0 and <= 20 } && value.All(char.IsAsciiDigit);
 
     private static bool IsOptionalIdentifier(string? value) => string.IsNullOrEmpty(value) || IsSafeIdentifier(value);
 

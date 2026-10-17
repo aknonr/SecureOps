@@ -40,4 +40,25 @@ public sealed class ItsmRecordLookupOptions
     /// with the record id only, as the Turuncu Hat team described it. Digits or identifier characters.
     /// </summary>
     public string ActivityMainObject { get; set; } = string.Empty;
+    /// <summary>
+    /// OR source field carrying the assigned group code (TH-11). Empty (default) means it is not selected and the
+    /// assignment class is Unknown. Identifier characters only; configuration-owned.
+    /// </summary>
+    public string OrAssignedGroupField { get; set; } = string.Empty;
+    /// <summary>
+    /// Source id of the WASAS group, digits only (TH-11). Empty (default) means no activity or assignment can be
+    /// attributed to WASAS and both classes are Unknown. Corporate value; configuration-owned, never in the repository.
+    /// </summary>
+    public string WasasGroupId { get; set; } = string.Empty;
+    /// <summary>Activity <c>m_status</c> code that means "approved" (owner-confirmed TEST observation; digits). Anything else on a completed row is NotApproved.</summary>
+    public string ActivityApprovedStatus { get; set; } = "4";
+    /// <summary>
+    /// Allow-list of text fragments of the activity task-model display text that identify the WASAS review activity.
+    /// Empty (default) means no activity can be identified and the activity class is Unknown (fail closed).
+    /// </summary>
+    public string[] ActivityTaskModelContains { get; set; } = [];
+    /// <summary>Stage ids that mean the OR is closed in the source (digits). Empty means the stage is not used for closure.</summary>
+    public string[] ClosedStageIds { get; set; } = [];
+    /// <summary>Status ids that mean the OR is closed in the source (digits). Empty means the status is not used for closure.</summary>
+    public string[] ClosedStatusIds { get; set; } = [];
 }

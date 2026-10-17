@@ -26,23 +26,32 @@
         @if (step is null)
         {
             <h2 id="@($"{Id}-title")" class="so-tour-title" tabindex="-1" data-tour-focus>Gösterilecek alan yok</h2>
-            <div id="@($"{Id}-body")">
-                <p class="so-tour-text">Turdaki @_state.Steps.Count adımın alanı şu an ekranda değil. Bu, yetkiniz, boş bir liste veya sayfanın henüz yüklenmemesi yüzünden olabilir; sayfa yüklendikten sonra yeniden deneyin.</p>
-            </div>
         }
         else
         {
             <h2 id="@($"{Id}-title")" class="so-tour-title" tabindex="-1" data-tour-focus>@step.Title</h2>
-            <div id="@($"{Id}-body")">
-                <p class="so-tour-text"><strong>Ne:</strong> @step.What</p>
-                <p class="so-tour-text"><strong>Neden:</strong> @step.Why</p>
-            </div>
         }
-        <p class="so-tour-skip" role="status" data-tour-skip>@SkipText</p>
+        <div class="so-tour-scroll">
+            <div id="@($"{Id}-body")" data-tour-body hidden="@(step is not null && _compact)">
+                @if (step is null)
+                {
+                    <p class="so-tour-text">Turdaki @_state.Steps.Count adımın alanı şu an ekranda değil. Bu, yetkiniz, boş bir liste veya sayfanın henüz yüklenmemesi yüzünden olabilir; sayfa yüklendikten sonra yeniden deneyin.</p>
+                }
+                else
+                {
+                    <p class="so-tour-text"><strong>Ne:</strong> @step.What</p>
+                    <p class="so-tour-text"><strong>Neden:</strong> @step.Why</p>
+                }
+            </div>
+            <p class="so-tour-skip" role="status" data-tour-skip>@SkipText</p>
+            <p class="so-tour-hint" hidden="@(step is not null && _compact)">Esc turu kapatır. Vurgulanan alan kullanılabilir kalır; tur hiçbir şeye basmaz ve kayıt yapmaz.</p>
+        </div>
         <div class="so-tour-controls">
             @if (step is not null)
             {
                 <button type="button" class="so-tour-button" data-tour-action="back" disabled="@(!_state.HasPrevious || _busy)" @onclick="BackAsync">Geri</button>
+                <button type="button" class="so-tour-button" data-tour-action="toggle" aria-expanded="@(_compact ? "false" : "true")"
+                        aria-controls="@($"{Id}-body")" @onclick="ToggleDetails">@(_compact ? "Açıklamayı göster" : "Açıklamayı gizle")</button>
             }
             <button type="button" class="so-tour-button" data-tour-action="close" @onclick="CloseAsync">Kapat</button>
             @if (step is not null)
@@ -50,7 +59,6 @@
                 <button type="button" class="so-tour-button so-tour-button--primary" data-tour-action="next" disabled="@_busy" @onclick="NextAsync">@(_state.HasNext ? "İleri" : "Bitir")</button>
             }
         </div>
-        <p class="so-tour-hint">Esc turu kapatır. Vurgulanan alan kullanılabilir kalır; tur hiçbir şeye basmaz ve kayıt yapmaz.</p>
     </div>
 }
 
@@ -66,6 +74,7 @@
     private bool _show;
     private bool _restoreFocus;
     private bool _busy;
+    private bool _compact;
 
     /// <summary>Unique id prefix on the page; the start button is "{Id}-start".</summary>
     [Parameter, EditorRequired] public string Id { get; set; } = "so-tour";
@@ -194,6 +203,10 @@
         _restoreFocus = true;
         return Task.CompletedTask;
     }
+
+    // Folding hides only the explanation (in memory, this page visit): heading, step count and buttons stay, so a low or zoomed
+    // screen keeps more of the highlighted area visible. so-guided-tour.js re-seats the area when the box changes size.
+    private void ToggleDetails() => _compact = !_compact;
 
     private Task KeyDownAsync(KeyboardEventArgs args) => args.Key == "Escape" ? CloseAsync() : Task.CompletedTask;
 

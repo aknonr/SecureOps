@@ -97,7 +97,7 @@ public sealed record InUseRecord(Guid Id, InUseSource Source, string SourceHash,
     public bool ReviewCurrent => Draft is not null && Draft.SourceVersion >= (ReviewSourceVersion ?? SourceVersion)
         && Draft.SourceVersion <= SourceVersion;
     /// <summary>Tracking includes only observed completion, never a local click or manual attestation.</summary>
-    public bool TrackingOnly => ActivityVerifiedAt.HasValue || InUseActivity.Has(Source.WasasActivity, "Completed") || InUseActivity.Has(Source.Lifecycle, "Closed");
+    public bool TrackingOnly => ActivityVerifiedAt.HasValue || InUseActivity.Has(Source.WasasActivity, "Completed") || InUseActivity.Has(Source.Lifecycle, "Closed") || InUseActivity.LeftTeam(Source.CurrentStage);
     /// <summary>Read-side projection of authoritative activity evidence, never manual attestation.</summary>
     public DateTimeOffset? ActivityVerifiedAt { get; init; }
     /// <summary>Read-side durable execution fence, including uncertain or partial effects; not completion.</summary>
@@ -125,6 +125,8 @@ public sealed record InUseQuery(string? Search = null, string View = "all", stri
 public sealed record InUseRefreshState(long Version, DateTimeOffset? LastAttemptAt, DateTimeOffset? LastSuccessfulAt,
     bool Complete, string? Issue)
 {
+    /// <summary>Known records the last refresh could not re-check against the source (over the bound or unreadable); they stay listed.</summary>
+    public int RecheckUnchecked { get; init; }
     /// <summary>Initial state before any operator-triggered refresh.</summary>
     public static InUseRefreshState Empty => new(0, null, null, false, "NotRefreshed");
     /// <summary>A local freshness indication, never proof that source state remains unchanged.</summary>

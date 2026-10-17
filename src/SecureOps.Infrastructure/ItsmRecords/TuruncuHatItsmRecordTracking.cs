@@ -15,6 +15,7 @@ namespace SecureOps.Infrastructure.ItsmRecords;
 /// workflow activities, and its comments reduced to a count and the newest creation time. Every part is mapped
 /// independently, so one failed part is Unknown without hiding the others. It never selects person fields, comment
 /// text or the completing person, and never logs the session, credentials, base URL, record id or any value read.
+/// <see cref="ClassifyAsync"/> adds the narrow WASAS classification (TH-11) from the OR row and activities only.
 /// </summary>
 public sealed class TuruncuHatItsmRecordTracking(
     HttpClient httpClient,
@@ -22,7 +23,7 @@ public sealed class TuruncuHatItsmRecordTracking(
     IOptions<TuruncuHatOptions> turuncuHat,
     IOptions<ItsmRecordLookupOptions> lookup,
     EnterpriseIntegrationTelemetry telemetry,
-    ILogger<TuruncuHatItsmRecordTracking> logger) : IItsmRecordTracking
+    ILogger<TuruncuHatItsmRecordTracking> logger) : IItsmRecordTracking, IItsmWasasTracking
 {
     /// <summary>Provider name reported in results.</summary>
     public const string ProviderName = "TuruncuHat";
@@ -32,6 +33,7 @@ public sealed class TuruncuHatItsmRecordTracking(
 
     private const string _lastModifiedField = "m_last_mod_dt";
     private const string _activityObject = "BPM_Actvty";
+    private const string _taskModelField = "m_actvty_task_model";
     private const string _commentObject = "cmn_comment";
     private const int _maxTextLength = 128;
     private const int _maxLabelLength = 256;
@@ -85,16 +87,56 @@ public sealed class TuruncuHatItsmRecordTracking(
         return header with { Activities = activities, Comments = comments };
     }
 
+    /// <inheritdoc />
+    public async Task<ItsmWasasClassification> ClassifyAsync(string? sourceId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        string? id = ItsmSourceId.Normalize(sourceId);
+        if (id is null)
+        {
+            return ItsmWasasClassification.Unknown(ItsmRecordLookupReason.InvalidIdentifier, ProviderName);
+        }
+
+        ItsmRecordLookupOptions options = lookup.Value;
+        if (!TuruncuHatItsmQueryClient.IsSafeIdentifier(options.OrBaseObject))
+        {
+            return FinishClassification(ItsmWasasClassification.Unknown(ItsmRecordLookupReason.NotConfigured, ProviderName), Stopwatch.StartNew());
+        }
+
+        var stopwatch = Stopwatch.StartNew();
+        ItsmRecordTrackingResult header;
+        try
+        {
+            header = await ReadHeaderAsync(id, options, cancellationToken);
+        }
+        catch (ItsmQueryFailure failure)
+        {
+            header = ItsmRecordTrackingResult.Unknown(id, failure.Reason, ProviderName);
+        }
+
+        // Not found, ambiguous or unreadable is never "closed" or "no activity": everything stays Unknown.
+        if (header.Status != ItsmRecordLookupStatus.Found || header.State is null)
+        {
+            return FinishClassification(ItsmWasasClassification.Unknown(
+                header.Status == ItsmRecordLookupStatus.Unknown ? header.Reason : ItsmRecordLookupReason.IncompleteResponse, ProviderName), stopwatch);
+        }
+
+        ItsmTrackingPart<IReadOnlyList<ItsmActivity>> activities = await ReadActivitiesAsync(id, options, cancellationToken);
+        return FinishClassification(ItsmWasasClassifier.Classify(options, header.State, activities, ProviderName), stopwatch);
+    }
+
     private async Task<ItsmRecordTrackingResult> ReadHeaderAsync(string id, ItsmRecordLookupOptions options, CancellationToken cancellationToken)
     {
         string? statusField = ConfiguredField(options.OrStatusField);
         string? stageField = ConfiguredField(options.OrStageField);
-        if ((!string.IsNullOrEmpty(options.OrStatusField) && statusField is null) || (!string.IsNullOrEmpty(options.OrStageField) && stageField is null))
+        string? groupField = ConfiguredField(options.OrAssignedGroupField);
+        if ((!string.IsNullOrEmpty(options.OrStatusField) && statusField is null) || (!string.IsNullOrEmpty(options.OrStageField) && stageField is null)
+            || (!string.IsNullOrEmpty(options.OrAssignedGroupField) && groupField is null))
         {
             return ItsmRecordTrackingResult.Unknown(id, ItsmRecordLookupReason.NotConfigured, ProviderName);
         }
 
-        string[] selects = [.. new[] { "id", _lastModifiedField, statusField, stageField }.OfType<string>().Distinct(StringComparer.Ordinal)];
+        string[] selects = [.. new[] { "id", _lastModifiedField, statusField, stageField, groupField }.OfType<string>().Distinct(StringComparer.Ordinal)];
         string[] optional = [.. selects.Where(select => select != "id")];
         string[] filters = [string.Concat("#%m_active%#='True' AND #%id%#=", id)];
         TuruncuHatItsmRecordRows? rows = await _query.QueryAsync(options.OrBaseObject, filters, selects, optional, cancellationToken);
@@ -133,13 +175,14 @@ public sealed class TuruncuHatItsmRecordTracking(
         if (!TryText(single, "SET." + _lastModifiedField, out string? modified)
             || !TryText(single, statusField is null ? null : "SET." + statusField, out string? status)
             || !TryText(single, stageField is null ? null : "SET." + stageField, out string? stage)
+            || !TryText(single, groupField is null ? null : "SET." + groupField, out string? assignedGroup)
             || !TryLabel(single, statusField, out string? statusLabel)
             || !TryLabel(single, stageField, out string? stageLabel))
         {
             return ItsmRecordTrackingResult.Unknown(id, ItsmRecordLookupReason.InvalidResponse, ProviderName);
         }
 
-        return ItsmRecordTrackingResult.Found(id, new ItsmOrState(modified, status, stage, statusLabel, stageLabel),
+        return ItsmRecordTrackingResult.Found(id, new ItsmOrState(modified, status, stage, statusLabel, stageLabel, assignedGroup),
             ItsmTrackingPart<IReadOnlyList<ItsmActivity>>.Unknown(ItsmRecordLookupReason.None),
             ItsmTrackingPart<ItsmCommentSummary>.Unknown(ItsmRecordLookupReason.None), ProviderName);
     }
@@ -157,7 +200,11 @@ public sealed class TuruncuHatItsmRecordTracking(
             + (mainObject is null ? string.Empty : " AND #%m_process.m_main_object%#=" + FilterToken(mainObject));
         try
         {
-            TuruncuHatItsmRecordRows? rows = await _query.QueryAsync(_activityObject, [filter], _activitySelects, _activityOptional, cancellationToken);
+            // The task-model display text is read only when an allow-list is configured; no person field is ever added.
+            bool taskModel = options.ActivityTaskModelContains is { Length: > 0 };
+            string[] selects = taskModel ? [.. _activitySelects, _taskModelField] : _activitySelects;
+            string[] optional = taskModel ? [.. _activityOptional, _taskModelField] : _activityOptional;
+            TuruncuHatItsmRecordRows? rows = await _query.QueryAsync(_activityObject, [filter], selects, optional, cancellationToken);
             if (rows is null)
             {
                 return ItsmTrackingPart<IReadOnlyList<ItsmActivity>>.Unknown(ItsmRecordLookupReason.AuthenticationFailed);
@@ -176,12 +223,13 @@ public sealed class TuruncuHatItsmRecordTracking(
                     || !TryText(row, "SET.m_group", out string? group)
                     || !TryText(row, "SET.m_status", out string? status)
                     || !TryText(row, "SET.m_created_dt", out string? created)
-                    || !TryText(row, "SET.m_completion_date", out string? completed))
+                    || !TryText(row, "SET.m_completion_date", out string? completed)
+                    || !TryLabel(row, taskModel ? _taskModelField : null, out string? taskLabel))
                 {
                     return ItsmTrackingPart<IReadOnlyList<ItsmActivity>>.Unknown(ItsmRecordLookupReason.InvalidResponse);
                 }
 
-                activities.Add((order, new ItsmActivity(activityId, group, status, created, completed)));
+                activities.Add((order, new ItsmActivity(activityId, group, status, created, completed, taskLabel)));
             }
 
             return ItsmTrackingPart<IReadOnlyList<ItsmActivity>>.Known(
@@ -299,6 +347,19 @@ public sealed class TuruncuHatItsmRecordTracking(
         if (result.Status == ItsmRecordLookupStatus.Unknown)
         {
             logger.LogWarning("Turuncu Hat ITSM tracking could not prove an answer. Reason: {Reason}.", result.Reason);
+        }
+
+        return result;
+    }
+
+    private ItsmWasasClassification FinishClassification(ItsmWasasClassification result, Stopwatch stopwatch)
+    {
+        // Classes and a bounded reason only; never an id, code or value read.
+        telemetry.RecordOperation(ProviderName, "itsm-wasas-classification",
+            string.Create(CultureInfo.InvariantCulture, $"{result.Activity}-{result.Closure}-{result.Assignment}").ToLowerInvariant(), stopwatch.Elapsed);
+        if (result.Activity == ItsmWasasActivityClass.Unknown)
+        {
+            logger.LogWarning("Turuncu Hat WASAS classification could not prove the activity. Reason: {Reason}.", result.ActivityReason);
         }
 
         return result;

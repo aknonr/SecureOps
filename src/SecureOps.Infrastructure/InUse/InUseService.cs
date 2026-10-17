@@ -87,12 +87,13 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
                 batch = await source.DiscoverAsync(timeout.Token);
                 if (!InUseState.Valid(batch))
                 { throw new InvalidDataException("Invalid bounded In Use batch."); }
+                batch = await RecheckKnownAsync(batch, user.Id, token);
             }
             catch (OperationCanceledException) when (!token.IsCancellationRequested) { error = "SourceTimeout"; batch = null; }
             catch (Exception ex) when (ex is ExternalIntegrationException or HttpRequestException or IOException or InvalidDataException or JsonException or InvalidOperationException)
             { error = "SourceUnavailableOrMalformed"; batch = null; }
             bool saved = await repository.RefreshAsync(state.Version, batch, error,
-                Audit(user, context, "Refresh", new { Count = batch?.Records.Count, batch?.Complete, Error = error ?? batch?.Issue }), token);
+                Audit(user, context, "Refresh", new { Count = batch?.Records.Count, batch?.Complete, Error = error ?? batch?.Issue, Rechecked = batch?.Rechecked?.Count, batch?.RecheckUnchecked }), token);
             if (!saved)
             {
                 await commands.FailAsync("InUseRefresh", "4241:68", key, begin.ExecutionToken!.Value, "InUseConflict", token);
@@ -101,6 +102,35 @@ public sealed partial class InUseService(IInUseRepository repository, IInUseSour
             await commands.CompleteAsync("InUseRefresh", "4241:68", key, begin.ExecutionToken!.Value, token);
             return new(await repository.StateAsync(token));
         }, token);
+
+    /// <summary>Most known records re-checked by id in one refresh (two source reads each); the rest stay listed and are counted.</summary>
+    internal const int MaxRecheck = 50;
+
+    // Discovery is filtered by the WASAS group, so a record that left it is never returned again. The known, still
+    // listed records that discovery did not return are therefore re-checked by exact id (read-only, sequential, bounded).
+    // Anything not proven keeps its stored evidence, stays in review and is reported as unchecked: it is never hidden.
+    private async Task<InUseBatch> RecheckKnownAsync(InUseBatch batch, Guid actor, CancellationToken token)
+    {
+        HashSet<string> discovered = [.. batch.Records.Select(r => r.Id)];
+        InUsePage page = await repository.QueryAsync(new InUseQuery(View: "review", PageSize: 100), actor, token);
+        string[] known = [.. page.Items.Select(r => r.Source.Id).Where(id => !discovered.Contains(id)).Distinct(StringComparer.Ordinal)];
+        int overPage = Math.Max(0, page.Total - page.Items.Count);
+        if (known.Length == 0)
+        { return batch with { RecheckUnchecked = overPage }; }
+        string[] requested = [.. known.Take(MaxRecheck)];
+        int skipped = known.Length - requested.Length + overPage;
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+            timeout.CancelAfter(TimeSpan.FromSeconds(45));
+            InUseRecheckResult result = await source.RecheckAsync(requested, timeout.Token);
+            return result is null ? batch with { RecheckUnchecked = skipped + requested.Length }
+                : batch with { Rechecked = result.Patches, RecheckUnchecked = skipped + result.Unchecked };
+        }
+        catch (Exception ex) when ((ex is OperationCanceledException && !token.IsCancellationRequested)
+            || ex is ExternalIntegrationException or HttpRequestException or IOException or InvalidDataException or JsonException or InvalidOperationException)
+        { return batch with { RecheckUnchecked = skipped + requested.Length }; }
+    }
 
     /// <summary>Manually assigns an approved reviewer with an audited reason and exact version.</summary>
     public Task<InUseResult<InUseRecord>> AssignAsync(ClaimsPrincipal principal, AccessOperationContext context,

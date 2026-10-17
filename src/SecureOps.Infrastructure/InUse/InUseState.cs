@@ -109,13 +109,16 @@ internal static class InUseState
 
     internal static InUseRefreshState Refresh(InUseRefreshState old, InUseBatch? batch, string? error, DateTimeOffset now) =>
         new(old.Version + 1, now, batch is null ? old.LastSuccessfulAt : now,
-            batch?.Complete ?? false, error ?? batch?.Issue);
+            batch?.Complete ?? false, error ?? batch?.Issue)
+        { RecheckUnchecked = batch?.RecheckUnchecked ?? 0 };
 
-    internal static InUseRecord RetainUnobserved(InUseRecord old)
+    internal static InUseRecord RetainUnobserved(InUseRecord old, InUseEvidencePatch? patch = null)
     {
-        if (old.SourceObservationMissing && !old.Source.Servers.Any(s => s.RelatedRequestReporter is { State: not "Stale" }))
+        InUseSource current = patch is null || patch.IsEmpty ? old.Source : patch.Apply(old.Source);
+        bool rechecked = current != old.Source;
+        if (old.SourceObservationMissing && !rechecked && !old.Source.Servers.Any(s => s.RelatedRequestReporter is { State: not "Stale" }))
         { return old; }
-        InUseSource source = old.Source with
+        InUseSource source = current with
         {
             Servers = old.Source.Servers.Select(s => s with
             { RelatedRequestReporter = Stale(s.RelatedRequestReporter) }).ToArray()

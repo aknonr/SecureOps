@@ -226,3 +226,46 @@ come back for `p_def_status` and the stage field, and the stage field code.
 
 **Ownership.** TH-4c (2026-10-14), assigned by the Turuncu Hat coordinator: Claude implements this amendment under the owner's TH-2/TH-4 exception, with the same
 exclusions as TH-4/TH-4b.
+
+## Amendment 2026-10-17 (TH-11): WASAS activity, OR closure and assignment classification
+
+**Context.** The owner observed in corporate TEST (2026-10-17): the OR object has a stage, a status and an assigned
+group; the BPM activity row of the WASAS review carries a completion time and a status code whose value for
+"approved" is `4`; an open task has an empty completion time; reject and send-back codes and the open-task code are
+not known. The In Use closed/completed page (G-44) needs these as server-classified values, not UI guesses.
+
+**Decision.**
+
+1. A narrow read-only interface `IItsmWasasTracking` (same Turuncu Hat adapter, Fake, Disabled) classifies an OR as
+   Activity (`Completed`, `Pending`, `NotApproved`, `Unknown`), Closure (`Closed`, `Open`, `Unknown`) and Assignment
+   (`AssignedToWasas`, `NotAssignedToWasas`, `Unknown`). Rules and options:
+   `docs/integrations/turuncu-hat-itsm-record-lookup.md`, section "WASAS classification". Fail closed: `Completed`
+   only for a complete successful response, no open candidate row, a unique newest row (by `m_created_dt`) with the
+   configured approved code and a filled completion time; any open row is `Pending`; equal or unreadable creation
+   times between completed rows are `Unknown`; not found is never "none" (rule extended 2026-10-17 for send-back and
+   resubmission, owner: the newest request decides).
+2. All codes (WASAS group id, approved status code with default `4`, closed stage and status ids, activity task-name
+   allow-list, assigned-group field) are server configuration; none is committed. Reject, send-back and unknown codes
+   are not named: a completed row with another code is only `NotApproved`. A group change is reported separately and is
+   never evidence of approval.
+3. **Persons are not read.** `m_done_by`, `m_done_by_delegate` and `m_assignee` are not selected, returned or logged
+   ("who completed it in the source" stays unanswered by owner decision 2026-10-17; the product approver is the
+   execution record). This tightens decision 1 of this ADR for the activity part: only group, status, times and the
+   task-model display text are read.
+4. In Use: the corporate adapter fills `Source.WasasActivity`, `Lifecycle` and `CurrentStage` from this
+   classification; the main-list drop rule is recorded in ADR-0020 (amendment 2026-10-17). No API route, OpenAPI
+   path, migration or UI changes; `activityStatus` gains one additive value, `NotAssigned`.
+
+**Unchanged.** Read-only, no write to Turuncu Hat, no real call made in this change, Disabled default, no Fake
+fallback, personal-data boundary, ADR status.
+
+**Re-check (added the same day, owner decision).** The discovery query is filtered by the WASAS group, so a record
+that left it is never rediscovered. The In Use refresh therefore re-checks known, still listed records that
+discovery did not return, by exact source id, read-only, sequentially, at most 50 per refresh (two reads each), and
+applies the same classification to the retained record. Not proven, over the bound or over the time budget: the
+record keeps its evidence, stays listed and is counted in `InUseRefreshState.RecheckUnchecked` (additive field; no
+route, no migration). Cost: at most 100 source reads per refresh.
+
+**Open.** (a) (resolved by the re-check above.) (b) The open-task, reject and send-back status codes. (c) Activation gate: one read-only TEST run that
+confirms the assigned-group field (`p_rel_group` expected), the `KEY.` display text of `m_actvty_task_model`, and a
+single WASAS row per OR; no real value is recorded in the repository.
