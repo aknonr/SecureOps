@@ -47,6 +47,7 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-38 — OR → Jira: no issue link, no persisted transfer key/time, no replay indicator, no reviewed draft for retry | ✅ **Resolved** by TH-8/9 (#51); UI states verified locally in TH-12 (2026-10-13); the corporate link remains unverified |
 | G-39 — Service Accounts event flow: close readiness read per request, no verification readiness, preview ids without names | Items 1–3 ✅ closed (2026-10-13, branch `feature/service-accounts-g39-readiness-20261013`); items 4–5 open (UI covers them honestly) |
 | G-40 — `GET /access/users/page` and `/access/requests/page` answer 503 on the InMemory access repository (SQL only) | Open (2026-10-14, #67) — the Demo/InMemory host cannot show real user or request lists; the UI shows its error state, and its list screens are measured on a Mac only through a loopback test proxy with synthetic data |
+| G-42 — Theme tokens give low contrast: `.so-chip` 3.32:1 (light), filled primary button 4.10:1 and filled Error button 2.28:1 (dark) | Open (2026-10-17, #79) — global tokens (`secureops-theme.css`, `SecureOpsTheme.cs`), not changed by the UI task; see the G-42 section |
 | G-43 — No route or capability for a server's local Administrators / Remote Desktop Users membership (with person and PAM account) | Open (2026-10-17, #80) — proposal only: `docs/contracts/server-local-access-proposal.md` (status Proposal, ADR needed; owner declined a phase exception). The UI cannot show a "Sunucu Erişim Analizi" page and invents nothing |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
@@ -1321,6 +1322,20 @@ under `/api/v1/service-accounts/me` (read) with a versioned write, audited like 
 **Raised:** 2026-10-17, issue #80 (branch `claude/server-local-access-proposal-20261017-639187`). **Owner:** backend/contracts (Codex); no UI work until an ADR is accepted.
 
 A page "Sunucu Erişim Analizi" (exact server name → members of its local Administrators and Remote Desktop Users groups, one row per person with directory identity and PAM account) has no backend: no route, no DTO, no JEA-read adapter, no person→PAM mapping (only `MockPamAccountResolver`), and `Identity.PrivilegedGroups.View` is not the right capability. **Needed:** `GET api/v1/directory/servers/{name}/local-access` (read-only, exact name, JEA only), a separate capability (proposed `Servers.LocalAccess.View`), and distinct not-configured / unreachable / unknown / partial states. Proposal, response shape, error codes, ADR draft headings and open questions: `docs/contracts/server-local-access-proposal.md`. Roadmap: local-admin inventory is Phase 5, PAM correlation Phase 4 (hard rule 11); the owner decided no phase exception (2026-10-17).
+
+## G-42 — Theme tokens give low contrast on chips and filled buttons
+
+**Raised:** 2026-10-17, #79 (branch `claude/ui-access-dialog-detail-20261017-c9857e`). **Owner:** whoever owns the global theme; not changed by the access dialog task
+(its scope excludes `wwwroot/css/secureops-theme.css` and `SecureOpsTheme.cs`). Measured on the Mac with the Demo profile, computed colours, WCAG ratio:
+
+| Where | Pair | Ratio | Size |
+|---|---|---|---|
+| `.so-chip` (role and permission chips), light | text `#54607A` on a 12 % tint of the same colour | 3.32:1 | 12.5 px |
+| Filled primary button, dark ("Rolleri değiştir") | white on `#E8394E` | 4.10:1 | 14 px |
+| Filled Error button, dark (`SessionRevokeDialog`, any `Color.Error` filled) | white on `#FF8A80` (dark `Error`, white contrast text) | 2.28:1 | 14 px |
+
+Needed: darker chip text or a lighter chip tint in light; a darker dark-theme primary/Error fill or dark contrast text (`ErrorContrastText`) in `SecureOpsTheme.cs`.
+Until then `AccessActionDialog` overrides only its own dark-theme confirm text colour in scoped CSS (no token change); `SessionRevokeDialog` and the other filled buttons are unchanged.
 
 ## Note: enums cross the wire as numbers
 

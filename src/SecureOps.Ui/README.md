@@ -39,6 +39,10 @@ Open UI ↔ API contract gaps: [`docs/26-ui-backend-contract-gaps.md`](../../doc
 Below this point: reference sections (Layout to Testing) and dated handoff logs, kept with their source SHAs and
 evidence paths. Search for the feature or date you need rather than reading top to bottom.
 
+## Access action dialog and user detail: keyboard pass (#79), 2026-10-17
+
+`AccessActionDialog` (Rolleri değiştir, Erişimi kapat, and the request approve/reject) and `AccessUserDetail`, measured then fixed on a Mac (Demo/InMemory, headless Chromium, synthetic data). MudBlazor 6.16 opens a dialog without moving focus, so the keyboard stayed on the page behind it, Tab left it, and role checkboxes (`MudCheckBox`) had no accessible name. Now: focus lands on the first block inside the dialog's focus trap (it carries the title for a screen reader; the title itself sits outside the trap), Tab/Shift+Tab wrap inside, role options are native checkboxes inside their `<label>`, buttons, checkboxes, the reason field and summaries draw a 2 px ring, and the dark-theme destructive confirm button has its own dark text (white on `#FF8A80` was 2.28:1). MudBlazor does not restore focus on close, so the detail page returns it to the opener (`wwwroot/js/so-focus.js`, by id) on Esc/Vazgeç and moves it to the `.user-outcome` block after a confirmed action (the re-read replaces the buttons). Not fixed: the dialog still has no `aria-modal`/`aria-labelledby` (MudBlazor's dialog instance exposes no attribute hook); global-token contrast is G-42. Tests: `AccessActionDialogRenderTests`; `tests/browser/access-dialog-detail.cjs` (1280 / 640x450 / 390, light and dark; acts only on the other demo actor, because changing one's own roles revokes one's own session). Local Mac only: not verified on Windows/IIS, Edge, corporate TEST or with a screen reader.
+
 ## Service accounts: guided tour (REHBER-UI), 2026-10-16
 
 `SoGuidedTour` (Shared/Components) is a person-started on-screen tour: "Adım adım göster" next to "Nasıl kullanılır?" in `SaPageGuide` on the

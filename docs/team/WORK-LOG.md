@@ -9,6 +9,7 @@ Short claim register for collaborators. It does **not** replace the owner's coor
 | 2026-10-14 | nurseliii | docs/mac-first-verification-20261014 | #62 | docs/team/WORK-LOG.md (docs only, no code) | bitti (#65) |
 | 2026-10-14 | nurseliii | fix/ui-access-screens-responsive-20261014 | #67 | src/SecureOps.Ui/Pages/{Sessions,AccessUsers,AccessRequests}.razor(.css), tests/SecureOps.Tests.Unit (UI), tests/browser/access-screens-responsive.cjs, src/SecureOps.Ui/README.md, docs/26-ui-backend-contract-gaps.md | bitti (#68) |
 | 2026-10-17 | nurseliii | claude/server-local-access-proposal-20261017-639187 | #80 | docs/contracts/server-local-access-proposal.md (new), docs/26-ui-backend-contract-gaps.md (G-43 only); docs only, no code | PR #81 açık |
+| 2026-10-17 | nurseliii | claude/ui-access-dialog-detail-20261017-c9857e | #79 | src/SecureOps.Ui/Shared/Components/AccessActionDialog.razor(.css), Pages/AccessUserDetail.razor(.css), wwwroot/js/so-focus.js, tests (UI render, tests/browser/access-dialog-detail.cjs), src/SecureOps.Ui/README.md, docs/26 (G-42) | PR açık |
 
 ## Number requests
 
