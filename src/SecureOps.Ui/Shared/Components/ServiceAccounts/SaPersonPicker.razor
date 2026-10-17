@@ -6,12 +6,12 @@
 @inject ILogger<SaPersonPicker> Logger
 
 <MudAutocomplete T="PersonView" Label="@Label" Value="_value" ValueChanged="ChangedAsync" SearchFuncWithCancel="SearchAsync" ToStringFunc="@(p => p?.DisplayName)"
-                 Clearable="true" ResetValueOnEmptyText="true" MinCharacters="2" DebounceInterval="300" Variant="Variant.Outlined" MaxItems="20">
+                 HelperText="@HelperText" Clearable="true" ResetValueOnEmptyText="true" MinCharacters="2" DebounceInterval="300" Variant="Variant.Outlined" MaxItems="20">
     <ItemTemplate>
         @context.DisplayName
         @if (context.VerificationState != "Verified") { <span class="so-panel-text--sm"> · doğrulanmamış kişi</span> }
     </ItemTemplate>
-    <NoItemsTemplate><span class="so-panel-text--sm">Eşleşen kişi kaydı yok.</span></NoItemsTemplate>
+    <NoItemsTemplate><span class="so-panel-text--sm">Eşleşen kişi kaydı yok. Kişi kayıtları Modül yönetimi → Kişiler bölümünde tutulur; liste, yazdıkça aranır.</span></NoItemsTemplate>
 </MudAutocomplete>
 
 @code {
@@ -19,6 +19,9 @@
 
     /// <summary>Field label.</summary>
     [Parameter] public string Label { get; set; } = "Kişi";
+
+    /// <summary>Text under the field: the list stays empty until the person types (it is a search, not a pre-filled list).</summary>
+    [Parameter] public string? HelperText { get; set; } = "Liste yazdıkça gelir: en az 2 harf yazın.";
 
     /// <summary>Selected person id.</summary>
     [Parameter] public Guid? Value { get; set; }

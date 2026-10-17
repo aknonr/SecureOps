@@ -9,11 +9,11 @@
             <h2 id="sa-report-activity" class="so-panel-title">Dönem içinde yapılan işlemler</h2>
             <span class="so-panel-text--sm">@(Report.Period == ReportPeriods.Week ? "Hafta" : Report.Period == ReportPeriods.Month ? "Ay" : "Dönem"): @Report.WeekStart.ToString("dd.MM.yyyy") – @Report.WeekEndExclusive.AddDays(-1).ToString("dd.MM.yyyy") · @Report.ScopeLabel</span>
         </div>
-        <p class="so-panel-text--sm">Ekibin dönem içinde sildiği, devrettiği, gMSA'ya geçirdiği ve değiştirdiği hesaplar. Ekip ve hesap düzeyindedir; kişi bazlı sayı veya sıralama yoktur. “Bildirildi” doğrulandı anlamına gelmez.</p>
+        <p class="so-panel-text--sm">Ekibin dönem içinde sildiği, devrettiği, gMSA'ya geçirdiği ve değiştirdiği hesaplar. Ekip ve hesap düzeyindedir; kişi bazlı sayı veya sıralama yoktur. “Bildirildi” doğrulandı anlamına gelmez: aşağıdaki sayılar bildirilen işlemleri sayar (doğrulanmamış olanlar dahil). “gMSA hedefi” ve “gMSA hunisi” sayıları başka kurallarla sayılır; bu sayılarla aynı olmak zorunda değildir.</p>
         <div class="d-flex flex-wrap gap-2" role="group" aria-label="Dönem içi işlem sayıları">
             @foreach (ActivityGroup group in activity.Groups)
             {
-                <SoMetric Label="@ActivityShortTitle(group.Key)" Value="@group.Accounts.ToString()" Hint="@(group.Lines == group.Accounts ? null : $"{group.Lines} satır")" />
+                <SoMetric Label="@ActivityShortTitle(group.Key)" Value="@group.Accounts.ToString()" Hint="@(group.Lines == group.Accounts ? "bildirilen işlem" : $"bildirilen işlem · {group.Lines} satır")" />
             }
             <SoMetric Label="Dönemde işlem gören hesap" Value="@activity.AccountsActed.ToString()" Tone="SoMetric.MetricTone.Lead" Hint="bekleyenler hariç" />
         </div>
@@ -183,7 +183,7 @@ else
     <div class="d-flex flex-wrap gap-2">
         <SoMetric Label="Devir bildirimi" Value="@Report.Handover.Reported.ToString()" />
         <SoMetric Label="Kabul / ret" Value="@($"{Report.Handover.Accepted} / {Report.Handover.Rejected}")" />
-        <SoMetric Label="gMSA hedefi / tamamlanan / bekleyen" Value="@($"{Report.Handover.GmsaTargeted} / {Report.Handover.GmsaCompleted} / {Report.Handover.GmsaPending}")" />
+        <SoMetric Label="gMSA hedefi / tamamlanan / bekleyen" Hint="devir bildirimlerinde gMSA hedefli hesaplar" Value="@($"{Report.Handover.GmsaTargeted} / {Report.Handover.GmsaCompleted} / {Report.Handover.GmsaPending}")" />
     </div>
     @if (Report.Handover.PendingBySuitability.Count > 0)
     {

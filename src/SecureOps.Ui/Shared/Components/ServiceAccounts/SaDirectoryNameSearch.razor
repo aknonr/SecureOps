@@ -7,6 +7,8 @@
 
 <section class="so-panel" aria-labelledby="sa-directory-search">
     <h2 id="sa-directory-search" class="so-panel-title">Dizinde ada göre ara</h2>
+    <p class="so-panel-text--sm">Kişi ara (kurumsal dizin): bir kişinin adından hesabını ve varsa servis hesabı kaydını bulur. Kayıtlı hesap adı için listedeki “Hesap adı” süzgecini kullanın.</p>
+    <SaDisclosure Title="Bu arama nasıl çalışır?" Class="mb-1">
     <p class="so-panel-text--sm">
         Bir <strong>kişiyi</strong> kurumsal dizinde ada göre bulur ve o kişinin hesabına karşılık gelen servis hesabı kaydı varsa bağlantısını
         verir. Aşağıdaki liste süzgecinden farklıdır: o yalnız kayıtlı servis hesaplarını süzer, dizine bakmaz.
@@ -14,6 +16,7 @@
         Seçim yetki vermez, hesap sahipliğini onaylamaz ve dizinde değişiklik yapmaz. Hesap adını biliyorsanız
         <a href="identity-lookup">tam hesap sorgusunu</a> kullanın.
     </p>
+    </SaDisclosure>
     <div class="d-flex flex-wrap align-center gap-2">
         <MudTextField T="string" @bind-Value="_query" Label="Ad veya ad soyad" MaxLength="64" Variant="Variant.Outlined" Immediate="true"
                       OnKeyDown="EnterAsync" Class="sa-directory-query" aria-label="Ad veya ad soyad" aria-describedby="sa-directory-hint" />

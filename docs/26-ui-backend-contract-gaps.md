@@ -49,6 +49,10 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-40 — `GET /access/users/page` and `/access/requests/page` answer 503 on the InMemory access repository (SQL only) | Open (2026-10-14, #67) — the Demo/InMemory host cannot show real user or request lists; the UI shows its error state, and its list screens are measured on a Mac only through a loopback test proxy with synthetic data |
 | G-42 — Theme tokens give low contrast: `.so-chip` 3.32:1 (light), filled primary button 4.10:1 and filled Error button 2.28:1 (dark) | Open (2026-10-17, #79) — global tokens (`secureops-theme.css`, `SecureOpsTheme.cs`), not changed by the UI task; see the G-42 section |
 | G-43 — No route or capability for a server's local Administrators / Remote Desktop Users membership (with person and PAM account) | Open (2026-10-17, #80) — proposal only: `docs/contracts/server-local-access-proposal.md` (status Proposal, ADR needed; owner declined a phase exception). The UI cannot show a "Sunucu Erişim Analizi" page and invents nothing |
+| G-44 — Import preview: date columns reject `yyyy-MM-dd HH:mm` (no seconds) and the server sends only codes, not sentences | Open (2026-10-17, UI-BULGULARI #3) — the UI words the known codes itself (`ServiceAccountImportText`) and lists the formats the parser reads today; the parser change is backend |
+| G-45 — Import history cannot cancel or expire an unconfirmed preview | Open (2026-10-17, UI-BULGULARI #6) — abandoned previews stay in history as "Önizleme hazır"; no cancel route, no status that hides them |
+| G-46 — Import with no domain column: every existing account is an "aynı ad, farklı domain" conflict, no one-candidate auto-link | Open (2026-10-17, UI-BULGULARI #5) — rule/policy decision for the owner first; the UI already offers bulk decision |
+| G-47 — Close readiness (and the preview) carry no sentence saying why a request may close without a verified action | Open (2026-10-17, UI-BULGULARI #13) — the UI added a generic "kapanış ≠ doğrulama" note; a per-request-type reason must come from the close rule (G-39 source) |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -1389,3 +1393,12 @@ re-opens the investigation:
   rendered with the same "unreachable" wording; that was a UI defect and is corrected.
 
 **No new backend gaps were found in this milestone.**
+
+## G-44 … G-47 — Service Accounts UI findings that need the server (UI-BULGULARI, 2026-10-17)
+
+**Raised:** 2026-10-17, branch `fix/service-accounts-ui-findings-20261017`. **Owner:** Service Accounts module. Numbered after G-43; if a parallel branch took a number, renumber on merge. Source: the user-guide review `UI-BULGULARI.md` (18 + 2 findings); the UI-fixable ones are fixed in the same branch.
+
+- **G-44 (finding 3).** A cell such as `2026-09-02 10:15` in a date column is not read by `ImportValues.TryTimestamp` (formats: `yyyy-MM-dd`, `yyyy-MM-dd HH:mm:ss`, `yyyy-MM-ddTHH:mm:ss[.F]`, `dd.MM.yyyy[ HH:mm[:ss]]`, `d.M.yyyy[ HH:mm[:ss]]`) and falls into `ObservationTextInDateColumn`. **Needed:** accept the minute-precision forms (or say so), and optionally return a sentence next to each code. UI meanwhile: Turkish sentence per known code, accepted formats named, unknown code shown as received.
+- **G-45 (finding 6).** `ImportHistoryItem` has no state that lets a person abandon a preview or lets it expire. **Needed:** a cancel route and an "İptal / süresi doldu" status the history can hide by default.
+- **G-46 (finding 5).** Without a domain every stored account matches by name only and conflicts. **Needed (owner decision):** whether exactly one candidate may be linked automatically for a declared "domain-less" profile, or the import offers a profile-level default domain. The UI cannot decide this.
+- **G-47 (finding 13).** For a password-change request the preview says the request "can be closed as Tamamlandı" while the action is unverified. The server's close rule decides; **needed:** a short reason text (per request type) in `CloseReadiness`, so the UI does not guess. UI meanwhile: "Talebin kapanması işlemin doğrulandığı veya hesabın kapandığı anlamına gelmez".
