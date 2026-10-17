@@ -1,0 +1,72 @@
+@using SecureOps.Shared.Contracts.InUse
+@* One In Use list row: OR number and title, one status badge with the saved progress, who reviews, one next step and one action.
+   Everything else (request date, requester, server and RFC mapping, source activity, relationship notes) sits in "Ayrıntı" so the
+   row reads at a glance. Red is never used: a row cannot prove a failure; caution is amber with a text label and an icon. *@
+
+@{
+    InUseBadge badge = InUsePresentation.RowBadge(Record);
+    int total = Record.Source.Servers.Count;
+    DateTimeOffset? created = InUseProgress.Created(Record.Source, DateTimeOffset.UtcNow);
+}
+<li class="iur @(badge.Tone == InUseBadgeTone.Caution ? "iur--attention" : null)">
+    <div class="iur-main">
+        <a class="iur-code" href="@Href">@Record.Source.Code</a>
+        @if (Record.Source.Synthetic) { <span class="so-chip">Sentetik yerel veri</span> }
+        <h2 class="iur-title">@Record.Source.Title</h2>
+    </div>
+    <div class="iur-status">
+        <SoStatusBadge Label="@badge.Label" Tone="@Tone(badge.Tone)" Icon="@(badge.Tone == InUseBadgeTone.Caution ? Icons.Material.Outlined.ErrorOutline : null)" />
+        <span class="iur-meta">@InUsePresentation.SavedCompleted(Record) / @total sunucu kaydedildi</span>
+        <span class="iur-meta">İnceleyici: @(Record.AssigneeLabel ?? "Atanmamış")</span>
+    </div>
+    <div class="iur-next" data-tour="@(First ? "inuse-next" : null)">
+        <span class="iur-label">Sıradaki adım</span>
+        <span>@InUsePresentation.NextStep(Record)</span>
+    </div>
+    <div class="iur-open">
+        <MudButton Href="@Href" Variant="Variant.Outlined" EndIcon="@Icons.Material.Filled.ArrowForward" aria-label="@($"{Record.Source.Code}: {(Record.TrackingOnly ? "takip et" : "incele")}")">@(Record.TrackingOnly ? "Takip et" : "İncele")</MudButton>
+    </div>
+    <details class="iur-more">
+        <summary>Ayrıntı</summary>
+        <dl class="iur-facts">
+            <dt>Talep tarihi</dt>
+            <dd>@if (created is { } date) { <time datetime="@date.ToString("O")">@date.ToUniversalTime().ToString("dd.MM.yyyy HH:mm:ss") UTC</time> } else { <span>Tarih alınmadı / doğrulanmadı</span> }</dd>
+            <dt>OR talep eden</dt><dd>@InUseDisplayText.Decode(Record.Source.Requester.Value)</dd>
+            <dt>Son okuma</dt><dd>@InUsePresentation.Time(Record.LastSeenAt)</dd>
+            <dt>WASAS aktivitesi</dt><dd>@InUsePresentation.SourceActivity(Record)</dd>
+            <dt>Genel OR</dt><dd>@InUsePresentation.SourceLifecycle(Record)</dd>
+            @if (Record.SourceObservationMissing) { <dt>Kaynak</dt><dd>Son yenilemede görülmedi; önceki kaynak gözlemi korunuyor.</dd> }
+            @if (Record.Source.ServiceItemsState is "Partial" or "Failed" or "Forbidden" or "Ambiguous")
+            { <dt>Sunucu ilişkisi</dt><dd>@InUsePresentation.Relationship(Record.Source.ServiceItemsState, total)</dd> }
+        </dl>
+        @if (total > 0)
+        {
+            <div class="so-inuse-server-table"><table><thead><tr><th scope="col">RFC talep eden · Ad soyad</th><th scope="col">Sunucu - RFC eşleşmesi</th></tr></thead><tbody>
+            @foreach (InUseServer server in Record.Source.Servers)
+            {
+                <tr><td><span class="so-inuse-mobile-label">RFC talep eden · Ad soyad</span><InUseReporter Value="server.RelatedRequestReporter" /></td>
+                    <td><span class="so-inuse-mobile-label">Sunucu - RFC eşleşmesi</span>@InUsePresentation.Field(server, "HOSTNAME") · @(server.RelatedRequestReporter?.RequestCode ?? server.RelatedRequestReporter?.RfcReference ?? "RFC alınmadı")</td></tr>
+            }
+            </tbody></table></div>
+        }
+    </details>
+</li>
+
+@code {
+    /// <summary>The persisted record to show.</summary>
+    [Parameter, EditorRequired] public InUseRecord Record { get; set; } = default!;
+
+    /// <summary>Link to the record page, carrying the list context.</summary>
+    [Parameter, EditorRequired] public string Href { get; set; } = "";
+
+    /// <summary>True for the first row, which carries the tour's "next step" target.</summary>
+    [Parameter] public bool First { get; set; }
+
+    private static SoStatusBadge.BadgeTone Tone(InUseBadgeTone tone) => tone switch
+    {
+        InUseBadgeTone.Caution => SoStatusBadge.BadgeTone.Caution,
+        InUseBadgeTone.Positive => SoStatusBadge.BadgeTone.Positive,
+        InUseBadgeTone.Info => SoStatusBadge.BadgeTone.Info,
+        _ => SoStatusBadge.BadgeTone.Neutral
+    };
+}

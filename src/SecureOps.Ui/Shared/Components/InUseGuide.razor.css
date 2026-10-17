@@ -1,0 +1,18 @@
+.iug { border: 1px solid var(--so-border); border-radius: var(--so-radius); background: var(--so-surface); padding: var(--so-space-3) var(--so-space-4); margin-block: var(--so-space-4); }
+.iug-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--so-space-3) var(--so-space-4); }
+.iug-flow { display: flex; flex-wrap: wrap; gap: var(--so-space-2) var(--so-space-4); list-style: none; margin: 0; padding: 0; min-width: 0; }
+.iug-flow-step { display: inline-flex; align-items: center; gap: var(--so-space-2); font-size: 15px; color: var(--so-text); min-width: 0; }
+.iug-num { display: inline-flex; align-items: center; justify-content: center; inline-size: 1.6rem; block-size: 1.6rem; border-radius: 50%; border: 1.5px solid var(--so-text-muted); color: var(--so-text); font-weight: 700; font-size: 13px; flex: none; }
+.iug-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--so-space-2); }
+.iug-toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 12px; border: 1px solid var(--so-border-input); border-radius: var(--so-radius-sm); background: var(--so-surface); color: var(--so-text); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.iug-toggle:hover { background: color-mix(in srgb, var(--so-accent-strong) 8%, var(--so-surface)); }
+.iug-toggle:focus-visible { outline: 2px solid var(--so-accent); outline-offset: 2px; }
+.iug-body { border-top: 1px solid var(--so-border); margin-top: var(--so-space-3); padding-top: var(--so-space-3); }
+.iug-purpose { margin: 0 0 var(--so-space-3); max-inline-size: 70ch; }
+.iug-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: var(--so-space-3); list-style: none; margin: 0; padding: 0; counter-reset: iug; }
+.iug-steps > li { counter-increment: iug; border: 1px solid var(--so-border-soft); border-radius: var(--so-radius-sm); padding: var(--so-space-3); min-width: 0; }
+.iug-steps h3 { margin: 0 0 var(--so-space-2); font-size: 16px; }
+.iug-steps h3::before { content: counter(iug) ". "; }
+.iug-steps p { margin: 0 0 var(--so-space-2); font-size: 15px; line-height: 1.5; }
+.iug-watch { color: var(--so-text-muted); }
+.iug-never { display: flex; gap: var(--so-space-2); align-items: flex-start; margin: var(--so-space-3) 0 0; font-size: 15px; color: var(--so-text-muted); }

@@ -9,17 +9,19 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
 const mode = process.argv[6];
 assert.ok(['before', 'effort-before', 'after', 'mapped', 'denied', 'unavailable'].includes(mode));
 async function tour(page, surface) {
-    const opener = page.locator(`#resource-guide-replay-${surface}`);
+    // SoGuidedTour (IU-UI): person-started, keyboard operable, closes with Esc and returns focus to its start button.
+    const startId = surface === 'inuse-list' ? 'inuse-list-tour-start' : 'inuse-record-tour-start';
+    const opener = page.locator(`#${startId}`);
     await opener.focus(); await opener.press('Enter');
-    const guide = page.getByRole('dialog', { name: 'Kullanım Rehberi', exact: true });
+    const guide = page.locator('[data-tour-box]');
     await guide.waitFor();
-    for (let index = 0; index < 3; index++) {
-        await page.waitForFunction(() => document.querySelector('.so-resource-guide')?.dataset.targetAvailable === 'true');
-        if (index < 2) await guide.getByRole('button', { name: 'İleri', exact: true }).click();
+    for (let index = 0; index < 2; index++) {
+        await page.waitForFunction(() => document.activeElement?.hasAttribute('data-tour-focus'));
+        await guide.getByRole('button', { name: 'İleri', exact: true }).click();
     }
-    await guide.press('ArrowLeft'); await guide.press('ArrowRight'); await guide.press('Escape');
+    await guide.press('Escape');
     await guide.waitFor({ state: 'hidden' });
-    await page.waitForFunction(id => document.activeElement?.id === id, `resource-guide-replay-${surface}`);
+    await page.waitForFunction(id => document.activeElement?.id === id, startId);
 }
 (async () => {
     fs.mkdirSync(out, { recursive: true });
@@ -91,7 +93,7 @@ async function tour(page, surface) {
         } else if (mode === 'unavailable') {
             await navigate(page, ui, 'in-use');
             await page.getByLabel('In Use kayıt ara').waitFor();
-            await page.waitForFunction(() => !document.querySelector('#resource-guide-replay-inuse-list')?.disabled);
+            await page.locator('#inuse-list-tour-start').waitFor();
             const signal = path.join(out, 'unavailable-continue.signal');
             fs.writeFileSync(signal, 'waiting');
             await new Promise((resolve, reject) => {
@@ -135,7 +137,6 @@ async function tour(page, surface) {
             await page.waitForFunction(() => getComputedStyle(document.querySelector('.so-inuse-filters')).display === 'grid');
             const beforeTour = await json(client, '/api/v1/in-use');
             for (let repeat = 0; repeat < 3; repeat++) await tour(page, 'inuse-list');
-            assert.equal(await page.evaluate(() => window.secureOpsResourceGuide.show('inuse-list', document.createElement('aside'))), false);
             assert.deepEqual(await json(client, '/api/v1/in-use'), beforeTour, 'Tour must not refresh or save state');
             await page.getByRole('button', { name: 'In Use kaynağını yenile', exact: true }).click();
             await page.getByText('Sınırlı kaynak okuması tamamlandı.', { exact: true }).waitFor();
@@ -155,7 +156,7 @@ async function tour(page, surface) {
             await page.waitForFunction(() => document.querySelectorAll('.so-inuse-records li').length === 2);
             await page.getByLabel('In Use görünüm').selectOption('unassigned');
             await page.getByLabel('In Use görünüm').selectOption('all');
-            await page.waitForFunction(() => !document.querySelector('#resource-guide-replay-inuse-list')?.disabled);
+            await page.locator('#inuse-list-tour-start').waitFor();
             await capture(page, out, 'after-list-dark');
             const stored = await json(client, '/api/v1/in-use?search=OR-DEMO-INUSE');
             assert.equal(stored.total, 2);

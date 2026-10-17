@@ -3,6 +3,8 @@
 Bu rehber teslimin `evidence` klasörüne ekran görüntüleriyle birlikte aktarılır.
 Görüntüler sentetik yerel kayıtlardır; gerçek Turuncu Hat kapanış kanıtı değildir.
 Kurulum ve geri dönüş için teslimdeki `operator-runbook-tr.md` belgesini kullanın.
+Ekrandaki **Nasıl kullanılır?** rehberi ve **Adım adım göster** turu aşağıdaki dört adımı izler; tur kendiliğinden açılmaz ve hiçbir şeye basmaz.
+Kapanmış ya da tamamlanmış kayıtlar ana listeden düşer ve **Kapalı / tamamlanan** sayfasında kanıtıyla yazılır.
 
 ## 1. Sunucuları İncele
 

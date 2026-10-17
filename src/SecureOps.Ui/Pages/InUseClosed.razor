@@ -1,0 +1,138 @@
+@page "/in-use/closed"
+@attribute [Authorize]
+@using SecureOps.Shared.Contracts.InUse
+@using SecureOps.Shared.Contracts.Api
+@implements IDisposable
+@inject InUseApiClient Api
+@inject ICurrentAccessProvider AccessProvider
+@inject NavigationManager Navigation
+
+<PageTitle>Kapalı / tamamlanan incelemeler · @WasasBrand.Name</PageTitle>
+<div class="so-page so-page--wide so-inuse-closed">
+    <SoPageHeader Title="Kapalı / tamamlanan incelemeler" Lead="Ürünün tamamlanmış ya da kapalı bildiği kayıtlar. Her durum kendi kanıtıyla ayrı yazılır.">
+        <Actions><MudButton Href="/in-use" StartIcon="@Icons.Material.Filled.ArrowBack">Aktif incelemeler</MudButton></Actions>
+    </SoPageHeader>
+    @if (_access is null) { <SoLoading Message="Yetkiler doğrulanıyor" /> }
+    else if (!_access.IsResolved) { <SoProblemPanel Problem="_access.Problem!" OnRetry="LoadAsync" /> }
+    else if (!_access.Can(Capabilities.InUseView))
+    { <SoEmptyState Title="In Use erişimi gerekli" Description="Uygulama yöneticisinden In Use yetkisi isteyin." /> }
+    else
+    {
+        <div class="so-panel-note" role="note"><MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" aria-hidden="true" /><span>
+            <strong>Bu liste nasıl belirlenir?</strong> Sunucunun "tamamlanan" dediği kayıtlar buradadır: kaynak WASAS aktivitesini tamamlanmış ya da genel OR'u kapalı gösteriyor, ya da ürün kaydında WASAS aktivite onayı doğrulanmış. Yerel taslak, elle doğrulama notu ve arşivlenen rapor bir kaydı buraya taşımaz.</span></div>
+        <div class="so-closed-filters">
+            <MudTextField T="string" Label="OR, sunucu veya bildiren ara" aria-label="Kapalı kayıt ara" MaxLength="100" Value="_search" ValueChanged="SearchAsync" Immediate="true" DebounceInterval="350" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <label>Sayfa boyutu<select aria-label="Kapalı kayıt sayfa boyutu" @bind="_size" @bind:after="FilterAsync"><option>10</option><option>25</option><option>50</option></select></label>
+        </div>
+        @if (_problem is not null) { <SoProblemPanel Problem="_problem" OnRetry="LoadAsync" /> }
+        @if (_loading) { <SoLoading Message="Kayıtlar okunuyor" /> }
+        else if (_page is { Items.Count: 0 } && _problem is null)
+        {
+            <SoEmptyState Title="@(_search.Length == 0 ? "Ürün henüz hiçbir kaydı tamamlanmış bilmiyor" : "Aramayla eşleşen kayıt yok")"
+                          Description="@(_search.Length == 0 ? "Bu, kayıtların tamamlanmadığı anlamına gelmez; yalnız tamamlandığına dair kanıt yok. Tamamlama kapısı kapalıysa (kayıt sayfasında nedeni yazar) bu beklenen durumdur. Kaynak tamamlandığını gösterince kayıtlar burada görünür." : "Aramayı değiştirin ya da temizleyin.")" />
+        }
+        else if (_page is not null)
+        {
+            <p class="so-closed-count" role="status">@_page.Total kayıt · Son başarılı kaynak okuması: @(_page.Refresh.LastSuccessfulAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "henüz yok")</p>
+            <ul class="so-closed-records" aria-label="Kapalı ve tamamlanan kayıtlar">
+                @foreach (InUseRecord record in _page.Items)
+                {
+                    InUseClosedFacts facts = InUsePresentation.Closed(record);
+                    <li class="so-closed-row">
+                        <div class="so-closed-main">
+                            <a href="@RecordUrl(record.Id)">@record.Source.Code</a>
+                            @if (record.Source.Synthetic) { <span class="so-chip">Sentetik yerel veri</span> }
+                            <h2>@record.Source.Title</h2>
+                            <span class="so-closed-meta">@record.Source.Servers.Count sunucu</span>
+                        </div>
+                        <div class="so-closed-state">
+                            <SoStatusBadge Label="@facts.Kind" Tone="@Tone(facts.Tone)" Icon="@Icons.Material.Outlined.TaskAlt" />
+                            <p>@facts.Meaning</p>
+                        </div>
+                        <dl class="so-closed-facts">
+                            <dt>Ne zaman</dt><dd>@facts.When</dd>
+                            <dt>Kim</dt><dd>@facts.Reviewer<br />@facts.Approver</dd>
+                            <dt>Hangi rapor</dt><dd>@facts.Report</dd>
+                            <dt>Tamamlama kaydı</dt><dd>@facts.Intent</dd>
+                        </dl>
+                        <div class="so-closed-open"><MudButton Href="@RecordUrl(record.Id)" Variant="Variant.Outlined" EndIcon="@Icons.Material.Filled.ArrowForward" aria-label="@($"{record.Source.Code}: kanıtı aç")">Kanıtı aç</MudButton></div>
+                    </li>
+                }
+            </ul>
+            <footer class="so-inuse-pager">
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" aria-label="Önceki sayfa" Disabled="@(_loading || _number == 1)" OnClick="PreviousAsync" />
+                <span>Sayfa @_number / @Math.Max(1, (int)Math.Ceiling((double)_page.Total / _size))</span>
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" aria-label="Sonraki sayfa" Disabled="@(_loading || _number * _size >= _page.Total)" OnClick="NextAsync" />
+            </footer>
+        }
+    }
+</div>
+
+@code {
+    /// <summary>Search kept in the address so Back and reload return to the same list.</summary>
+    [SupplyParameterFromQuery(Name = "q")] public string? QuerySearch { get; set; }
+    /// <summary>Stored bounded page.</summary>
+    [SupplyParameterFromQuery(Name = "page")] public int? QueryPage { get; set; }
+    /// <summary>Stored bounded page size.</summary>
+    [SupplyParameterFromQuery(Name = "size")] public int? QuerySize { get; set; }
+
+    private AccessSnapshot? _access;
+    private InUsePage? _page;
+    private UiProblem? _problem;
+    private string _search = "";
+    private int _number = 1, _size = 25, _generation;
+    private bool _loading;
+    private readonly CancellationTokenSource _lifetime = new();
+
+    private string ListQuery => $"?q={Uri.EscapeDataString(_search)}&page={_number}&size={_size}";
+    private static string RecordUrl(Guid id) => $"/in-use/{id}";
+
+    private static SoStatusBadge.BadgeTone Tone(InUseBadgeTone tone) => tone switch
+    {
+        InUseBadgeTone.Positive => SoStatusBadge.BadgeTone.Positive,
+        InUseBadgeTone.Info => SoStatusBadge.BadgeTone.Info,
+        InUseBadgeTone.Caution => SoStatusBadge.BadgeTone.Caution,
+        _ => SoStatusBadge.BadgeTone.Neutral
+    };
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync() => _access = await AccessProvider.GetAsync(_lifetime.Token);
+
+    /// <inheritdoc />
+    protected override async Task OnParametersSetAsync()
+    {
+        _search = QuerySearch is { Length: <= 100 } ? QuerySearch : "";
+        _number = QueryPage is > 0 and <= 100000 ? QueryPage.Value : 1;
+        _size = QuerySize is 10 or 25 or 50 ? QuerySize.Value : 25;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        if (_access is null || !_access.IsResolved || !_access.Can(Capabilities.InUseView))
+        { return; }
+        int generation = ++_generation;
+        _loading = true;
+        _problem = null;
+        try
+        {
+            InUsePage page = await Api.GetAsync<InUsePage>($"?view=tracking&search={Uri.EscapeDataString(_search)}&page={_number}&pageSize={_size}", _lifetime.Token);
+            if (generation == _generation)
+            { _page = page; }
+        }
+        catch (SecureOpsApiException exception) when (generation == _generation)
+        { _page = null; _problem = exception.Problem; }
+        catch (OperationCanceledException)
+        { }
+        finally
+        { if (generation == _generation) { _loading = false; } }
+    }
+
+    private Task SearchAsync(string value) { _search = value; _number = 1; Navigation.NavigateTo("/in-use/closed" + ListQuery, replace: true); return Task.CompletedTask; }
+    private Task FilterAsync() { _number = 1; Navigation.NavigateTo("/in-use/closed" + ListQuery, replace: true); return Task.CompletedTask; }
+    private Task PreviousAsync() { _number = Math.Max(1, _number - 1); Navigation.NavigateTo("/in-use/closed" + ListQuery); return Task.CompletedTask; }
+    private Task NextAsync() { _number++; Navigation.NavigateTo("/in-use/closed" + ListQuery); return Task.CompletedTask; }
+
+    /// <inheritdoc />
+    public void Dispose() { ++_generation; _lifetime.Cancel(); _lifetime.Dispose(); }
+}

@@ -1,0 +1,29 @@
+.iur { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.2fr) minmax(0, 1.6fr) auto; gap: var(--so-space-2) var(--so-space-5); align-items: start; padding: var(--so-space-4); margin-block: var(--so-space-3); border: 1px solid var(--so-border); border-radius: var(--so-radius); background: var(--so-surface); }
+.iur--attention { border-inline-start: 4px solid var(--so-warning); }
+.iur > div { min-width: 0; overflow-wrap: anywhere; }
+.iur-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--so-space-1) var(--so-space-3); }
+.iur-code { font-weight: 700; font-size: 16px; color: var(--so-text); text-decoration: underline; text-underline-offset: 3px; }
+.iur-code:focus-visible { outline: 2px solid var(--so-accent); outline-offset: 2px; }
+.iur-title { flex: 1 0 100%; margin: 0; font-size: 16px; font-weight: 500; line-height: 1.45; color: var(--so-text); }
+.iur-status { display: flex; flex-direction: column; align-items: flex-start; gap: var(--so-space-1); }
+.iur-status ::deep .so-badge { font-size: 14px; white-space: normal; }
+.iur-meta { font-size: 14px; color: var(--so-text-muted); }
+.iur-next { display: flex; flex-direction: column; gap: 2px; font-size: 15px; }
+.iur-label { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; color: var(--so-text-muted); }
+.iur-open ::deep .mud-button-root { min-height: 44px; text-transform: none; }
+.iur-more { grid-column: 1 / -1; border-top: 1px solid var(--so-border-soft); padding-top: var(--so-space-2); }
+.iur-more > summary { cursor: pointer; font-weight: 600; font-size: 15px; padding-block: var(--so-space-1); color: var(--so-text); min-height: 32px; }
+.iur-more > summary:focus-visible { outline: 2px solid var(--so-accent); outline-offset: 2px; }
+.iur-facts { display: grid; grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr); gap: var(--so-space-1) var(--so-space-4); margin: var(--so-space-2) 0; font-size: 15px; }
+.iur-facts dt { color: var(--so-text-muted); }
+.iur-facts dd { margin: 0; }
+@media (max-width: 1000px) {
+    .iur { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .iur-next { grid-column: 1 / -1; }
+}
+@media (max-width: 600px) {
+    .iur { grid-template-columns: minmax(0, 1fr); padding: var(--so-space-3); }
+    .iur-open ::deep .mud-button-root { inline-size: 100%; }
+    .iur-facts { grid-template-columns: minmax(0, 1fr); }
+    .iur-facts dd { margin-block-end: var(--so-space-2); }
+}

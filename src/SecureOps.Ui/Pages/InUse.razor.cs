@@ -36,7 +36,7 @@ public partial class InUse
     private IReadOnlyList<InUseAssignee> _assignees = [];
     private UiProblem? _problem;
     private string? _notice;
-    private string _search = "", _view = "all", _status = "", _sort = "code", _assignee = "", _reason = "", _notes = "";
+    private string _search = "", _view = "review", _status = "", _sort = "code", _assignee = "", _reason = "", _notes = "";
     private string _editingServer = "";
     private string? _validation;
     private (AnswerEdit Target, string Before, string After)[]? _changes;
@@ -51,16 +51,7 @@ public partial class InUse
     private readonly HashSet<string> _selected = [];
     private readonly CancellationTokenSource _lifetime = new();
     private bool Can(string capability) => _access?.Can(capability) == true;
-    private static string Relationship(string state, int? count) => state switch
-    {
-        "Complete" => count == 0 ? "İlişkili kayıt yok (doğrulandı)" : $"{count} doğrulanmış kayıt",
-        "Observed" => $"{count} gözlenen kayıt; tamlık doğrulanmadı",
-        "Partial" => $"Eksik sonuç; {count} kayıt korunuyor, güncel üyelik doğrulanmalı",
-        "Forbidden" => "Kaynak ilişki erişimi yetersiz; önceki kanıt varsa korunur",
-        "Failed" => "İlişki okuması başarısız; önceki kanıt varsa korunur",
-        "Ambiguous" => "Eşleme belirsiz; önceki kanıt varsa korunur",
-        _ => "Henüz sorgulanmadı / sözleşme bekleniyor"
-    };
+    private static string Relationship(string state, int? count) => InUsePresentation.Relationship(state, count);
     private bool CanEdit => Can(Capabilities.InUseReview) && _record is { Discarded: false };
     private bool AssignmentEdited => _record is not null && (!string.IsNullOrWhiteSpace(_reason)
         || _assignee != (_record.AssigneeId?.ToString("D") ?? ""));
@@ -88,7 +79,13 @@ public partial class InUse
     protected override async Task OnParametersSetAsync()
     {
         _search = QuerySearch is { Length: <= 100 } ? QuerySearch : "";
-        _view = QueryView is "mine" or "unassigned" or "tracking" or "review" or "pending" or "verification" ? QueryView : "all";
+        if (!Id.HasValue && QueryView == "tracking")
+        {
+            // Finished records live on their own page; an old tracking link follows them there.
+            Navigation.NavigateTo("/in-use/closed" + (string.IsNullOrEmpty(QuerySearch) ? "" : "?q=" + Uri.EscapeDataString(QuerySearch)), replace: true);
+            return;
+        }
+        _view = QueryView is "mine" or "unassigned" or "review" or "pending" or "verification" or "all" ? QueryView : "review";
         // Date ordering remains available in the API, but the real parent creation mapping is unverified.
         _sort = "code";
         _status = QueryStatus is "Unreviewed" or "Draft" or "Stale" or "Discarded" ? QueryStatus : "";
@@ -112,14 +109,7 @@ public partial class InUse
         _assigneeSearch = value;
         _assignees = await ReadAsync<InUseAssignee[]>("/assignees?search=" + Uri.EscapeDataString(value));
     });
-    private static int SavedCompleted(InUseRecord record) => record.Source.Servers.Count(s => InUseChecks.OperatorCodes.All(c =>
-        record.Draft?.Answers.Any(a => a.ServerId == s.Id && a.Check == c && a.Value is "Yes" or "No") == true));
-    private static string RowNext(InUseRecord record) => record.TrackingOnly ? "Kaynakta doğrulanan sonucu inceleyin; yeni WASAS onayı göndermeyin"
-        : record.HasActiveExecution ? "Önceki işlemin sonucunu doğrulayın; yeni onay göndermeyin"
-        : record.SourceObservationMissing ? "Son yenilemede görülmedi; kaynak durumunu doğrulayın, cevaplar korunuyor"
-        : record.Status == "Stale" ? "Sunucu incelemesini etkileyen farkları inceleyin; cevaplar korunuyor"
-        : record.Source.Servers.Count == 0 ? "Sunucu ilişki kanıtı gerekli"
-        : SavedCompleted(record) < record.Source.Servers.Count ? "Eksik cevapları tamamla" : "Excel önizlemesini incele";
+    private static int SavedCompleted(InUseRecord record) => InUsePresentation.SavedCompleted(record);
     private Task LoadAsync()
     {
         ++_generation;
@@ -148,6 +138,7 @@ public partial class InUse
                 _page = null;
                 _page = await ReadAsync<InUsePage>($"?search={Uri.EscapeDataString(_search)}&view={_view}&sort={_sort}&page={_number}&pageSize={_size}"
                     + (string.IsNullOrEmpty(_status) ? "" : "&status=" + _status));
+                _recount = true;
             }
         });
     }
@@ -157,6 +148,7 @@ public partial class InUse
         _notice = state.Issue is null ? "Sınırlı kaynak okuması tamamlandı." : RefreshIssue(state.Issue);
         _page = await ReadAsync<InUsePage>($"?page={_number}&pageSize={_size}&view={_view}&sort={_sort}&search={Uri.EscapeDataString(_search)}"
             + (string.IsNullOrEmpty(_status) ? "" : "&status=" + _status));
+        _recount = true;
     });
     private async Task OpenAssignmentAsync()
     {
@@ -372,6 +364,13 @@ public partial class InUse
             try
             { await Js.InvokeVoidAsync("secureOpsInUseScroll.restore"); }
             catch (JSDisconnectedException) { }
+        }
+        if (_recount && Id is null && !_busy && Can(Capabilities.InUseView))
+        {
+            _recount = false;
+            try
+            { await ReadCountsAsync(); StateHasChanged(); }
+            catch (OperationCanceledException) { }
         }
     }
     private Task<InUseReport> ReportAsync() => SendAsync<InUseReport>(HttpMethod.Post, $"/{_record!.Id}/report",

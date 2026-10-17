@@ -48,7 +48,7 @@ const proxy = http.createServer(async (req, res) => {
     let page;
     const button = name => page.getByRole('button', { name, exact: true });
     const ready = async () => page.waitForFunction(() => document.querySelector('.so-inuse') && !document.querySelector('.so-inuse [aria-busy=true]')
-        && !document.querySelector('[id^=resource-guide-replay-inuse]')?.disabled);
+        && !document.querySelector('[id$=-tour-start]')?.disabled);
     const saved = async () => { await button('Cevapları kaydet').click(); await page.getByText('Yerel inceleme taslağı kaydedildi.', { exact: true }).waitFor(); await ready(); };
     try {
         const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' });
@@ -130,12 +130,12 @@ const proxy = http.createServer(async (req, res) => {
         for (const theme of ['light', 'dark']) {
             await page.evaluate(t => localStorage.setItem('wasas.appearance', t), theme);
             await navigate(page, ui, `in-use/${record.id}`); await ready();
-            const beforeTour = await read(), opener = page.locator('#resource-guide-replay-inuse-review');
+            const beforeTour = await read(), opener = page.locator('#inuse-record-tour-start');
             for (let repeat = 0; repeat < 2; repeat++) {
                 await opener.focus(); await opener.press('Enter');
-                const guide = page.getByRole('dialog', { name: 'Kullanım Rehberi', exact: true }); await guide.waitFor();
-                await guide.press('ArrowRight'); await guide.press('ArrowLeft'); await guide.press('Escape'); await guide.waitFor({ state: 'hidden' });
-                await page.waitForFunction(() => document.activeElement?.id === 'resource-guide-replay-inuse-review');
+                const guide = page.locator('[data-tour-box]'); await guide.waitFor();
+                await guide.getByRole('button', { name: 'İleri', exact: true }).press('Enter'); await guide.press('Escape'); await guide.waitFor({ state: 'hidden' });
+                await page.waitForFunction(() => document.activeElement?.id === 'inuse-record-tour-start');
             }
             assert.deepEqual(await read(), beforeTour); await capture(page, out, `reopened-${theme}`);
         }

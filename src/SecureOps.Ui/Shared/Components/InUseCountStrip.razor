@@ -1,0 +1,22 @@
+@* Status strip of the In Use list: a few server totals, each a link to the list it counts. A total that could not be read says so
+   ("alınamadı"); it is never shown as zero. Current view is marked with aria-current and a heavier border, not by colour alone. *@
+
+<nav class="iuc" aria-label="In Use durum şeridi" data-tour="inuse-strip">
+    <ul>
+        @foreach (InUseCount item in Items)
+        {
+            <li>
+                <a href="@item.Href" aria-current="@(item.Current ? "page" : null)" class="@(item.Current ? "iuc-current" : null)">
+                    <span class="iuc-value">@(item.Total?.ToString() ?? "alınamadı")</span>
+                    <span class="iuc-label">@item.Label</span>
+                    <span class="iuc-hint">@item.Hint</span>
+                </a>
+            </li>
+        }
+    </ul>
+</nav>
+
+@code {
+    /// <summary>The figures, in display order.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<InUseCount> Items { get; set; } = [];
+}

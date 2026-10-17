@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using SecureOps.Shared.Contracts.InUse;
+using SecureOps.Ui.Services;
 
 namespace SecureOps.Ui.Pages;
 
@@ -68,15 +69,8 @@ public partial class InUse
             ? "Kaynak ortamını doğrulayın; bilinmeyen ortam TEST sayılmaz"
             : environment + " (iş kuralı; kaynak alan değeri eşlemesi ayrıca doğrulanmalı)";
     }
-    private static string SourceActivity(InUseRecord record) => record.ActivityStatus switch
-    {
-        "Completed" => "Tamamlandığı kaynakta doğrulandı",
-        "Pending" => "Kaynakta bekliyor",
-        "OrClosed" => "Genel OR kapalı; WASAS aktivitesine ait doğrulama alınmadı",
-        _ => "Doğrulama bekliyor; güncel WASAS durumu doğrulanmadı"
-    };
-    private static string SourceLifecycle(InUseRecord record) => string.IsNullOrWhiteSpace(record.Source.Lifecycle?.Source) ? "Kaynak durumu alınmadı" : record.Source.Lifecycle?.Value switch
-    { "Open" => "Açık", "Closed" => "Kapalı (kaynak kanıtı)", _ => "Kaynak durumu alınmadı" };
+    private static string SourceActivity(InUseRecord record) => InUsePresentation.SourceActivity(record);
+    private static string SourceLifecycle(InUseRecord record) => InUsePresentation.SourceLifecycle(record);
     private static string ExecutionStep(string step) => step switch
     {
         "Intent" => "İncelenen rapor ve işlem kaydı",

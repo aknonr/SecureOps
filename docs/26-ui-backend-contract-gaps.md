@@ -49,6 +49,7 @@ Each item states what the UI needs, what exists today, and what the UI does in t
 | G-40 — `GET /access/users/page` and `/access/requests/page` answer 503 on the InMemory access repository (SQL only) | Open (2026-10-14, #67) — the Demo/InMemory host cannot show real user or request lists; the UI shows its error state, and its list screens are measured on a Mac only through a loopback test proxy with synthetic data |
 | G-42 — Theme tokens give low contrast: `.so-chip` 3.32:1 (light), filled primary button 4.10:1 and filled Error button 2.28:1 (dark) | Open (2026-10-17, #79) — global tokens (`secureops-theme.css`, `SecureOpsTheme.cs`), not changed by the UI task; see the G-42 section |
 | G-43 — No route or capability for a server's local Administrators / Remote Desktop Users membership (with person and PAM account) | Open (2026-10-17, #80) — proposal only: `docs/contracts/server-local-access-proposal.md` (status Proposal, ADR needed; owner declined a phase exception). The UI cannot show a "Sunucu Erişim Analizi" page and invents nothing |
+| G-44 — The In Use list gives no per-record completion actor, completion time, manual-verification state or report version; no server filter by completion kind | Open (2026-10-17, IU-UI) — the closed/completed page shows only what the list returns and says "bu listede yok" for the rest; nothing is invented |
 | `AccessSelfApprovalDenied` | ✅ Verified working — precedence explains the earlier observation |
 
 ---
@@ -1336,6 +1337,19 @@ A page "Sunucu Erişim Analizi" (exact server name → members of its local Admi
 
 Needed: darker chip text or a lighter chip tint in light; a darker dark-theme primary/Error fill or dark contrast text (`ErrorContrastText`) in `SecureOpsTheme.cs`.
 Until then `AccessActionDialog` overrides only its own dark-theme confirm text colour in scoped CSS (`#1b0a09`, 8.41:1; mentor decision in #79, no token change). This is temporary: the rule goes when the token is fixed. `SessionRevokeDialog` and the other filled buttons are unchanged (2.28:1).
+
+## G-44 — In Use closed/completed page: what the list does not carry
+
+**Raised:** 2026-10-17, IU-UI (`/in-use/closed`). **Owner:** backend/contracts (Codex). The UI works today with the existing `GET /api/v1/in-use?view=tracking`; nothing below blocks it, but each missing field shows as "bu listede yok" instead of an answer.
+
+What `view=tracking` returns: the server's own classification (`activityStatus` Completed or OrClosed), `activityVerifiedAt` (time of a verified activity approval, no actor), the last completion intent (`completion`: stage, report version, confirmation time, a WASAS actor id without a label) and the reviewer label from the draft. What it does not return:
+
+- who approved the WASAS activity (the execution `InitiatorLabel` exists only on the per-record execution read, and only for callers with the review capability);
+- whether a manual verification ("Kaynakta kontrol ettim") was recorded, by whom and when — it is deliberately not a completion, but the closed page cannot show it either;
+- the report version/archive for records without a completion intent, and the time for source-classified records (the list has only `lastSeenAt`);
+- a server filter by kind (activity completed / OR closed / verified by manual mode); the page offers search and paging only, not a client-side filter that would silently cover one page.
+
+Asked of the owner (IU-UI report): which evidence makes a record "tamamlandı" for the product (today: source activity Completed, source OR Closed, or an execution whose activity step is Verified) and whether manual verification should also move a record off the main list. Until answered the UI follows the server rule and documents it on the page.
 
 ## Note: enums cross the wire as numbers
 

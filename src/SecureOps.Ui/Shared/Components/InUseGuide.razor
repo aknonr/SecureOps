@@ -1,0 +1,75 @@
+@* In Use page guide: the four-step flow as one quiet strip, a "Nasıl kullanılır?" disclosure that explains each step in the owner's
+   words (what to do, what to watch for), and the person-started on-screen tour (SoGuidedTour). Nothing opens on its own and nothing is
+   stored in the browser (CLAUDE.md; no server "seen" preference exists, gap G-41). The last step says what the server reports about the
+   completion gate instead of promising it. Wording: InUseTours, flow of docs/inuse-v2-walkthrough-tr.md. *@
+
+<section class="iug" aria-label="@($"{Title}: rehber")">
+    <div class="iug-bar">
+        <ol class="iug-flow" aria-label="Akış">
+            @for (int i = 0; i < Flow.Count; i++)
+            {
+                <li class="iug-flow-step">
+                    <span class="iug-num" aria-hidden="true">@(i + 1)</span>
+                    <span>@Flow[i].Title</span>
+                    @if (i == Flow.Count - 1 && !string.IsNullOrWhiteSpace(CompleteBadge))
+                    {
+                        <SoStatusBadge Label="@CompleteBadge" Tone="@CompleteTone" />
+                    }
+                </li>
+            }
+        </ol>
+        <div class="iug-actions">
+            @if (Tour is { Count: > 0 })
+            {
+                <SoGuidedTour Id="@TourId" Title="@Title" Steps="Tour" />
+            }
+            <button type="button" id="@ToggleId" class="iug-toggle" aria-expanded="@(_open ? "true" : "false")" aria-controls="@BodyId" @onclick="Toggle">
+                <MudIcon Icon="@Icons.Material.Outlined.HelpOutline" Size="Size.Small" aria-hidden="true" /> @(_open ? "Rehberi kapat" : "Nasıl kullanılır?")
+            </button>
+        </div>
+    </div>
+    @if (_open)
+    {
+        <div id="@BodyId" class="iug-body" role="region" aria-label="Nasıl kullanılır?">
+            <p class="iug-purpose">@InUseTours.Purpose</p>
+            <ol class="iug-steps">
+                @foreach (InUseGuideStep step in Flow)
+                {
+                    <li>
+                        <h3>@step.Title</h3>
+                        <p><strong>Ne yapın:</strong> @step.Do</p>
+                        <p class="iug-watch"><strong>Dikkat:</strong> @step.Watch</p>
+                    </li>
+                }
+            </ol>
+            <p class="iug-never"><MudIcon Icon="@Icons.Material.Outlined.Shield" Size="Size.Small" aria-hidden="true" /> <span><strong>Bu sayfa şunu yapmaz:</strong> @InUseTours.Never</span></p>
+        </div>
+    }
+</section>
+
+@code {
+    private bool _open;
+
+    /// <summary>Page name used in labels.</summary>
+    [Parameter] public string Title { get; set; } = "In Use";
+
+    /// <summary>The flow, from <see cref="InUseTours.Flow"/>.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<InUseGuideStep> Flow { get; set; } = [];
+
+    /// <summary>On-screen tour (permissions already applied); no tour button when null or empty.</summary>
+    [Parameter] public IReadOnlyList<SoTourStep>? Tour { get; set; }
+
+    /// <summary>Unique id prefix of the tour on the page.</summary>
+    [Parameter] public string TourId { get; set; } = "inuse-tour";
+
+    /// <summary>Short state word after the last step (for example "Kapalı"), only when the server reported it.</summary>
+    [Parameter] public string? CompleteBadge { get; set; }
+
+    /// <summary>Tone of <see cref="CompleteBadge"/>.</summary>
+    [Parameter] public SoStatusBadge.BadgeTone CompleteTone { get; set; } = SoStatusBadge.BadgeTone.Neutral;
+
+    private string ToggleId => $"{TourId}-toggle";
+    private string BodyId => $"{TourId}-body";
+
+    private void Toggle() => _open = !_open;
+}
