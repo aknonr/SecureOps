@@ -28,7 +28,7 @@ public sealed class InUseCompletionPolicy(IOptions<InUseCompletionOptions> optio
     /// <summary>Normal deployments remain disabled; corporate missing contracts cannot be bypassed by a boolean.</summary>
     public InUseExecutionReadiness Readiness(InUseSource source)
     {
-        if (source.WasasActivity?.Value == "Completed" || source.Lifecycle?.Value == "Closed")
+        if (source.WasasActivity?.Value == "Completed" || source.Lifecycle?.Value == "Closed" || InUseActivity.LeftTeam(source.CurrentStage))
         { return new(false, "TrackingOnly", "Kaynakta tamamlanmış iş yalnız izlenir. Başka ekibin aktivitesi onaylanmaz."); }
         if (!options.Value.Enabled)
         {

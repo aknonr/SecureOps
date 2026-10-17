@@ -1,5 +1,14 @@
 # Integrated TEST activation continuation
 
+## TH-11 server configuration keys, 2026-10-17 (read-only; no real Turuncu Hat call made)
+
+`ItsmRecordLookup` section (server configuration only; corporate values are never committed): `OrStageField`,
+`OrStatusField`, `OrAssignedGroupField` (field names), `WasasGroupId`, `ActivityApprovedStatus` (default `4`),
+`ActivityTaskModelContains` (list), `ClosedStageIds` (list), `ClosedStatusIds` (list), `ActivityMainObject` (existing).
+With the defaults every class is Unknown and nothing changes. Meaning, rules and the In Use effect:
+`docs/integrations/turuncu-hat-itsm-record-lookup.md` section "WASAS classification". Activation needs one read-only
+TEST run (ADR-0032 amendment 2026-10-17, Open (c)); nothing was run against a real source here.
+
 ## In Use source-write gate separation, 2026-10-13
 
 In Use completion no longer reads `OperationalRecords:SourceCloseEnabled`

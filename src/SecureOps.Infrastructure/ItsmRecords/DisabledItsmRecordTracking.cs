@@ -1,10 +1,17 @@
 namespace SecureOps.Infrastructure.ItsmRecords;
 
 /// <summary>Default provider: every tracking read is Unknown/NotConfigured. It never answers Found or NotFound.</summary>
-public sealed class DisabledItsmRecordTracking : IItsmRecordTracking
+public sealed class DisabledItsmRecordTracking : IItsmRecordTracking, IItsmWasasTracking
 {
     /// <summary>Provider name reported in results.</summary>
     public const string ProviderName = "Disabled";
+
+    /// <inheritdoc />
+    public Task<ItsmWasasClassification> ClassifyAsync(string? sourceId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(ItsmWasasClassification.Unknown(ItsmRecordLookupReason.NotConfigured, ProviderName));
+    }
 
     /// <inheritdoc />
     public Task<ItsmRecordTrackingResult> GetOrTrackingAsync(string? sourceId, CancellationToken cancellationToken)

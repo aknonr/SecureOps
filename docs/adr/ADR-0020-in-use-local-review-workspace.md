@@ -370,3 +370,19 @@ eligibility. Verified completion remains historical source evidence, distinct fr
 overall OR closure; local intent and manual confirmation never promote completion.
 These rules are locally testable with labelled fixtures, not a replacement for the
 missing corporate IU-05-STATUS query. Next-team/timeline stay deferred.
+
+## Amendment 2026-10-17 (TH-11): main-list drop rule and source persons
+
+Owner decisions of 2026-10-17. (1) "If it leaves our team it drops": the In Use main list (`view=review`) drops a
+record when (a) the product's own verified activity approval exists, or (b) the source OR is Closed (configured
+stage/status ids), or (c) the source says the record is no longer assigned to the WASAS group (`Source.CurrentStage`
+= `NotAssignedToWasas`: a filled assigned group that differs from the configured WASAS group). Unknown or unread
+source state never drops a record (fail closed: an unknown is not hidden). A dropped record stays visible in the
+tracking view (`view=tracking`) with its server class: `Completed` (verified in the source: approved code and
+completion time, or the product's own verification), `OrClosed`, or `NotAssigned` ("not with WASAS; approved or sent
+back is not verified" unless the activity class says `Completed` or `NotApproved`). A group change alone is not
+approval. This replaces the earlier proposal that leaving the group should not drop a record on its own. Ordering of
+classes: `Completed` before `OrClosed` before `NotAssigned` before `Pending`. (2) The person who completed the
+activity in the source (`m_done_by`, delegate, assignee) is not read; the product's own approver is the execution
+record. Classification, options and limits: ADR-0032 amendment 2026-10-17. No migration; `activityStatus` gains the
+additive value `NotAssigned`; execution readiness treats it as tracking-only like `Completed` and `OrClosed`.

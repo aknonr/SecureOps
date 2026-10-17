@@ -50,12 +50,14 @@ public sealed record ItsmTrackingPart<T>(ItsmTrackingPartState State, ItsmRecord
 /// <param name="RawStage">Raw stage code when a stage field is configured and filled.</param>
 /// <param name="StatusLabel">Source display text of the status code; null when absent, empty or no status field is configured.</param>
 /// <param name="StageLabel">Source display text of the stage code; null when absent, empty or no stage field is configured.</param>
+/// <param name="RawAssignedGroup">Raw assigned-group code when an assigned-group field is configured and filled (TH-11); the group is a code, never a person.</param>
 public sealed record ItsmOrState(
     string? LastModifiedText,
     string? RawStatusCode,
     string? RawStage,
     string? StatusLabel = null,
-    string? StageLabel = null);
+    string? StageLabel = null,
+    string? RawAssignedGroup = null);
 
 /// <summary>
 /// One workflow activity of the OR. The person who completed it is never selected. Group and status are source
@@ -66,7 +68,14 @@ public sealed record ItsmOrState(
 /// <param name="RawStatus">Raw status code.</param>
 /// <param name="CreatedText">Raw creation time text.</param>
 /// <param name="CompletedText">Raw completion time text; null while the activity is open or the source left it empty.</param>
-public sealed record ItsmActivity(string ActivityId, string? RawGroup, string? RawStatus, string? CreatedText, string? CompletedText);
+/// <param name="TaskModelLabel">Source display text of the task model, read only when an activity allow-list is configured (TH-11); a task name, never a person.</param>
+public sealed record ItsmActivity(
+    string ActivityId,
+    string? RawGroup,
+    string? RawStatus,
+    string? CreatedText,
+    string? CompletedText,
+    string? TaskModelLabel = null);
 
 /// <summary>Number of comments on the OR and the raw creation time of the newest one. No text, no author.</summary>
 /// <param name="Count">Comments returned by a complete, single-page response.</param>

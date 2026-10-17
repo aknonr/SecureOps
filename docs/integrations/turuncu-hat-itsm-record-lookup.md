@@ -76,7 +76,9 @@ Authorization header, base URL, number or title. Metric `secureops.integration.o
 ```json
 "ItsmRecordLookup": {
   "Provider": "Disabled", "OrBaseObject": "", "OcoBaseObject": "",
-  "OrStatusField": "", "OrStageField": "", "CommentMainObject": "", "CommentTimeField": "m_created_dt", "ActivityMainObject": ""
+  "OrStatusField": "", "OrStageField": "", "CommentMainObject": "", "CommentTimeField": "m_created_dt", "ActivityMainObject": "",
+  "OrAssignedGroupField": "", "WasasGroupId": "", "ActivityApprovedStatus": "4",
+  "ActivityTaskModelContains": [], "ClosedStageIds": [], "ClosedStatusIds": []
 }
 ```
 
@@ -94,7 +96,13 @@ Authorization header, base URL, number or title. Metric `secureops.integration.o
   selected), `CommentMainObject` (the `m_mob` value that identifies an OR in comments; empty makes the comment part
   `Unknown/NotConfigured`), `CommentTimeField` (default `m_created_dt`, not yet proven for comments),
   `ActivityMainObject` (optional `m_process.m_main_object` value; empty sends the id-only filter).
-- `Disabled` and `Fake` are chosen once for the lookup, tracking and user-match interfaces together.
+- WASAS classification options (TH-11, section "WASAS classification"): `OrAssignedGroupField` (identifier, empty =
+  not selected), `WasasGroupId` (digits, empty = nothing can be attributed to WASAS), `ActivityApprovedStatus`
+  (digits, default `4`, the owner-confirmed TEST code for "approved"), `ActivityTaskModelContains` (allow-list of
+  text fragments of the task-model display text; empty = the activity cannot be identified), `ClosedStageIds` and
+  `ClosedStatusIds` (digit lists; empty = not used for closure). Malformed values fail at startup. No value is built
+  into code or committed; corporate ids live only in server configuration.
+- `Disabled` and `Fake` are chosen once for the lookup, tracking, WASAS-classification and user-match interfaces together.
 
 ## OR tracking (ADR-0032)
 
@@ -128,6 +136,48 @@ field and the optional header fields may be omitted by the source when empty and
 key must be present or the row is malformed (`Unknown/IncompleteResponse`). The `!=` operator and the system-action
 exclusion come from the Turuncu Hat team's description and are unexecuted. Telemetry operations:
 `itsm-tracking-or|itsm-tracking-activities|itsm-tracking-comments`.
+
+## WASAS classification (TH-11, ADR-0032 amendment 2026-10-17)
+
+`IItsmWasasTracking.ClassifyAsync(string? sourceId, CancellationToken)` is a narrow, read-only interface beside
+`IItsmRecordTracking` (the same singleton answers both). It reads the OR header and the activity rows only (two
+queries, no comment query) and returns `ItsmWasasClassification(Activity, Closure, Assignment, ActivityReason, Provider)`
+with no id, code, person or comment text. Three independent questions, each Unknown unless proven:
+
+| Class | Values | Rule |
+|---|---|---|
+| `Activity` | `Completed` | exactly ONE candidate row (`m_group` = `WasasGroupId` and task-model display text contains an `ActivityTaskModelContains` fragment, case-insensitive) with `m_completion_date` filled and `m_status` = `ActivityApprovedStatus` |
+| | `Pending` | the same single row with `m_completion_date` empty (its status code is not interpreted: the open-task code is not known) |
+| | `NotApproved` | the single row is completed but `m_status` differs: rejection, send-back or an unknown code. The meaning is not named |
+| | `Unknown` | no candidate (not found is not "none"), several candidates, filter or group not configured, activity part Unknown/incomplete/oversized/timeout/parse error, completed row without a status cell |
+| `Closure` | `Closed` | stage in `ClosedStageIds` or status in `ClosedStatusIds` |
+| | `Open` | every configured list was compared with a filled value and none matched |
+| | `Unknown` | nothing configured, a configured value is empty, or the OR was not read |
+| `Assignment` | `AssignedToWasas` / `NotAssignedToWasas` | the filled `OrAssignedGroupField` equals / differs from `WasasGroupId` |
+| | `Unknown` | field or group not configured, group empty (a closed OR has none), or the OR was not read |
+
+Fail closed: `Completed` needs a complete successful response, one candidate, the approved code and a completion
+time. An OR that is not found, ambiguous or unreadable makes all three classes Unknown. `Assignment` is **not** proof
+of approval: send-back and reject change the group too, so `NotAssignedToWasas` alone says "not with WASAS", never
+"approved". Added reads: the `OrAssignedGroupField` cell of the OR row (group code only) and, only when an allow-list
+is configured, the `m_actvty_task_model` select with its `KEY.` display text (HTML-decoded, trimmed, max 256
+characters; longer is `Unknown/InvalidResponse`). `m_done_by`, `m_done_by_delegate`, `m_assignee` and comment text are
+never selected, returned or logged (owner decision 2026-10-17: the source person who completed is not read; the
+product's own approver is the execution record). Telemetry operation `itsm-wasas-classification` (outcome is the three
+class names only). Fake ids (`FakeItsmRecordTracking`): `900001` Pending/Open/Assigned, `900101`
+Completed/Open/NotAssigned, `900102` NotApproved/Open/NotAssigned, `900103` Completed/Closed/Unknown assignment,
+`900003` Unknown/Unavailable, any other id Unknown.
+
+**In Use bridge.** `TrackingClassifiedInUseSourceClient` wraps the corporate In Use source client when
+`IItsmWasasTracking` is registered and fills, per discovered record, `Source.WasasActivity` (`Completed`, `Pending`,
+`NotApproved`), `Source.Lifecycle` (`Closed`, `Open`) and `Source.CurrentStage` (`AssignedToWasas`,
+`NotAssignedToWasas`) with a provenance string naming the rule. A class that is Unknown leaves the field as it was.
+The main list ("review" view) drops a record when the product's own verified activity approval exists, the OR is
+Closed, or `CurrentStage` is `NotAssignedToWasas` (new `activityStatus` value `NotAssigned`, grouped with
+`Completed` and `OrClosed` in the "tracking" view). Unknown keeps the record listed. Known limit: the corporate
+discovery query itself filters on the WASAS group, so a record that already left it is not rediscovered and is shown
+as "source observation missing" instead; classifying such records needs a per-record re-check of locally known
+records (open item, see ADR-0032 amendment 2026-10-17).
 
 ## User match (ADR-0032, amendment 2026-10-13)
 

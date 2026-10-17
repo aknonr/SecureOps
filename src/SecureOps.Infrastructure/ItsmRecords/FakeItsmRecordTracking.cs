@@ -6,11 +6,32 @@ namespace SecureOps.Infrastructure.ItsmRecords;
 /// two comments and synthetic status and stage labels; <c>900002</c> Ambiguous; <c>900003</c> Unknown/Unavailable;
 /// <c>900004</c> Found with the activity part Unknown/IncompleteResponse and zero comments; any other valid id
 /// NotFound; an invalid id Unknown/InvalidIdentifier. Results report Provider "Fake" and are never real evidence.
+/// For <see cref="IItsmWasasTracking"/>: <c>900001</c> Pending/Open/AssignedToWasas, <c>900101</c>
+/// Completed/Open/NotAssignedToWasas, <c>900102</c> NotApproved/Open/NotAssignedToWasas, <c>900103</c>
+/// Completed/Closed with an unknown assignment (empty group); every other id, including a valid one the source does
+/// not know, is Unknown (not found is never "no activity"); an invalid id is Unknown/InvalidIdentifier.
 /// </summary>
-public sealed class FakeItsmRecordTracking : IItsmRecordTracking
+public sealed class FakeItsmRecordTracking : IItsmRecordTracking, IItsmWasasTracking
 {
     /// <summary>Provider name reported in results.</summary>
     public const string ProviderName = "Fake";
+
+    /// <inheritdoc />
+    public Task<ItsmWasasClassification> ClassifyAsync(string? sourceId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ItsmWasasClassification result = ItsmSourceId.Normalize(sourceId) switch
+        {
+            null => ItsmWasasClassification.Unknown(ItsmRecordLookupReason.InvalidIdentifier, ProviderName),
+            "900001" => new(ItsmWasasActivityClass.Pending, ItsmOrClosureClass.Open, ItsmAssignmentClass.AssignedToWasas, ItsmRecordLookupReason.None, ProviderName),
+            "900101" => new(ItsmWasasActivityClass.Completed, ItsmOrClosureClass.Open, ItsmAssignmentClass.NotAssignedToWasas, ItsmRecordLookupReason.None, ProviderName),
+            "900102" => new(ItsmWasasActivityClass.NotApproved, ItsmOrClosureClass.Open, ItsmAssignmentClass.NotAssignedToWasas, ItsmRecordLookupReason.None, ProviderName),
+            "900103" => new(ItsmWasasActivityClass.Completed, ItsmOrClosureClass.Closed, ItsmAssignmentClass.Unknown, ItsmRecordLookupReason.None, ProviderName),
+            "900003" => ItsmWasasClassification.Unknown(ItsmRecordLookupReason.Unavailable, ProviderName),
+            _ => ItsmWasasClassification.Unknown(ItsmRecordLookupReason.IncompleteResponse, ProviderName)
+        };
+        return Task.FromResult(result);
+    }
 
     /// <inheritdoc />
     public Task<ItsmRecordTrackingResult> GetOrTrackingAsync(string? sourceId, CancellationToken cancellationToken)

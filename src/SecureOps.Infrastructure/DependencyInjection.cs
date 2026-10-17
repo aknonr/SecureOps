@@ -205,7 +205,8 @@ public static class DependencyInjection
         services.AddSingleton<IInUseSourceClient>(provider =>
             string.Equals(sourceProvider, "Fake", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(sourceProvider, "Simulation", StringComparison.OrdinalIgnoreCase) ? new LocalInUseSourceClient()
-            : provider.GetRequiredService<IOperationalRecordClient>() is IInUseSourceClient client ? client
+            : provider.GetRequiredService<IOperationalRecordClient>() is IInUseSourceClient client
+                ? provider.GetService<ItsmRecords.IItsmWasasTracking>() is { } wasas ? new TrackingClassifiedInUseSourceClient(client, wasas) : client
             : new DisabledInUseSourceClient());
         if (string.Equals(sourceProvider, "Simulation", StringComparison.OrdinalIgnoreCase))
         {

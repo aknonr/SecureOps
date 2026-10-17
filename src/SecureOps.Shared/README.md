@@ -51,7 +51,7 @@ new draft/report snapshots retain name/account with stable technical identity.
 
 `InUseQuery.Sort` accepts code/oldest/newest (default code). Date ordering is
 retained for later verified mapping, not a delivery prerequisite. `ActivityStatus` is a
-minimal list classification: Pending, Completed, OrClosed or VerificationPending.
+minimal list classification: Pending, Completed, OrClosed, NotAssigned (source group is not WASAS, TH-11) or VerificationPending.
 `HasActiveExecution` is a repository read-side fence; `SourceObservationMissing`
 marks a parent not observed in the latest refresh. Neither manual confirmation nor
 missing rows proves completion. These fields do not authorize command execution.
