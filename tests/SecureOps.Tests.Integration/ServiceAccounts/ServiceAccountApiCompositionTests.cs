@@ -261,6 +261,7 @@ public sealed class ServiceAccountApiCompositionTests
             (SaErrors.Invalid, "requestAccountMismatch", StatusCodes.Status400BadRequest),
             (SaErrors.IdempotencyKey, "idempotencyKey", StatusCodes.Status400BadRequest),
             (SaErrors.Forbidden, "eventItemDenied", StatusCodes.Status403Forbidden),
+            (SaErrors.ProviderMessageIdUnavailable, "communication.providerMessageIdUnavailable", StatusCodes.Status400BadRequest),
             (SaErrors.EventStale, "previewDigest", StatusCodes.Status409Conflict),
             (SaErrors.IdempotencyKeyReused, "idempotencyKey", StatusCodes.Status409Conflict),
             (SaErrors.CloseNotAllowed, "closeRequest", StatusCodes.Status422UnprocessableEntity),

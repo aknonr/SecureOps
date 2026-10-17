@@ -30,11 +30,11 @@ public sealed class ServiceAccountScopeHardeningSqlTests
 
         SaResult<CommunicationSaveResult> viaAccount = await fx.Service.CreateCommunicationAsync(coordA.Principal, fx.Context,
             new CreateCommunicationRequest("Incoming", "Reply", [accA], _on, Subject: "başka", ProviderMessageId: provider), _token);
-        viaAccount.ErrorCode.Should().Be(SaErrors.Invalid);
+        viaAccount.ErrorCode.Should().Be(SaErrors.ProviderMessageIdUnavailable);
         viaAccount.Value.Should().BeNull();
         SaResult<CommunicationSaveResult> viaTeam = await fx.Service.CreateCommunicationAsync(coordA.Principal, fx.Context,
             new CreateCommunicationRequest("Incoming", "Reply", [], _on, ContactTeamId: teamA, Subject: "başka", ProviderMessageId: provider), _token);
-        viaTeam.ErrorCode.Should().Be(SaErrors.Invalid);
+        viaTeam.ErrorCode.Should().Be(SaErrors.ProviderMessageIdUnavailable);
         viaTeam.Value.Should().BeNull();
         (await fx.CountAsync("SELECT COUNT(*) FROM svcacct.CommunicationAccounts WHERE AccountId = @accA", new { accA })).Should().Be(0);
         Ok(await fx.Service.AccountAsync(coordA.Principal, fx.Context, accA, _token)).Communications.Should().BeEmpty();
@@ -67,8 +67,8 @@ public sealed class ServiceAccountScopeHardeningSqlTests
         EventDraft draft = new("OwnerReplied", _on, "DateOnly", "Mail", account.Summary.Version,
             Communication: new EventCommunication(Summary: "SYN özet", ProviderMessageId: provider));
         SaResult<EventPreview> preview = await fx.Service.PreviewEventAsync(coordA.Principal, fx.Context, accA, draft, _token);
-        preview.ErrorCode.Should().Be(SaErrors.Invalid);
-        preview.Field.Should().Be("communication.providerMessageId");
+        preview.ErrorCode.Should().Be(SaErrors.ProviderMessageIdUnavailable);
+        preview.Field.Should().Be("communication.providerMessageIdUnavailable");
 
         // The service refuses at planning; a commit that gets past it (the mail stored after the preview) must still be refused by the
         // repository's own visibility check inside the write transaction. The write below carries a version the account really has.

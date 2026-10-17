@@ -64,6 +64,7 @@ public static class ServiceAccountReplies
             SaErrors.ChangePlanState => (409, "change-plan", true, "Plan siz incelerken değişti veya bu adım için uygun durumda değil; güncel planı inceleyin."),
             SaErrors.ChangePlansNotInstalled => (503, "change-plan-schema", false, "Değişiklik planı tabloları (033) bu ortamda kurulu değil."),
             SaErrors.ChangePlanEvidenceNotInstalled => (503, "change-plan-schema", false, "Plan kanıtı (034) bu ortamda kurulu değil; dosya kaydedilmedi."),
+            SaErrors.ProviderMessageIdUnavailable => (400, "validation", false, "Bu mail kimliği bu kayıtta kullanılamıyor."),
             SaErrors.EventStale => (409, "account-event", true, "Önizlemeden sonra hesap veya talep değişti; hiçbir kayıt yapılmadı. Önizlemeyi yenileyin."),
             SaErrors.IdempotencyKeyReused => (409, "account-event", false, "Bu işlem anahtarı başka bir içerikle kullanılmış; hiçbir kayıt yapılmadı."),
             SaErrors.CloseNotAllowed => (422, "account-event", false, "Talep bu kayıtlarla kapatılamıyor; hiçbir kayıt yapılmadı. Kapatmayı seçmeden yeniden kaydedebilirsiniz."),

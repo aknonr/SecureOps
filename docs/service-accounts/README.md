@@ -98,6 +98,12 @@ lists only the linked accounts the caller may see; a module write re-reads the c
 transaction; import batches record the stager's organization scope and are listed, read, decided, refreshed and committed only by a
 caller whose current scope covers it (batches staged earlier belong to their uploader and to `All`); closing a request re-evaluates the
 close rule on the supporting actions as locked inside the close transaction.
+
+Release note: import batches staged before the scope hardening carry no recorded scope, so after this release they are visible only to
+their uploader (and to `All`); organization-scoped coordinators no longer see them in the list or by id. A mail ID that is already
+stored outside the caller's scope is refused with the dedicated code `ServiceAccountProviderMessageIdUnavailable` (field
+`communication.providerMessageIdUnavailable`, or `providerMessageIdUnavailable` on a plain communication); the UI says "Bu mail kimliği
+bu kayıtta kullanılamıyor." and does not blame the length.
 Concurrency: every module write transaction takes the application lock `svcacct:import-commit`
 in Shared mode first; the import commit holds it exclusively (see PROGRESS, VerifyAction deadlock).
 

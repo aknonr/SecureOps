@@ -62,6 +62,8 @@ public static class SaErrors
     public const string ChangePlanEvidenceNotInstalled = "ServiceAccountChangePlanEvidenceNotInstalled";
     /// <summary>Account event tables (migration 036) are not installed on this database.</summary>
     public const string EventsNotInstalled = "ServiceAccountEventsNotInstalled";
+    /// <summary>The mail ID names a message this caller cannot use (recorded outside the caller's scope); nothing was written or linked.</summary>
+    public const string ProviderMessageIdUnavailable = "ServiceAccountProviderMessageIdUnavailable";
     /// <summary>The account or the linked request changed after the preview (or the digest differs); nothing was written.</summary>
     public const string EventStale = "ServiceAccountEventStale";
     /// <summary>The idempotency key was already used on this account with a different draft; nothing was written.</summary>

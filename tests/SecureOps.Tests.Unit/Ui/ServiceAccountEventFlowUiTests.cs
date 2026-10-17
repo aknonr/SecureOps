@@ -179,6 +179,10 @@ public sealed class ServiceAccountEventFlowUiTests
         UiProblemFactory.FromResponse(422, new ProblemDetailsPayload { Code = "ServiceAccountEventCloseNotAllowed" }).Explanation.Should().Contain("Hiçbir kayıt yapılmadı");
         UiProblemFactory.FromResponse(409, new ProblemDetailsPayload { Code = "ServiceAccountEventIdempotencyKeyReused" }).Title.Should().Contain("başka içerikle");
         UiProblemFactory.FromResponse(503, new ProblemDetailsPayload { Code = "ServiceAccountEventsNotInstalled" }).Explanation.Should().Contain("036");
+        UiProblem unavailable = UiProblemFactory.FromResponse(400, new ProblemDetailsPayload { Code = "ServiceAccountProviderMessageIdUnavailable", Fields = ["communication.providerMessageIdUnavailable"] });
+        unavailable.Title.Should().Be("Bu mail kimliği bu kayıtta kullanılamıyor");
+        ServiceAccountProblems.FieldMessage(unavailable).Should().Be("Bu mail kimliği bu kayıtta kullanılamıyor.").And.NotContain("256");
+        ServiceAccountProblems.FieldText("providerMessageIdUnavailable").Should().NotContain("256");
         ServiceAccountProblems.FieldText("requestTypeMismatch").Should().Contain("eşleşmiyor");
         ServiceAccountProblems.FieldText("blockNotAllowed:ownership").Should().Contain("bu bilgiyi almıyor");
     }
