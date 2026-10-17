@@ -92,6 +92,12 @@ teams and, for organization-scope coordinators, scope-wide overdue/follow-up cou
 decisions and performed actions awaiting verification. The account list and "Ekibimin işleri"
 show it first, so the caller sees their follow-ups before changing anything.
 
+Scope is re-checked where data is stored (2026-10-16): a mail already recorded under a provider message id is returned or linked only
+when the caller's scope covers it by its own anchors (a linked in-scope account, or its contact team for an unlinked mail); a shared mail
+lists only the linked accounts the caller may see; a module write re-reads the caller's grants and the account anchor inside its own
+transaction; import batches record the stager's organization scope and are listed, read, decided, refreshed and committed only by a
+caller whose current scope covers it (batches staged earlier belong to their uploader and to `All`); closing a request re-evaluates the
+close rule on the supporting actions as locked inside the close transaction.
 Concurrency: every module write transaction takes the application lock `svcacct:import-commit`
 in Shared mode first; the import commit holds it exclusively (see PROGRESS, VerifyAction deadlock).
 
@@ -145,6 +151,8 @@ Profiles: `coordination-list` (evidenced Book1 headers), `dba-handover` (evidenc
 `legacy-package` (JSON `wasas.service-account-migration.v1`), `legacy-workbook` (tracking
 workbook input sheets, header row 6, helper/formula columns ignored), `generic` (bounded manual
 mapping for not-yet-seen files such as the team return file; no invented parser).
+
+The `legacy-package` JSON obeys the same row, column and cell limits as spreadsheets (per section and in total), and caps the person-alias and mail-link collections, before any row is built.
 
 Legacy records keep a stable reference `legacy:{workbookSha256}:{sheet}:{row}`; the JSON package
 supplies the same key through `reportWorkbookSha256` plus its `migrationKey`, so importing both

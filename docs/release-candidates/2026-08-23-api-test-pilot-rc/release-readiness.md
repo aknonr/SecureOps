@@ -17,7 +17,7 @@ All milestones are direct ancestors in one linear chain:
 **BLOCKED FOR DEPLOYMENT.** The package may be built and reviewed, but Pilot deployment must not start until every external blocker below is closed by the responsible infrastructure owner.
 
 1. SQL TLS certificate trust is not valid with `Encrypt=True;TrustServerCertificate=False`.
-2. `MSSQLSvc` SPNs were not found for `secureops-mssql-test.thynet.thy.com:3406` or `vtmlistener36.thynet.thy.com:3406`.
+2. `MSSQLSvc` SPNs were not found for `sql-listener-1.example.test:3406` or `sql-listener-2.example.test:3406`.
 3. Windows Integrated Security for `DOMAIN\WASAST_YONETIM` is therefore not proven.
 4. The IIS API Application Pool currently uses `ApplicationPoolIdentity`, not `DOMAIN\WASAST_YONETIM`.
 5. IIS Windows Authentication is currently disabled and Anonymous Authentication is enabled.

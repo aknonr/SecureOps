@@ -222,7 +222,7 @@ public sealed class IdentityLookupServiceTests
 
     private static IdentityLookupExecutionContext CreateContext()
     {
-        return new IdentityLookupExecutionContext("CONTOSO\\lead.user", "10.4.22.18", "trace-1");
+        return new IdentityLookupExecutionContext("CONTOSO\\lead.user", "198.51.100.18", "trace-1");
     }
 
     private sealed class ThrowingDirectoryProvider : IIdentityDirectoryProvider

@@ -277,6 +277,21 @@ public sealed class ManagementReportProjectorTests
         result.Coverage.CoverageComplete.Should().BeTrue();
     }
 
+    [Fact]
+    public void ProjectOperators_KeepsServerOrderAndDoesNotReorderByOperationCount()
+    {
+        OperatorActivityDataPage data = new(3,
+        [
+            new OperatorActivityData("synthetic-a", 1, _window.FromInclusiveUtc, _window.ToExclusiveUtc, 1, 0, 0, 0),
+            new OperatorActivityData("synthetic-b", 9, _window.FromInclusiveUtc, _window.ToExclusiveUtc, 9, 0, 0, 0),
+            new OperatorActivityData("synthetic-c", 4, _window.FromInclusiveUtc, _window.ToExclusiveUtc, 4, 0, 0, 0)
+        ], _window.FromInclusiveUtc.AddDays(-1));
+
+        OperatorActivityPageResponse result = new ManagementReportProjector().ProjectOperators(_window, 1, 50, data);
+
+        result.Items.Select(item => item.Actor).Should().Equal("synthetic-a", "synthetic-b", "synthetic-c");
+    }
+
     private static ReportingAuditCount Count(string action, long count, string? detailCode = null) =>
         new(new DateTime(2026, 8, 20), action, detailCode, count);
 

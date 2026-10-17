@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Primitives;
 using SecureOps.Api.Security;
 using SecureOps.Shared.Contracts.Api;
 
@@ -25,7 +26,17 @@ public sealed class AccessDeniedProblemDetailsMiddleware
             string code = context.Items.TryGetValue(CapabilityAuthorizationHandler.DenialCodeItem, out object? value)
                 ? value as string ?? OperationalErrorCodes.AccessDenied
                 : OperationalErrorCodes.AccessDenied;
+            StringValues authenticate = context.Response.Headers.WWWAuthenticate;
+            StringValues correlationId = context.Response.Headers[CorrelationIdMiddleware.HeaderName];
             context.Response.Clear();
+            if (authenticate.Count > 0)
+            {
+                context.Response.Headers.WWWAuthenticate = authenticate;
+            }
+            if (correlationId.Count > 0)
+            {
+                context.Response.Headers[CorrelationIdMiddleware.HeaderName] = correlationId;
+            }
             await OperationalProblemDetails.WriteAsync(context, status, code, "Access is denied.", "authorization", false, context.RequestAborted);
         }
     }

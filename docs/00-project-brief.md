@@ -35,7 +35,7 @@ This manual process has consistent problems:
 
 ## What This Project Does
 
-1. **Receives alarms** from the existing monitoring chain: **SolarWinds** is the alarm source, **monthly.thy.com / HPE OpsBridge** provides event-detail context, and **Turuncuhat** is the central ITSM + IVR system where EVT records are created, acknowledged, and closed. The exact SecureOps integration method with Turuncuhat is pending stakeholder input.
+1. **Receives alarms** from the existing monitoring chain: **SolarWinds** is the alarm source, **the corporate monitoring portal (HPE OpsBridge)** provides event-detail context, and **Turuncuhat** is the central ITSM + IVR system where EVT records are created, acknowledged, and closed. The exact SecureOps integration method with Turuncuhat is pending stakeholder input.
 2. **Runs read-only diagnostic checks** on the target server using PowerShell Remoting through a JEA constrained endpoint.
 3. **Persists structured findings** to SQL Server with an append-only audit trail.
 4. **Presents results** to the engineer through a Blazor Server web UI with role-based access.

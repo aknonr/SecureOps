@@ -246,9 +246,21 @@ public static class OperationalRecordConfigurationValidator
         }
     }
 
-    private static void ValidateTuruncuHatReadConfiguration(TuruncuHatOptions options)
+    /// <summary>Validates the shared Turuncu Hat HTTPS endpoint and HTTP bounds.</summary>
+    internal static void ValidateTuruncuHatHttpConfiguration(TuruncuHatOptions options)
     {
         ValidateHttpsBaseUrl(options.BaseUrl, "TuruncuHat:BaseUrl");
+        if (options.ConnectTimeoutSeconds is < 1 or > 30
+            || options.RequestTimeoutSeconds is < 1 or > 120
+            || options.MaxResponseBytes is < 1024 or > 5_242_880)
+        {
+            throw new InvalidOperationException("TuruncuHat session or HTTP bounds are invalid.");
+        }
+    }
+
+    private static void ValidateTuruncuHatReadConfiguration(TuruncuHatOptions options)
+    {
+        ValidateTuruncuHatHttpConfiguration(options);
         RequireSecret(options.Authorization, "TuruncuHat:Authorization");
         RequireSecret(options.Username, "TuruncuHat:Username");
         RequireSecret(options.Password, "TuruncuHat:Password");
@@ -263,9 +275,6 @@ public static class OperationalRecordConfigurationValidator
 
         if (options.SessionIdSegmentIndex < 0
             || options.SessionLifetimeSeconds is < 1 or > 86_400
-            || options.ConnectTimeoutSeconds is < 1 or > 30
-            || options.RequestTimeoutSeconds is < 1 or > 120
-            || options.MaxResponseBytes is < 1024 or > 5_242_880
             || options.MaxDescriptionLength is < 1 or > 8000)
         {
             throw new InvalidOperationException("TuruncuHat session or HTTP bounds are invalid.");

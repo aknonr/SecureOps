@@ -235,7 +235,8 @@ public sealed partial class TuruncuHatOperationalRecordClient : IOperationalReco
                 BoundedJsonReadResult readResult = await BoundedJsonHttpContent.ReadWithLengthAsync(
                     response.Content,
                     Math.Min(_options.MaxResponseBytes, maximumBytes ?? _options.MaxResponseBytes),
-                    cancellationToken);
+                    cancellationToken,
+                    TimeSpan.FromSeconds(_options.RequestTimeoutSeconds));
                 JsonDocument document = readResult.Document;
                 if (_options.DiagnosticContractLogging)
                 {
@@ -329,7 +330,8 @@ public sealed partial class TuruncuHatOperationalRecordClient : IOperationalReco
             using JsonDocument document = await BoundedJsonHttpContent.ReadAsync(
                 response.Content,
                 _options.MaxResponseBytes,
-                cancellationToken);
+                cancellationToken,
+                TimeSpan.FromSeconds(_options.RequestTimeoutSeconds));
             if (!TuruncuHatQueryParser.IsSuccessfulUpdate(document.RootElement))
             {
                 throw new ExternalIntegrationException(OperationalErrorCodes.OperationalRecordCloseFailed, true);
@@ -456,7 +458,8 @@ public sealed partial class TuruncuHatOperationalRecordClient : IOperationalReco
             BoundedJsonReadResult readResult = await BoundedJsonHttpContent.ReadWithLengthAsync(
                 response.Content,
                 _options.MaxResponseBytes,
-                cancellationToken);
+                cancellationToken,
+                TimeSpan.FromSeconds(_options.RequestTimeoutSeconds));
             using JsonDocument document = readResult.Document;
             LogQueryResponseContract(response.StatusCode, readResult.ByteLength, document.RootElement);
         }

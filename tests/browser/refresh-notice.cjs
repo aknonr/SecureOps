@@ -17,7 +17,7 @@ const { loopback, navigate, signIn, capture } = require('./journey-support.cjs')
             await navigate(page, ui, 'operational-records');
             const start = performance.now();
             await page.getByRole('button', { name: 'Kaynağı yenile', exact: true }).click();
-            await page.getByText('Sınırlı kaynak yenilemesi tamamlandı.', { exact: false }).waitFor();
+            await page.getByText('Sınırlı kaynak yenilemesi tamamlandı', { exact: false }).waitFor();
             durations.push(Math.round(performance.now() - start));
         }
         await capture(page, out, 'refresh-notice');

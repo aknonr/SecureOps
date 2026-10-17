@@ -26,15 +26,41 @@ public sealed class AuditConfigurationValidatorTests
     {
         IConfiguration configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["Audit:Provider"] = "File",
+            ["Audit:Provider"] = "SqlServer",
             ["Audit:FailClosed"] = "false",
-            ["Audit:File:Directory"] = @"D:\SecureOps\Audit"
+            ["ConnectionStrings:SecureOpsDb"] = "Server=.;Database=Synthetic;Integrated Security=true"
         });
 
         Action act = () => AuditConfigurationValidator.Validate(configuration, "Production");
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*FailClosed*Production*");
+    }
+
+    [Theory]
+    [InlineData("Production", true)]
+    [InlineData("Development", false)]
+    public void Validate_FileRetentionFloor_RequiresApprovedProductionStore(string environment, bool rejected)
+    {
+        IConfiguration configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["Audit:Provider"] = "File",
+            ["Audit:FailClosed"] = "true",
+            ["Audit:RequirePersistentStoreInProduction"] = "false",
+            ["Audit:File:Directory"] = Path.Combine(Path.GetTempPath(), "synthetic-audit"),
+            ["Audit:File:RetainedFileCountLimit"] = "0"
+        });
+        Action act = () => AuditConfigurationValidator.Validate(configuration, environment);
+
+        if (rejected)
+        {
+            act.Should().Throw<InvalidOperationException>()
+                .WithMessage("*File audit*not an approved Production store*at least 36 months*SqlServer is required*");
+        }
+        else
+        {
+            act.Should().NotThrow();
+        }
     }
 
     [Fact]
@@ -52,8 +78,10 @@ public sealed class AuditConfigurationValidatorTests
             .WithMessage("*ConnectionStrings:SecureOpsDb*");
     }
 
-    [Fact]
-    public void Validate_WhenSqlServerUsesSecureOpsDbConnectionString_DoesNotThrow()
+    [Theory]
+    [InlineData("Development")]
+    [InlineData("Production")]
+    public void Validate_WhenSqlServerUsesSecureOpsDbConnectionString_DoesNotThrow(string environment)
     {
         IConfiguration configuration = BuildConfiguration(new Dictionary<string, string?>
         {
@@ -62,7 +90,7 @@ public sealed class AuditConfigurationValidatorTests
             ["ConnectionStrings:SecureOpsDb"] = "Server=.;Database=SecureOps;Integrated Security=true;TrustServerCertificate=true"
         });
 
-        Action act = () => AuditConfigurationValidator.Validate(configuration, "Development");
+        Action act = () => AuditConfigurationValidator.Validate(configuration, environment);
 
         act.Should().NotThrow();
     }

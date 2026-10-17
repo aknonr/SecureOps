@@ -37,7 +37,7 @@ public sealed class BulkIdentityLookupTests
     {
         DefaultHttpContext context = new();
         context.TraceIdentifier = "bulk-test";
-        context.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("10.0.0.10");
+        context.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("192.0.2.10");
         return new IdentityController(service, new IdentityLookupRequestValidator(), audit, Options.Create(new IdentityLookupOptions()), NullLogger<IdentityController>.Instance)
         {
             ControllerContext = new ControllerContext { HttpContext = context }

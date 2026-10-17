@@ -46,8 +46,8 @@ onaylı süreçle yalnız eksik nesne izinlerini tamamlar; db_owner, DDL veya ge
 DELETE verilmez. Yeni `InUse.Complete` uygulama yetkisi hiçbir mevcut role
 otomatik eklenmez. Admin etiketi tek başına bu yetkiyi sağlamaz.
 
-API yolu `D:\Applications\api\wasasyonetimapi.thy.com`, UI yolu
-`D:\Applications\ui\wasasyonetim.thy.com`, Worker yolu `D:\secureops_worker`
+API yolu `D:\Applications\api\api.example.test`, UI yolu
+`D:\Applications\ui\ui.example.test`, Worker yolu `D:\secureops_worker`
 olarak bildirildi. Dağıtım ayrı operatör onayı gerektirir. API mevcut onaylı
 çalışma hesabını, UI `ApplicationPoolIdentity` kimliğini kullanmaya devam eder;
 bu çalışma sunucuda tekrar doğrulama yapmadı. Worker aynı onaylı hesabın gerçek

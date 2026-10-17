@@ -8,29 +8,34 @@ internal static class BoundedJsonHttpContent
     public static async Task<JsonDocument> ReadAsync(
         HttpContent content,
         int maximumBytes,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        TimeSpan readTimeout)
     {
-        BoundedJsonReadResult result = await ReadWithLengthAsync(content, maximumBytes, cancellationToken);
+        BoundedJsonReadResult result = await ReadWithLengthAsync(content, maximumBytes, cancellationToken, readTimeout);
         return result.Document;
     }
 
     public static async Task<BoundedJsonReadResult> ReadWithLengthAsync(
         HttpContent content,
         int maximumBytes,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        TimeSpan readTimeout)
     {
         if (content.Headers.ContentLength > maximumBytes)
         {
             throw new InvalidDataException("Dependency response exceeded the configured limit.");
         }
 
-        await using Stream source = await content.ReadAsStreamAsync(cancellationToken);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(readTimeout);
+        CancellationToken readToken = timeout.Token;
+        await using Stream source = await content.ReadAsStreamAsync(readToken);
         using MemoryStream destination = new(Math.Min(maximumBytes, 81_920));
         byte[] buffer = new byte[16_384];
         int total = 0;
         while (true)
         {
-            int read = await source.ReadAsync(buffer, cancellationToken);
+            int read = await source.ReadAsync(buffer, readToken);
             if (read == 0)
             {
                 break;
@@ -49,7 +54,7 @@ internal static class BoundedJsonHttpContent
         JsonDocument document = await JsonDocument.ParseAsync(
             destination,
             new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Disallow, MaxDepth = 64 },
-            cancellationToken);
+            readToken);
         return new BoundedJsonReadResult(document, total);
     }
 }

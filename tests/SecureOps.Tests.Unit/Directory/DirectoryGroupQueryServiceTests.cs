@@ -297,7 +297,7 @@ public sealed class DirectoryGroupQueryServiceTests
     }
 
     private const string _purpose = "Approved synthetic incident verification";
-    private static readonly DirectoryQueryExecutionContext _context = new("CONTOSO\\lead.user", "10.0.0.5", "directory-test");
+    private static readonly DirectoryQueryExecutionContext _context = new("CONTOSO\\lead.user", "192.0.2.5", "directory-test");
 
     private static MockDirectoryGroupProvider CreateMock(bool upn = false) =>
         new(Options.Create(new IdentityLookupOptions { EnableUpnLookup = upn }));

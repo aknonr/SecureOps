@@ -64,7 +64,7 @@ param(
 
     [Parameter(ParameterSetName = 'Names')]
     [Parameter(ParameterSetName = 'List')]
-    [ValidatePattern('^[A-Za-z0-9.]{1,64}$')]
+    [ValidateSet('SecureOpsServiceAccountUsage')]
     [string]$ConfigurationName = 'SecureOpsServiceAccountUsage',
 
     [Parameter(ParameterSetName = 'Names')]
@@ -256,7 +256,7 @@ else {
     $remote = [scriptblock]::Create($commandText)
     $sessionOption = New-PSSessionOption -OpenTimeout ($OpenTimeoutSeconds * 1000) -OperationTimeout ($OperationTimeoutSeconds * 1000) -NoMachineProfile
     $errors = @()
-    $answers = @(Invoke-Command -ComputerName @($planned) -ConfigurationName $ConfigurationName -SessionOption $sessionOption `
+    $answers = @(Invoke-Command -ComputerName @($planned) -ConfigurationName $ConfigurationName -Authentication Kerberos -SessionOption $sessionOption `
             -ThrottleLimit $ThrottleLimit -ScriptBlock $remote -ErrorAction SilentlyContinue -ErrorVariable errors)
     foreach ($answer in $answers) {
         $key = "$($answer.PSComputerName)".ToUpperInvariant()

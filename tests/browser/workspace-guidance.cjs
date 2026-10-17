@@ -61,7 +61,7 @@ async function tour(page, surface, count) {
         checks.push('Links, groups and personalization tours: next/back/finish/Escape/replay, visible or missing targets, focus restoration, no personal writes');
         await navigate(page, ui, 'operational-records'); await interactive(page, 'Kayıt ara');
         await page.getByRole('button', { name: 'Kaynağı yenile', exact: true }).click();
-        await page.getByText('Sınırlı kaynak yenilemesi tamamlandı.', { exact: false }).waitFor();
+        await page.getByText('Sınırlı kaynak yenilemesi tamamlandı', { exact: false }).waitFor();
         const before = await json(owner, '/api/v1/operational-records/stored?search=SIM-OR&sort=code');
         assert.equal(before.total, 5);
         await page.getByLabel('Kayıt ara', { exact: true }).fill('SIM-OR');

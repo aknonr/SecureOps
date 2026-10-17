@@ -91,7 +91,7 @@ public sealed class ApplicationSessionHostedTests
         browser.DefaultRequestHeaders.Add("X-SecureOps-Demo-Actor", DemoApiAuthentication.PlatformAdminActor);
         browser.DefaultRequestHeaders.Add(ApiSessionHeaders.BrowserSession, "one-logical-browser-session");
 
-        HttpResponseMessage first = await browser.GetAsync("/api/v1/operational-records");
+        HttpResponseMessage first = await browser.PostAsync("/api/v1/operational-records/refresh", null);
         first.EnsureSuccessStatusCode();
         OperationalRecordResponse record = (await first.Content.ReadFromJsonAsync<OperationalRecordResponse[]>())!
             .Single(item => item.OrCode == "SIM-OR-100");
@@ -107,7 +107,7 @@ public sealed class ApplicationSessionHostedTests
             {
                 0 => "/api/v1/access/me",
                 1 => "/api/v1/sessions/current",
-                _ => "/api/v1/operational-records"
+                _ => "/api/v1/operational-records/stored"
             };
             (await browser.GetAsync(path)).EnsureSuccessStatusCode();
         }
