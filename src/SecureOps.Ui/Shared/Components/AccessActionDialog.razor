@@ -243,7 +243,9 @@
         // the first control and stays inside the dialog.
         if (firstRender)
         {
-            await _landing.FocusAsync();
+            try { await _landing.FocusAsync(); }
+            catch (InvalidOperationException) { }
+            catch (JSDisconnectedException) { }
         }
     }
 
