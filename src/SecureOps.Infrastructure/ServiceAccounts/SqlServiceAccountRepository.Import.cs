@@ -98,6 +98,12 @@ public sealed partial class SqlServiceAccountRepository
     {
         await using SqlConnection connection = await OpenAsync(cancellationToken);
         await using SqlTransaction transaction = await BeginWriteAsync(connection, cancellationToken);
+        // Queue behind any other staging; a wait past the gate timeout writes nothing and is reported as persistence unavailable.
+        await connection.ExecuteAsync(Cmd("""
+            DECLARE @result int;
+            EXEC @result = sp_getapplock @Resource = @resource, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = @timeout;
+            IF @result < 0 THROW 51313, 'Service Accounts import staging in progress.', 1;
+            """, new { resource = _importStageLock, timeout = _writeGateTimeoutMilliseconds }, transaction, cancellationToken));
         await connection.ExecuteAsync(Cmd("""
             INSERT INTO svcacct.ImportBatches(Id, Profile, FileName, ContentType, Sha256, Content, SourceReportDate, SourceDateProvenance, DeclaredScope,
                 DeclaredDomain, MappingJson, MappingVersion, PreviewVersion, DecisionVersion, Status, ReplayKey, SummaryJson, UploadedBy, UploadedAt)
@@ -118,13 +124,22 @@ public sealed partial class SqlServiceAccountRepository
             BatchSelect(includeContent) + " WHERE Id = @id;", new { id }, null, cancellationToken));
     }
 
-    /// <summary>Lists recent batches.</summary>
-    public async Task<IReadOnlyList<ImportBatchRecord>> ListBatchesAsync(int take, CancellationToken cancellationToken)
+    /// <summary>Lists recent batches the caller's scope covers; the scope filter runs before the limit so other scopes' volume cannot hide history.</summary>
+    public async Task<IReadOnlyList<ImportBatchRecord>> ListBatchesAsync(int take, bool all, IReadOnlyCollection<Guid> organizations, Guid userId,
+        CancellationToken cancellationToken)
     {
         await using SqlConnection connection = await OpenAsync(cancellationToken);
+        string reachable = all ? string.Empty : """
+             WHERE ISJSON(MappingJson) = 1 AND (
+                (JSON_QUERY(MappingJson, '$.Boundary') IS NULL AND UploadedBy = @userId)
+                OR (JSON_QUERY(MappingJson, '$.Boundary') IS NOT NULL AND JSON_VALUE(MappingJson, '$.Boundary.All') = 'false'
+                    AND EXISTS (SELECT 1 FROM OPENJSON(MappingJson, '$.Boundary.Organizations'))
+                    AND NOT EXISTS (SELECT 1 FROM OPENJSON(MappingJson, '$.Boundary.Organizations') o
+                        WHERE NOT EXISTS (SELECT 1 FROM OPENJSON(@organizations) WITH (Id uniqueidentifier '$') c WHERE c.Id = TRY_CAST(o.value AS uniqueidentifier)))))
+            """;
         return [.. await connection.QueryAsync<ImportBatchRecord>(Cmd(
-            BatchSelect(false).Replace("SELECT Id,", "SELECT TOP (@take) Id,", StringComparison.Ordinal) + " ORDER BY UploadedAt DESC, Id;",
-            new { take }, null, cancellationToken))];
+            BatchSelect(false).Replace("SELECT Id,", "SELECT TOP (@take) Id,", StringComparison.Ordinal) + reachable + " ORDER BY UploadedAt DESC, Id;",
+            new { take, userId, organizations = JsonSerializer.Serialize(organizations) }, null, cancellationToken))];
     }
 
     /// <summary>Pages preview rows with stable ordering.</summary>
@@ -238,7 +253,7 @@ public sealed partial class SqlServiceAccountRepository
     /// </summary>
     public async Task<SaResult<ImportCommitOutcome>> CommitAsync(Guid batchId, ImportCommitRequest request, string idempotencyKey, SaActor actor,
         ServiceAccountScope scope, Func<ImportBatchRecord, ImportContext, IReadOnlyDictionary<int, ImportRowDecision>, ImportPlanResult> plan,
-        CancellationToken cancellationToken)
+        Func<ImportBatchRecord, bool> twinReachable, CancellationToken cancellationToken)
     {
         await using SqlConnection connection = await OpenAsync(cancellationToken);
         await using SqlTransaction transaction = await BeginAsync(connection, cancellationToken, IsolationLevel.Serializable);
@@ -263,6 +278,12 @@ public sealed partial class SqlServiceAccountRepository
             BatchSelect(false) + " WHERE ReplayKey = @ReplayKey AND Status = 'Committed';", new { batch.ReplayKey }, transaction, cancellationToken));
         if (twin is not null)
         {
+            if (!twinReachable(twin))
+            {
+                // A twin of another scope (only possible for a batch keyed before the boundary joined the key) is never revealed: stage again.
+                return SaResult<ImportCommitOutcome>.Fail(SaErrors.PreviewStale, "previewVersion");
+            }
+
             return SaResult<ImportCommitOutcome>.Fail(SaErrors.AlreadyImported, current: JsonSerializer.Deserialize<ImportResultView>(twin.ResultJson!));
         }
 

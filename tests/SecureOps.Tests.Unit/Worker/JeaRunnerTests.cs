@@ -191,6 +191,29 @@ public sealed class JeaRunnerTests
         await WaitUntilAsync(() => transport.Disposed == 1);
     }
 
+    [Fact]
+    public async Task HungCloses_AreBoundedAndTheOverflowIsSkippedInsteadOfPiledUp()
+    {
+        using ManualResetEventSlim release = new();
+        FakeTransport transport = new() { InvokeGate = new TaskCompletionSource<IReadOnlyList<object?>>().Task, DisposeBlock = release };
+        CollectingLogger logger = new();
+        JeaRunner runner = new(transport, logger, maxPendingCloses: 1, closeTimeout: TimeSpan.FromMilliseconds(200));
+
+        try
+        {
+            (await runner.InvokeAsync("syn-app-01", Command(), _limits, CancellationToken.None)).Status.Should().Be(JeaInvocationStatus.Timeout);
+            (await runner.InvokeAsync("syn-app-02", Command(), _limits, CancellationToken.None)).Status.Should().Be(JeaInvocationStatus.Timeout);
+            await WaitUntilAsync(() => logger.Warnings > 0);
+        }
+        finally
+        {
+            release.Set();
+        }
+
+        await WaitUntilAsync(() => transport.Disposed == 1);
+        transport.Disposed.Should().Be(1, "the second close found no free slot and was never started");
+    }
+
     public static TheoryData<object?[]> BadOutputs => new()
     {
         Array.Empty<object?>(),
@@ -324,6 +347,26 @@ public sealed class JeaRunnerTests
         }
 
         return directory?.FullName ?? throw new InvalidOperationException("Repository root not found.");
+    }
+
+    private sealed class CollectingLogger : Microsoft.Extensions.Logging.ILogger<JeaRunner>
+    {
+        private int _warnings;
+
+        public int Warnings => Volatile.Read(ref _warnings);
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel == Microsoft.Extensions.Logging.LogLevel.Warning)
+            {
+                Interlocked.Increment(ref _warnings);
+            }
+        }
     }
 
     private sealed class FakeTransport : IJeaTransport

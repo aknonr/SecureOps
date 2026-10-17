@@ -29,7 +29,7 @@ public sealed partial class SqlServiceAccountRepository
             await LockedScopeAsync(connection, transaction, actor.UserId, cancellationToken), known, cancellationToken))
         {
             // A message already recorded outside the caller's scope is neither returned nor linked.
-            return SaResult<(Guid, bool, int)>.Fail(SaErrors.Invalid, "providerMessageId");
+            return SaResult<(Guid, bool, int)>.Fail(SaErrors.ProviderMessageIdUnavailable, "providerMessageIdUnavailable");
         }
 
         Guid id = existing ?? Guid.NewGuid();

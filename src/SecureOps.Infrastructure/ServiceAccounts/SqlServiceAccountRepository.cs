@@ -25,6 +25,13 @@ public sealed partial class SqlServiceAccountRepository
     /// </summary>
     private const string _importCommitLock = "svcacct:import-commit";
 
+    /// <summary>
+    /// Application lock that serializes import staging. Two concurrent stagings deadlock inside the bulk insert of the row
+    /// table (its foreign-key check reads parent batch rows the other transaction has not committed); queueing them removes
+    /// the cycle instead of retrying a write. Held to the end of the transaction; staging is rare and short.
+    /// </summary>
+    private const string _importStageLock = "svcacct:import-stage";
+
     /// <summary>Shared gate wait; below the 30 s command timeout so a long commit surfaces as error 51312, not a timeout.</summary>
     private const int _writeGateTimeoutMilliseconds = 25000;
     private readonly string _connectionString;

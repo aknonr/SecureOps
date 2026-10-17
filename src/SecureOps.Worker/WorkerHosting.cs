@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using SecureOps.Infrastructure;
 using Serilog;
 using Serilog.Formatting.Json;
 
@@ -30,6 +32,14 @@ internal static class WorkerHosting
     /// </summary>
     internal static void UseDirectAuditWriter(IConfigurationBuilder configuration) =>
         configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Audit:Queue:Enabled"] = "false" });
+
+    /// <summary>The Worker's infrastructure composition: the direct audit writer override first, then the shared infrastructure registrations.</summary>
+    internal static void AddInfrastructure(HostApplicationBuilder builder)
+    {
+        UseDirectAuditWriter(builder.Configuration);
+        builder.Services.AddSecureOpsInfrastructure(builder.Configuration, builder.Environment.EnvironmentName);
+    }
+
     internal static string? Validate(IConfiguration configuration, bool service)
     {
         if (service && string.IsNullOrWhiteSpace(configuration[HostDefaults.EnvironmentKey]))

@@ -74,10 +74,16 @@ public sealed partial class ServiceAccountService
                 Coverage = CoverageOf(request),
                 CoverageOrganizationIds = [.. (request.CoverageOrganizationIds ?? []).Distinct().Order()]
             };
-            string replayKey = ReplayKey(normalized, sha);
-            if (await repository!.FindCommittedReplayAsync(replayKey, cancellationToken) is { } committed)
+            ImportBoundary boundary = new(caller.Scope.All, [.. caller.Scope.Organizations.Order()]);
+            string replayKey = ReplayKey(normalized, sha, boundary);
+            // The scope boundary is part of the key: another scope's committed batch is never a twin of this one. Batches keyed before the
+            // boundary existed are still found by the plain key, but only shown to a caller who covers them.
+            foreach (string key in new[] { replayKey, ReplayKey(normalized, sha, null) })
             {
-                return View(committed, replay: true);
+                if (await repository!.FindCommittedReplayAsync(key, cancellationToken) is { } committed && BatchReachable(caller, committed))
+                {
+                    return View(committed, replay: true);
+                }
             }
 
             StagedFile staged;
@@ -90,7 +96,7 @@ public sealed partial class ServiceAccountService
                 return SaResult<ImportBatchView>.Fail(SaErrors.ImportFile, rejected.Code);
             }
 
-            ImportContext importContext = await repository.LoadImportContextAsync(caller.Scope, cancellationToken);
+            ImportContext importContext = await repository!.LoadImportContextAsync(caller.Scope, cancellationToken);
             if (!CoverageInScope(normalized, importContext))
             {
                 return SaResult<ImportBatchView>.Fail(SaErrors.Invalid, "coverageOrganizationIds");
@@ -101,7 +107,7 @@ public sealed partial class ServiceAccountService
             ImportBatchRecord batch = new(Guid.NewGuid(), request.Profile, SafeName(fileName), ContentTypeOf(bytes), sha, bytes, request.SourceReportDate,
                 normalized.SourceDateProvenance, Clean(request.DeclaredScope, 200), Clean(request.DeclaredDomain, 128),
                 JsonSerializer.Serialize(new StoredMapping(normalized, staged.Mapping, [.. staged.Warnings, .. plan.Warnings],
-                    new ImportBoundary(caller.Scope.All, [.. caller.Scope.Organizations.Order()]))), 1, 1, 1,
+                    boundary)), 1, 1, 1,
                 staged.Rows.Count == 0 ? "Staged" : "Previewed", replayKey, JsonSerializer.Serialize(Summary(plan, staged)), null, null,
                 caller.User.Id, now, null);
             await repository.StageAsync(batch, Records(plan, new Dictionary<int, ImportRowDecision>(), caller, now), caller.Actor, cancellationToken);
@@ -123,7 +129,7 @@ public sealed partial class ServiceAccountService
                 return SaResult<IReadOnlyList<ImportHistoryItem>>.Fail(SaErrors.Forbidden, "scope");
             }
 
-            IReadOnlyList<ImportBatchRecord> batches = await repository!.ListBatchesAsync(500, cancellationToken);
+            IReadOnlyList<ImportBatchRecord> batches = await repository!.ListBatchesAsync(100, caller.Scope.All, [.. caller.Scope.Organizations], caller.User.Id, cancellationToken);
             return new SaResult<IReadOnlyList<ImportHistoryItem>>([.. batches.Where(b => BatchReachable(caller, b)).Take(100).Select(b => new ImportHistoryItem(b.Id, b.Profile, b.FileName, b.SourceReportDate,
                 b.Status, b.UploadedAt, b.CommittedAt, b.SummaryJson is null ? 0 : JsonSerializer.Deserialize<ImportSummary>(b.SummaryJson)!.TotalRows))]);
         }, cancellationToken);
@@ -260,7 +266,7 @@ public sealed partial class ServiceAccountService
             {
                 (StagedFile staged, StoredMapping mapping) = Reparse(batch);
                 return ImportPlanner.Plan(PlanInput(mapping.Request, batch.FileName), staged, importContext, stored);
-            }, cancellationToken);
+            }, twin => BatchReachable(caller, twin), cancellationToken);
             if (!outcome.IsSuccess)
             {
                 return SaResult<ImportBatchView>.Fail(outcome.ErrorCode!, outcome.Field, outcome.Current);
@@ -341,8 +347,10 @@ public sealed partial class ServiceAccountService
         (request.CoverageOrganizationIds ?? []).All(id => context.Organizations.Any(o => o.Id == id)
             && (context.Scope.All || context.Scope.Organizations.Contains(id)));
 
-    private static string ReplayKey(StageImportRequest request, string sha) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+    /// <summary>Identity of "the same import": file, parameters and - unless it is the pre-boundary form (null) - the stager's scope boundary.</summary>
+    private static string ReplayKey(StageImportRequest request, string sha, ImportBoundary? boundary)
+    {
+        string parameters = JsonSerializer.Serialize(new
         {
             request.Profile,
             sha,
@@ -354,7 +362,10 @@ public sealed partial class ServiceAccountService
             Mapping = request.Mapping?.Select(m => new { Header = Domain.ServiceAccounts.ServiceAccountText.LabelKey(m.SourceHeader), m.TargetField }),
             Coverage = CoverageOf(request),
             CoverageOrganizations = request.CoverageOrganizationIds?.Distinct().Order()
-        })))).ToLowerInvariant();
+        });
+        string material = boundary is null ? parameters : parameters + "|" + JsonSerializer.Serialize(boundary);
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(material))).ToLowerInvariant();
+    }
 
     private (StagedFile Staged, StoredMapping Stored) Reparse(ImportBatchRecord batch)
     {

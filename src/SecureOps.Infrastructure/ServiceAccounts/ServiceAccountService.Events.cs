@@ -92,7 +92,7 @@ public sealed partial class ServiceAccountService
                 AccountEventStatus.Committed or AccountEventStatus.Replayed => await EventResultAsync(caller, accountId, outcome.EventId!.Value, outcome.Created,
                     outcome.Status == AccountEventStatus.Replayed, cancellationToken),
                 AccountEventStatus.KeyReused => SaResult<EventCommitResult>.Fail(SaErrors.IdempotencyKeyReused, "idempotencyKey"),
-                AccountEventStatus.CommunicationRefused => SaResult<EventCommitResult>.Fail(SaErrors.Invalid, "communication.providerMessageId"),
+                AccountEventStatus.CommunicationRefused => SaResult<EventCommitResult>.Fail(SaErrors.ProviderMessageIdUnavailable, "communication.providerMessageIdUnavailable"),
                 AccountEventStatus.CloseRefused => SaResult<EventCommitResult>.Fail(SaErrors.CloseNotAllowed, "closeRequest",
                     CloseReadinessView(outcome.RequestStatus ?? ServiceAccountRequestStatus.Open, ServiceAccountCloseOutcome.Completed, outcome.Gaps)),
                 _ => SaResult<EventCommitResult>.Fail(SaErrors.EventStale, "accountVersion")
@@ -324,7 +324,7 @@ public sealed partial class ServiceAccountService
                 ? await repository.CommunicationByProviderIdAsync(provider, cancellationToken) : null;
             if (existingMail is { } recorded && !await repository.CommunicationVisibleAsync(recorded, scope, cancellationToken))
             {
-                return Invalid("communication.providerMessageId");
+                return SaResult<AccountEventPlan>.Fail(SaErrors.ProviderMessageIdUnavailable, "communication.providerMessageIdUnavailable");
             }
 
             if (existingMail is not null)
