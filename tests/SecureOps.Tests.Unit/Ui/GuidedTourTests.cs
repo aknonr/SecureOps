@@ -142,6 +142,34 @@ public sealed class GuidedTourTests
     }
 
     [Fact]
+    public async Task Component_FoldsTheExplanation_KeepsHeadingAndButtons_AndStaysFoldedOnTheNextStep()
+    {
+        await using TourHarness tour = await TourHarness.RenderAsync(_steps, [true, true, true]);
+        await tour.ClickAsync("start");
+        TestElement toggle = tour.Find("button", "data-tour-action", "toggle")!;
+        toggle.Text.Should().Be("Açıklamayı gizle");
+        toggle.Attributes["aria-expanded"].Should().Be("true");
+        toggle.Attributes["aria-controls"].Should().Be("t-body");
+        tour.Find("div", "data-tour-body")!.Attributes.Should().NotContainKey("hidden");
+
+        await tour.ClickAsync("toggle");
+
+        tour.Find("button", "data-tour-action", "toggle")!.Text.Should().Be("Açıklamayı göster");
+        tour.Find("button", "data-tour-action", "toggle")!.Attributes["aria-expanded"].Should().Be("false");
+        tour.Find("div", "data-tour-body")!.Attributes["hidden"].Should().Be(true);
+        tour.Text().Should().Contain("Adım 1 / 3").And.Contain("Birinci");
+        tour.Find("button", "data-tour-action", "next").Should().NotBeNull();
+
+        await tour.ClickAsync("next");
+
+        tour.Text().Should().Contain("Adım 2 / 3");
+        tour.Find("div", "data-tour-body")!.Attributes["hidden"].Should().Be(true, "the fold lasts for the whole tour");
+        tour.Calls("show").Select(c => c[0]).Should().Equal("a", "b");
+        await tour.ClickAsync("toggle");
+        tour.Find("div", "data-tour-body")!.Attributes.Should().NotContainKey("hidden");
+    }
+
+    [Fact]
     public async Task Component_Escape_ClosesTheTour_AndReturnsFocusToTheStartButton()
     {
         await using TourHarness tour = await TourHarness.RenderAsync(_steps, [true, true, true]);

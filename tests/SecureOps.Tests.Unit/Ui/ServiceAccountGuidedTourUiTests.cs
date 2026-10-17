@@ -21,13 +21,21 @@ public sealed partial class ServiceAccountGuidedTourUiTests
         { "ServiceAccountImports", [.. ServiceAccountTours.Imports.Select(s => s.Target)] },
         { "ServiceAccountPlans", [.. ServiceAccountTours.Plans(true).Select(s => s.Target)] },
         { "ServiceAccountPlanDetail", [.. ServiceAccountTours.PlanDetail.Select(s => s.Target)] },
+        { "ServiceAccountWork", [.. ServiceAccountTours.Work(true, true).Select(s => s.Target)] },
+        {
+            "ServiceAccountAdmin",
+            [.. ServiceAccountTours.AdminScope.Concat(ServiceAccountTours.AdminOrganizations).Concat(ServiceAccountTours.AdminRouting)
+                .Concat(ServiceAccountTours.AdminPeople).Select(s => s.Target)]
+        },
     };
 
     [Theory]
     [MemberData(nameof(Pages))]
     public void EveryTourTarget_IsRenderedByItsPage(string page, string[] targets)
     {
-        string source = Ui("Pages", "ServiceAccounts", page + ".razor");
+        // The people tab is its own component; its areas are marked there.
+        string source = Ui("Pages", "ServiceAccounts", page + ".razor")
+            + (page == "ServiceAccountAdmin" ? Ui("Shared", "Components", "ServiceAccounts", "SaPeopleAdmin.razor") : string.Empty);
         HashSet<string> rendered = [.. TourAttribute().Matches(source).Select(m => m.Groups["name"].Value)];
 
         source.Should().Contain("Tour=", "the page hands its tour to SaPageGuide");
@@ -43,6 +51,18 @@ public sealed partial class ServiceAccountGuidedTourUiTests
         Ui("Shared", "Components", "ServiceAccounts", "SaTabTitle.razor").Should().Contain("data-tour=\"@Tour\"");
         Ui("Shared", "Components", "ServiceAccounts", "SaPageGuide.razor").Should().Contain("<SoGuidedTour Id=\"@TourId\"")
             .And.Contain("@if (Tour is { Count: > 0 })");
+    }
+
+    [Fact]
+    public void AdminPage_GivesEachTabItsOwnTour_WithUniqueIds()
+    {
+        string source = Ui("Pages", "ServiceAccounts", "ServiceAccountAdmin.razor");
+        foreach (string tour in new[] { "AdminScope", "AdminOrganizations", "AdminRouting", "AdminPeople" })
+        {
+            source.Should().Contain($"Tour=\"ServiceAccountTours.{tour}\"");
+        }
+
+        Regex.Matches(source, "TourId=\"(?<id>[^\"]+)\"").Select(m => m.Groups["id"].Value).Should().OnlyHaveUniqueItems().And.HaveCount(4);
     }
 
     [Fact]
@@ -68,6 +88,11 @@ public sealed partial class ServiceAccountGuidedTourUiTests
         new GuidedTourState(ServiceAccountTours.Detail(_everything, false)).Steps.Select(s => s.Title).Should()
             .NotContain("Bir gelişme mi oldu?", "the event flow is not installed (036)").And.Contain("Doğrulama");
         new GuidedTourState(ServiceAccountTours.Plans(false)).Steps.Select(s => s.Target).Should().NotContain("sa-plan-create");
+        new GuidedTourState(ServiceAccountTours.Work(false, false)).Steps.Select(s => s.Target).Should().NotContain("sa-reminders-run")
+            .And.HaveCount(4, "running the evaluation needs Administer");
+        new GuidedTourState(ServiceAccountTours.Work(true, true)).Steps.Should().HaveCount(5);
+        ServiceAccountTours.Work(false, false).Single(s => s.Target == "sa-reminders-list").What.Should().NotContain("Kapat ile", "closing needs Work");
+        ServiceAccountTours.Work(true, false).Single(s => s.Target == "sa-reminders-list").What.Should().Contain("Kapat ile");
     }
 
     [Fact]
@@ -76,7 +101,8 @@ public sealed partial class ServiceAccountGuidedTourUiTests
         IReadOnlyList<SoTourStep>[] tours =
         [
             ServiceAccountTours.List(true, true, true), ServiceAccountTours.Detail(_everything, true), ServiceAccountTours.Imports,
-            ServiceAccountTours.Plans(true), ServiceAccountTours.PlanDetail,
+            ServiceAccountTours.Plans(true), ServiceAccountTours.PlanDetail, ServiceAccountTours.Work(true, true), ServiceAccountTours.AdminScope,
+            ServiceAccountTours.AdminOrganizations, ServiceAccountTours.AdminRouting, ServiceAccountTours.AdminPeople,
         ];
         foreach (IReadOnlyList<SoTourStep> tour in tours)
         {
@@ -114,6 +140,9 @@ public sealed partial class ServiceAccountGuidedTourUiTests
             source.Should().NotContain("localStorage").And.NotContain("sessionStorage").And.NotContain("indexedDB").And.NotContain("document.cookie");
         }
 
+        module.Should().Contain("reseat").And.Contain("ResizeObserver");
+        component.Should().Contain("data-tour-action=\"toggle\"").And.Contain("aria-expanded").And.Contain("aria-controls");
+        css.Should().Contain("max-height: 42vh").And.Contain(".so-tour-scroll");
         module.Should().Contain("prefers-reduced-motion: reduce").And.Contain("'instant'").And.Contain("(max-width: 700px)");
         css.Should().Contain("@media (prefers-reduced-motion: no-preference)").And.Contain("@media (max-width: 700px)")
             .And.Contain("pointer-events: none").And.Contain("forced-colors");

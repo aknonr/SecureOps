@@ -18,3 +18,5 @@ aside { border-left:1px solid var(--mud-palette-divider);padding-left:24px; }
 section,aside { overflow-wrap:anywhere;min-width:0; }
 @media(max-width:950px) { .user-summary { grid-template-columns:1fr 1fr; } .user-actions { grid-column:1/-1; } }
 @media(max-width:700px) { .user-summary,.user-access-layout { grid-template-columns:minmax(0,1fr);gap:16px; } .user-actions { grid-column:auto; } aside { border-left:0;border-top:1px solid var(--mud-palette-divider);padding:16px 0; } }
+.user-capabilities > summary:focus-visible,.user-history summary:focus-visible,.user-profile > summary:focus-visible { outline:2px solid var(--so-accent);outline-offset:3px;border-radius:4px; }
+.so-page ::deep :is(.mud-button-root, a):focus-visible { outline:2px solid var(--so-accent);outline-offset:2px; }

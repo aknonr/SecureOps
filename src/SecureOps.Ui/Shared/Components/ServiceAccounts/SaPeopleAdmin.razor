@@ -6,7 +6,7 @@
 
 <section class="so-panel" aria-labelledby="sa-people">
     <h2 id="sa-people" class="so-panel-title">Kişi kayıtları</h2>
-    <div class="d-flex flex-wrap gap-2 align-center">
+    <div class="d-flex flex-wrap gap-2 align-center" data-tour="sa-people-search">
         <MudTextField @bind-Value="_search" Label="Ad ile ara (en az 2 harf)" MaxLength="100" Variant="Variant.Outlined" />
         <MudButton OnClick="SearchAsync" Disabled="@(Busy || (_search?.Trim().Length ?? 0) < 2)" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Search">Ara</MudButton>
     </div>
@@ -16,7 +16,7 @@
         @if (_people.Count == 0) { <SoEmptyState Title="Eşleşen kişi yok" /> }
         else
         {
-            <MudTable Items="_people" Dense="true" Breakpoint="Breakpoint.Sm" T="PersonView" Class="mt-2">
+            <div data-tour="sa-people-list"><MudTable Items="_people" Dense="true" Breakpoint="Breakpoint.Sm" T="PersonView" Class="mt-2">
                 <HeaderContent><MudTh>Ad</MudTh><MudTh>Durum</MudTh><MudTh>Diğer yazımlar</MudTh><MudTh>İşlem</MudTh></HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Ad">@context.DisplayName</MudTd>
@@ -24,13 +24,13 @@
                     <MudTd DataLabel="Diğer yazımlar">@(context.Aliases.Count == 0 ? "—" : string.Join(", ", context.Aliases))</MudTd>
                     <MudTd DataLabel="İşlem"><MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => _selected = context)">Seç</MudButton></MudTd>
                 </RowTemplate>
-            </MudTable>
+            </MudTable></div>
         }
     }
 
     @if (_selected is { } person)
     {
-        <div class="so-panel mt-2" role="group" aria-label="@($"{person.DisplayName} kaydı")">
+        <div class="so-panel mt-2" role="group" aria-label="@($"{person.DisplayName} kaydı")" data-tour="sa-people-edit">
             <h3 class="so-panel-title">@person.DisplayName</h3>
             @if (person.VerificationState != "Verified")
             {
@@ -51,7 +51,7 @@
     }
 
     <h3 class="so-panel-title mt-4">Kişi kaydı ekle</h3>
-    <div class="d-flex flex-wrap gap-2 align-center">
+    <div class="d-flex flex-wrap gap-2 align-center" data-tour="sa-people-add">
         <MudTextField @bind-Value="_newName" Label="Görünen ad" MaxLength="200" Variant="Variant.Outlined" />
         <MudButton OnClick="CreateAsync" Disabled="@(Busy || string.IsNullOrWhiteSpace(_newName))" Variant="Variant.Filled" Color="Color.Primary">Ekle</MudButton>
     </div>

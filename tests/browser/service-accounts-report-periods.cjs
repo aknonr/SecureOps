@@ -15,7 +15,17 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
     const results = [], snapshots = [], errors = [];
     page.on('pageerror', error => errors.push(String(error)));
     async function choose(label, value) {
-        await page.getByLabel(label, { exact: true }).locator('visible=true').click();
+        // MudSelect shows a read-only text input while no item matches its value (empty, or the first render) and a combobox div afterwards,
+        // swapping one for the other. A click that holds the replaced input waits for ever, so a short click is retried on the current shape.
+        const target = page.locator('.mud-input-control.mud-select').filter({ has: page.locator('label', { hasText: label }) })
+            .locator('div.mud-input-slot[role="combobox"], input.mud-select-input:not([type="hidden"])');
+        for (let attempt = 1; ; attempt++) {
+            try {
+                await target.click({ timeout: 3000 });
+                await page.locator('.mud-popover-open .mud-list-item').first().waitFor({ timeout: 3000 });
+                break;
+            } catch (error) { if (attempt === 4) throw error; }
+        }
         await page.locator('.mud-popover-open .mud-list-item').filter({ hasText: value }).click();
     }
     async function field(label, value) {
@@ -66,6 +76,17 @@ const ui = loopback(process.argv[3]), api = loopback(process.argv[4]), out = pat
         await page.locator('section[aria-labelledby="sa-compare"] table tbody tr').first().waitFor();
         await capture(page, out, 'snapshot-comparison');
         results.push({ name: 'snapshots remain immutable after a write and compare through UI', result: 'passed' });
+        for (const days of [7, 30]) {
+            // The quick ranges end today (the UI and the API run on this machine) and must fill the date fields they report on.
+            await navigate(page, ui, 'service-accounts/reports');
+            await page.getByRole('button', { name: `Son ${days} gün`, exact: true }).click();
+            await page.getByRole('heading', { name: 'Canlı rapor', exact: true }).waitFor();
+            const day = offset => { const d = new Date(); d.setDate(d.getDate() + offset); return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`; };
+            assert.equal(await page.getByLabel('Başlangıç', { exact: true }).locator('visible=true').inputValue(), day(1 - days), `Son ${days}: start`);
+            assert.equal(await page.getByLabel('Bitiş (dahil)', { exact: true }).locator('visible=true').inputValue(), day(0), `Son ${days}: end`);
+            assert.match(await page.locator('.mud-input-control.mud-select').filter({ has: page.locator('label', { hasText: 'Dönem' }) }).textContent(), /Tarih aralığı/);
+            results.push({ name: `Son ${days} gün fills the range ending today`, result: 'passed' });
+        }
         assert.deepEqual(errors, []);
     } catch (error) {
         results.push({ name: 'report journey', result: 'failed', error: String(error.message).slice(0, 500) });

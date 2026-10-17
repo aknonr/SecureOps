@@ -39,6 +39,10 @@ Open UI ↔ API contract gaps: [`docs/26-ui-backend-contract-gaps.md`](../../doc
 Below this point: reference sections (Layout to Testing) and dated handoff logs, kept with their source SHAs and
 evidence paths. Search for the feature or date you need rather than reading top to bottom.
 
+## Access action dialog and user detail: keyboard pass (#79), 2026-10-17
+
+`AccessActionDialog` (Rolleri değiştir, Erişimi kapat, and the request approve/reject) and `AccessUserDetail`, measured then fixed on a Mac (Demo/InMemory, headless Chromium, synthetic data). MudBlazor 6.16 opens a dialog without moving focus, so the keyboard stayed on the page behind it, Tab left it, and role checkboxes (`MudCheckBox`) had no accessible name. Now: focus lands on the first block inside the dialog's focus trap (it carries the title for a screen reader; the title itself sits outside the trap), Tab/Shift+Tab wrap inside, role options are native checkboxes inside their `<label>`, buttons, checkboxes, the reason field and summaries draw a 2 px ring, and the dark-theme destructive confirm button has its own dark text (`#1b0a09`, 8.41:1; white on `#FF8A80` was 2.28:1; temporary until G-42 is fixed). MudBlazor does not restore focus on close, so the detail page returns it to the opener (`wwwroot/js/so-focus.js`, by id) on Esc/Vazgeç and moves it to the `.user-outcome` block after a confirmed action (the re-read replaces the buttons). **Scope addition (kapsam eki):** `wwwroot/js/so-focus.js` is not on the issue's "May change" list. It is needed because MudBlazor 6.16 does not restore focus and `MudButton` has no `FocusAsync`; its only purpose is focusing an element by id, currently used only by `AccessUserDetail`; owner: Claude (UI). Not fixed: the dialog still has no `aria-modal`/`aria-labelledby` (MudBlazor's dialog instance exposes no attribute hook); global-token contrast is G-42. Tests: `AccessActionDialogRenderTests`; `tests/browser/access-dialog-detail.cjs` (1280 / 640x450 / 390, light and dark; acts only on the other demo actor, because changing one's own roles revokes one's own session). Local Mac only: not verified on Windows/IIS, Edge, corporate TEST or with a screen reader.
+
 ## Service accounts: guided tour (REHBER-UI), 2026-10-16
 
 `SoGuidedTour` (Shared/Components) is a person-started on-screen tour: "Adım adım göster" next to "Nasıl kullanılır?" in `SaPageGuide` on the
@@ -54,7 +58,15 @@ automatic opening (G-41). Tests: `GuidedTourTests` (state + the real component t
 next/back, skipped target, Esc, focus return, hidden step), `ServiceAccountGuidedTourUiTests` (every target rendered by its page, permissions,
 one-sentence what/why, short guides, no storage, reduced motion). Local Linux only: module and CSS in headless Chromium on a staged page
 (1440 / 390 px / 640×400). At 640×400 (200 % of 1280×800) an area taller than the space above the docked box is partly under it. Not verified:
-real pages in a browser, `tests/browser/service-accounts-guided-tour.cjs`, screen reader, Windows/IIS, corporate TEST.
+screen reader, Windows/IIS, corporate TEST. Windows 2026-10-17: `tests/browser/service-accounts-guided-tour.cjs` 6/6 on the local Demo (the first run failed because the journey pressed the start button before the list had loaded; the tour reported that honestly, so the journey now waits for the areas; no UI change).
+### Guided tour follow-up (REHBER-2), 2026-10-17
+
+"Ekibimin işleri" and the four administration tabs (Kapsam yetkileri, Kurum ve ekipler, gMSA yönlendirme, Kişiler) have their own "Adım adım göster" tour
+(`ServiceAccountTours.Work/AdminScope/AdminOrganizations/AdminRouting/AdminPeople`; `data-tour` only in SA pages and `SaPeopleAdmin`). The tour box has
+"Açıklamayı gizle/göster" (in memory, not stored): heading, step count and buttons stay, only the explanation scrolls/folds, and the module re-seats the
+highlighted area when the box changes size (≤700 px docked box, ≤520 px high: max 42 vh). Still no automatic opening (G-41). Windows 2026-10-17: journey 9/9
+on the local Demo incl. 640×400; not verified: screen reader, IIS/TEST. See `docs/service-accounts/GUIDED-TOUR-DESIGN.md` §4b.
+
 ## Service accounts: report first page "Dönem içinde yapılan işlemler" (RAPOR-2), 2026-10-16
 
 `SaReportView` renders `Report.Activity` first (when present): a count strip (`SoMetric` per group + distinct acted accounts), then one `MudTable` per group (deleted, handed over with "Eski → yeni sorumlu ekip", moved to gMSA, changed,
