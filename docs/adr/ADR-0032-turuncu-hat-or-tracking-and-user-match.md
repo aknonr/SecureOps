@@ -259,8 +259,13 @@ not known. The In Use closed/completed page (G-44) needs these as server-classif
 **Unchanged.** Read-only, no write to Turuncu Hat, no real call made in this change, Disabled default, no Fake
 fallback, personal-data boundary, ADR status.
 
-**Open.** (a) The discovery query is filtered by the WASAS group, so records that left it need a per-record re-check
-of locally known active records to be classified `NotAssignedToWasas` (until then they appear as source observation
-missing). (b) The open-task, reject and send-back status codes. (c) Activation gate: one read-only TEST run that
+**Re-check (added the same day, owner decision).** The discovery query is filtered by the WASAS group, so a record
+that left it is never rediscovered. The In Use refresh therefore re-checks known, still listed records that
+discovery did not return, by exact source id, read-only, sequentially, at most 50 per refresh (two reads each), and
+applies the same classification to the retained record. Not proven, over the bound or over the time budget: the
+record keeps its evidence, stays listed and is counted in `InUseRefreshState.RecheckUnchecked` (additive field; no
+route, no migration). Cost: at most 100 source reads per refresh.
+
+**Open.** (a) (resolved by the re-check above.) (b) The open-task, reject and send-back status codes. (c) Activation gate: one read-only TEST run that
 confirms the assigned-group field (`p_rel_group` expected), the `KEY.` display text of `m_actvty_task_model`, and a
 single WASAS row per OR; no real value is recorded in the repository.

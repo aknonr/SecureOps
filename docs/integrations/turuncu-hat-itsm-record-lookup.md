@@ -174,10 +174,15 @@ Completed/Open/NotAssigned, `900102` NotApproved/Open/NotAssigned, `900103` Comp
 `NotAssignedToWasas`) with a provenance string naming the rule. A class that is Unknown leaves the field as it was.
 The main list ("review" view) drops a record when the product's own verified activity approval exists, the OR is
 Closed, or `CurrentStage` is `NotAssignedToWasas` (new `activityStatus` value `NotAssigned`, grouped with
-`Completed` and `OrClosed` in the "tracking" view). Unknown keeps the record listed. Known limit: the corporate
-discovery query itself filters on the WASAS group, so a record that already left it is not rediscovered and is shown
-as "source observation missing" instead; classifying such records needs a per-record re-check of locally known
-records (open item, see ADR-0032 amendment 2026-10-17).
+`Completed` and `OrClosed` in the "tracking" view). Unknown keeps the record listed. Because the corporate discovery
+query itself filters on the WASAS group, a record that left it is never rediscovered; the refresh therefore
+**re-checks** the known records that are still in the main list ("review" view) and were not returned by discovery,
+by exact source id (`IInUseSourceClient.RecheckAsync`): read-only, sequential through the shared session, at most 50
+records per refresh (`InUseService.MaxRecheck`), a 40 s budget and two source reads per record (OR row + activities;
+at most 100 requests per refresh). The proven evidence is applied to the retained record only (it stays "source
+observation missing", because discovery did not observe it). A record over the bound, over the budget or not proven
+keeps its stored evidence, stays in the main list and is counted in `InUseRefreshState.RecheckUnchecked` (additive
+field of the refresh state: "some could not be checked"). Records that already dropped are not asked again.
 
 ## User match (ADR-0032, amendment 2026-10-13)
 
