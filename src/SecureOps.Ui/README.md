@@ -59,6 +59,14 @@ next/back, skipped target, Esc, focus return, hidden step), `ServiceAccountGuide
 one-sentence what/why, short guides, no storage, reduced motion). Local Linux only: module and CSS in headless Chromium on a staged page
 (1440 / 390 px / 640×400). At 640×400 (200 % of 1280×800) an area taller than the space above the docked box is partly under it. Not verified:
 screen reader, Windows/IIS, corporate TEST. Windows 2026-10-17: `tests/browser/service-accounts-guided-tour.cjs` 6/6 on the local Demo (the first run failed because the journey pressed the start button before the list had loaded; the tour reported that honestly, so the journey now waits for the areas; no UI change).
+### Guided tour follow-up (REHBER-2), 2026-10-17
+
+"Ekibimin işleri" and the four administration tabs (Kapsam yetkileri, Kurum ve ekipler, gMSA yönlendirme, Kişiler) have their own "Adım adım göster" tour
+(`ServiceAccountTours.Work/AdminScope/AdminOrganizations/AdminRouting/AdminPeople`; `data-tour` only in SA pages and `SaPeopleAdmin`). The tour box has
+"Açıklamayı gizle/göster" (in memory, not stored): heading, step count and buttons stay, only the explanation scrolls/folds, and the module re-seats the
+highlighted area when the box changes size (≤700 px docked box, ≤520 px high: max 42 vh). Still no automatic opening (G-41). Windows 2026-10-17: journey 9/9
+on the local Demo incl. 640×400; not verified: screen reader, IIS/TEST. See `docs/service-accounts/GUIDED-TOUR-DESIGN.md` §4b.
+
 ## Service accounts: report first page "Dönem içinde yapılan işlemler" (RAPOR-2), 2026-10-16
 
 `SaReportView` renders `Report.Activity` first (when present): a count strip (`SoMetric` per group + distinct acted accounts), then one `MudTable` per group (deleted, handed over with "Eski → yeni sorumlu ekip", moved to gMSA, changed,

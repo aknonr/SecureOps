@@ -6,7 +6,7 @@ namespace SecureOps.Ui.Services.ServiceAccounts;
 /// On-screen tours of the Service Accounts pages (docs/service-accounts/GUIDED-TOUR-DESIGN.md §4). Each step names the
 /// <c>data-tour</c> area it points at, says in one sentence what the area is and in one why it matters. Whether a step is shown comes
 /// only from the server's answer (capabilities in the access snapshot, or the record's own permissions); the tour grants nothing. The
-/// report page has no tour (parallel report work).
+/// report page has no tour (parallel report work); the team-work page and the four administration tabs have one each.
 /// </summary>
 public static class ServiceAccountTours
 {
@@ -134,5 +134,91 @@ public static class ServiceAccountTours
         new("sa-plan-verification", "Doğrulama",
             "Değişiklikten sonra gMSA kontrol taraması ve hesap sayfasındaki doğrulama ayrıca yapılır.",
             "Planın kapanması hesabı doğrulanmış saymaz ve bağlı talebi kapatmaz."),
+    ];
+
+    /// <summary>Team work (<c>/service-accounts/work</c>).</summary>
+    /// <param name="work">ServiceAccounts.Work: closing a delivered or dead-lettered reminder.</param>
+    /// <param name="administer">ServiceAccounts.Administer: running the reminder evaluation by hand.</param>
+    public static IReadOnlyList<SoTourStep> Work(bool work, bool administer) =>
+    [
+        new("sa-work-summary", "Takibinizdeki işler",
+            "Ekibinize atanmış açık, geciken ve karar bekleyen işlerin sayıları burada.",
+            "Hatırlatmalara bakmadan önce size düşen işin büyüklüğünü görmeniz için."),
+        new("sa-work-links", "Hazır süzgeçli listeler",
+            "Üç düğme hesap listesini ekibinizin açık, plan bitişi geçen veya sahiplik önerisi bekleyen hesaplarıyla açar.",
+            "Aynı süzgeci her seferinde elle kurmamanız için."),
+        new("sa-reminders-filter", "Hatırlatma süzgeci",
+            "Durumu seçin, isterseniz yalnız doğrudan ekiplerinizi işaretleyip Listele'ye basın.",
+            "Kapatılmış veya kalıcı hata almış hatırlatmaları da bulabilmeniz için."),
+        new("sa-reminders-list", "Hatırlatmalar",
+            work
+                ? "Her kayıt hesabı, kuralı ve tarihi gösterir; koordinatör taslağını kopyalayıp uygulama dışında gönderirsiniz, işi bitenleri Kapat ile kapatırsınız."
+                : "Her kayıt hesabı, kuralı ve tarihi gösterir; koordinatör taslağını kopyalayıp uygulama dışında gönderirsiniz.",
+            "Uygulama e-posta göndermez; gönderme sizin elinizde kalır."),
+        new("sa-reminders-run", "Değerlendirmeyi şimdi çalıştır",
+            "Açık talepleri şimdi değerlendirip yeni hatırlatma üretir.",
+            "Zamanlanmış çalışmayı beklemeden güncel hatırlatmaları görmek için.", administer),
+    ];
+
+    /// <summary>Administration, "Kapsam yetkileri" tab (<c>/service-accounts/admin</c>); the page itself requires ServiceAccounts.Administer.</summary>
+    public static IReadOnlyList<SoTourStep> AdminScope { get; } =
+    [
+        new("sa-admin-grants", "Verilmiş kapsamlar",
+            "Kim hangi kurumun veya ekibin hesaplarını görüyor, gerekçesiyle burada; Geri al yetkiyi geçmişte bırakır.",
+            "Kapsam yalnız görünürlüğü belirler ve her verilişi denetim kaydına yazılır."),
+        new("sa-admin-bootstrap", "İlk kurulum",
+            "Modülde hiç kapsam yokken yönetici kendine bir kez \"Tüm kurum\" kapsamı alabilir.",
+            "İlk kapsamı verecek başka yönetici olmadığı için; sonrasında bu hak bir daha açılmaz."),
+        new("sa-admin-grant-form", "Kapsam ver",
+            "Onaylı kullanıcıyı, kapsam türünü (tüm kurum, kurum veya ekip) ve gerekçeyi seçip kaydedin.",
+            "Kapsam uygulamaya giriş yetkisi vermez; kişinin ayrıca Erişim Talepleri üzerinden yetkisi olmalıdır."),
+    ];
+
+    /// <summary>Administration, "Kurum ve ekipler" tab.</summary>
+    public static IReadOnlyList<SoTourStep> AdminOrganizations { get; } =
+    [
+        new("sa-admin-orgs", "Kurumlar",
+            "Raporlardaki direktörlük ve birim adlarının sözlüğü, üst kurum bağlantısıyla.",
+            "Aynı kurum farklı yazılmasın, raporlar doğru toplansın diye."),
+        new("sa-admin-org-form", "Kurum ekle veya düzenle",
+            "Adı, türü ve üst kurumu yazıp Kaydet'e basın; Düzenle ile var olanı değiştirirsiniz.",
+            "İçe aktarımdan gelen yazım farklarını burada düzeltirsiniz."),
+        new("sa-admin-teams", "Ekipler",
+            "Ekip adları, bağlı kurumları ve içe aktarımdan gelen \"Geçici\" olanlar.",
+            "Geçici ekipleri gözden geçirip onaylamadan raporlardaki ekip sayıları güvenilir olmaz."),
+        new("sa-admin-team-form", "Ekip ekle veya düzenle",
+            "Adı ve kurumu seçin; doğrulanmış ekibin Geçici işaretini kaldırın.",
+            "Ekip kaydı kimseye yetki vermez; yalnız adlandırmayı düzenler."),
+    ];
+
+    /// <summary>Administration, "gMSA yönlendirme" tab.</summary>
+    public static IReadOnlyList<SoTourStep> AdminRouting { get; } =
+    [
+        new("sa-admin-routing-rule", "Yönlendirme kararı",
+            "SQL ekibi olarak işaretlenen ekiplerin hesapları gMSA sayılır ve yürütücü ekibe atanır.",
+            "1 Ekim 2026 kararı budur; ayar erişim vermez, sahipliği veya kabulü değiştirmez."),
+        new("sa-admin-roles", "Mevcut ayarlar",
+            "Hangi ekibin hangi rolde olduğu ve gerekçesi; Kaldır ile bir rol geri alınır.",
+            "Yürütücü ekip kaldırılırsa otomatik yönlendirme durur; bunu burada görürsünüz."),
+        new("sa-admin-role-form", "Rol ekle",
+            "Ekibi, rolü (SQL ekibi veya yürütücü) ve gerekçeyi seçip Ekle'ye basın.",
+            "Yalnız bir yürütücü ekip olabilir; değiştirmek için önce mevcut olanı kaldırırsınız."),
+    ];
+
+    /// <summary>Administration, "Kişiler" tab.</summary>
+    public static IReadOnlyList<SoTourStep> AdminPeople { get; } =
+    [
+        new("sa-people-search", "Kişi ara",
+            "Hesap sorumlusu olarak geçen kişiyi adıyla (en az iki harf) arayın.",
+            "Aynı kişinin farklı yazımları tek kayıtta toplanıp kişi sayıları doğru çıksın diye."),
+        new("sa-people-list", "Sonuçlar",
+            "Kişinin adı, doğrulama durumu ve diğer yazımları; Seç ile kaydını açarsınız.",
+            "Doğrulanmamış kayıtları burada ayırt edersiniz."),
+        new("sa-people-edit", "Seçili kişi",
+            "Kimliği kanıtıyla doğrulanmış olarak kaydedin veya farklı bir yazımı kanıtıyla takma ad olarak ekleyin.",
+            "Kayıt kanıtsız değiştirilmez; kişi kaydı uygulamaya erişim vermez."),
+        new("sa-people-add", "Kişi kaydı ekle",
+            "Listede olmayan kişiyi görünen adıyla ekleyin.",
+            "Kişi sorumlu olarak atanabilsin diye; kayıt dizinde arama yapmaz."),
     ];
 }
