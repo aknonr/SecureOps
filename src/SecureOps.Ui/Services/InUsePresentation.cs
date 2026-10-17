@@ -109,13 +109,18 @@ public static class InUsePresentation
         ArgumentNullException.ThrowIfNull(record);
         bool orClosed = InUseActivity.Has(record.Source.Lifecycle, "Closed");
         bool sourceActivity = InUseActivity.Has(record.Source.WasasActivity, "Completed");
+        bool notApproved = InUseActivity.Has(record.Source.WasasActivity, "NotApproved");
         (string kind, InUseBadgeTone tone, string meaning) = sourceActivity
-            ? ("WASAS aktivitesi tamamlandı", InUseBadgeTone.Positive, "Kaynak okuması aktivitenin tamamlandığını gösteriyor." + (orClosed ? " Genel OR da kapalı." : " Genel OR durumu ayrıca doğrulanmadı."))
+            ? ("WASAS aktivitesi onaylandı (kaynakta doğrulandı)", InUseBadgeTone.Positive, "Kaynak okuması aktivitenin tamamlandığını gösteriyor." + (orClosed ? " Genel OR da kapalı." : " Genel OR durumu ayrıca doğrulanmadı."))
             : record.ActivityVerifiedAt.HasValue
-                ? ("WASAS aktivitesi onaylandı", InUseBadgeTone.Positive, "Onay yanıtı ürün kaydında doğrulandı; kaynaktan OR son durumu okunmadı." + (orClosed ? " Genel OR kaynakta kapalı görünüyor." : ""))
+                ? ("WASAS aktivitesi onaylandı (ürün kaydında doğrulandı)", InUseBadgeTone.Positive, "Onay yanıtı ürün kaydında doğrulandı; kaynaktan aktivite durumu okunmadı." + (orClosed ? " Genel OR kaynakta kapalı görünüyor." : ""))
                 : orClosed
                     ? ("Genel OR kapalı", InUseBadgeTone.Info, "Kaynak genel OR'u kapalı gösteriyor; WASAS aktivitesinin kendi durumu doğrulanmadı.")
-                    : ("Durum doğrulanmadı", InUseBadgeTone.Neutral, "Sunucu bu kaydı tamamlanmış olarak listeledi ama nedenini bildirmedi.");
+                    : notApproved
+                        ? ("Onaylanmadı (ret/geri gönderme)", InUseBadgeTone.Caution, "Kaynak, WASAS aktivitesinin onaylanmadığını gösteriyor; kayıt ekibimizden çıktı.")
+                        : InUseActivity.LeftTeam(record.Source.CurrentStage)
+                            ? ("Kaynakta WASAS'a atanmış değil", InUseBadgeTone.Neutral, "Onaylandı mı geri mi gönderildi doğrulanmadı; gruptan çıkmak tek başına onay kanıtı değildir.")
+                            : ("Durum doğrulanmadı", InUseBadgeTone.Neutral, "Sunucu bu kaydı ayırdı ama nedenini bildirmedi.");
         string when = record.ActivityVerifiedAt is { } verified ? $"Aktivite onayı: {Time(verified)}"
             : record.Completion is { } intent ? $"Tamamlama niyeti: {Time(intent.ConfirmedAt)}"
             : "Zaman bu listede yok; kayıt ayrıntısına bakın";
@@ -138,6 +143,7 @@ public static class InUsePresentation
         "Completed" => "Tamamlandığı kaynakta doğrulandı",
         "Pending" => "Kaynakta bekliyor",
         "OrClosed" => "Genel OR kapalı; WASAS aktivitesine ait doğrulama alınmadı",
+        "NotAssigned" => "Kaynakta WASAS'a atanmış değil; onaylandı mı geri mi gönderildi doğrulanmadı",
         _ => "Doğrulama bekliyor; güncel WASAS durumu doğrulanmadı"
     };
 

@@ -54,8 +54,8 @@ public sealed partial class InUseRedesignTests
     {
         InUseRecord verified = Record(answered: true) with { ActivityVerifiedAt = DateTimeOffset.UtcNow };
         InUseClosedFacts facts = InUsePresentation.Closed(verified);
-        facts.Kind.Should().Be("WASAS aktivitesi onaylandı");
-        facts.Meaning.Should().Contain("OR son durumu okunmadı").And.NotContain("OR kapandı");
+        facts.Kind.Should().Be("WASAS aktivitesi onaylandı (ürün kaydında doğrulandı)");
+        facts.Meaning.Should().Contain("aktivite durumu okunmadı").And.NotContain("OR kapandı");
         facts.Approver.Should().Contain("bu listede yok");
         facts.Reviewer.Should().Contain("Synthetic Operator");
         facts.Report.Should().Contain("bu listede yok", "no completion intent means the report is unknown here, not absent");
@@ -66,7 +66,14 @@ public sealed partial class InUseRedesignTests
         InUsePresentation.Closed(Record(source: closed)).Meaning.Should().Contain("WASAS aktivitesinin kendi durumu doğrulanmadı");
 
         InUseSource activity = Source(1) with { WasasActivity = new("Completed", "Synthetic source read") };
-        InUsePresentation.Closed(Record(source: activity)).Kind.Should().Be("WASAS aktivitesi tamamlandı");
+        InUsePresentation.Closed(Record(source: activity)).Kind.Should().Be("WASAS aktivitesi onaylandı (kaynakta doğrulandı)");
+
+        InUseSource left = Source(1) with { CurrentStage = new(InUseActivity.NotAssignedToWasas, "Synthetic source read") };
+        InUsePresentation.Closed(Record(source: left)).Kind.Should().Be("Kaynakta WASAS'a atanmış değil");
+        InUsePresentation.Closed(Record(source: left)).Meaning.Should().Contain("naylandı mı geri mi gönderildi doğrulanmadı").And.Contain("tek başına onay kanıtı değildir");
+        InUsePresentation.Closed(Record(source: left with { WasasActivity = new("NotApproved", "Synthetic source read") })).Kind.Should().Be("Onaylanmadı (ret/geri gönderme)");
+        Record(source: left).TrackingOnly.Should().BeTrue("the server rule: left the team leaves the main list");
+        Record(source: Source(1) with { CurrentStage = new("Unknown", "Synthetic source read") }).TrackingOnly.Should().BeFalse("unreadable stays listed");
 
         InUseClosedFacts unexplained = InUsePresentation.Closed(Record());
         unexplained.Kind.Should().Be("Durum doğrulanmadı");
@@ -132,6 +139,8 @@ public sealed partial class InUseRedesignTests
     {
         string closed = Ui("Pages", "InUseClosed.razor");
         closed.Should().Contain("@page \"/in-use/closed\"").And.Contain("view=tracking").And.Contain("InUsePresentation.Closed");
+        Ui("Pages", "InUse.razor").Should().Contain("RecheckUnchecked").And.Contain("listede bırakıldı");
+        closed.Should().Contain("RecheckUnchecked").And.Contain("Ekibimizden çıkan");
         string code = Ui("Pages", "InUse.razor.cs");
         code.Should().Contain("_view = \"review\"", "finished records leave the main list by default").And.Contain("/in-use/closed");
         Ui("Pages", "InUse.razor").Should().NotContain("ResourceHelp").And.Contain("<InUseGuide");

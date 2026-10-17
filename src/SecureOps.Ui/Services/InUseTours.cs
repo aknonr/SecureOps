@@ -47,7 +47,7 @@ public static class InUseTours
             "Neyin sizi beklediğini listeyi gezmeden görmeniz için."),
         new("inuse-filters", "Kayıt bul",
             "OR numarası, sunucu veya bildiren adıyla arayın; görünümle yalnız size atananları ya da atanmamışları seçin.",
-            "Kapanmış kayıtlar bu listeden düşer; onlar Kapalı / tamamlanan sayfasındadır."),
+            "Kapanmış kayıtlar bu listeden düşer; onlar Ekibimizden çıkan / kapanan sayfasındadır."),
         new("inuse-refresh", "Kaynağı yenile",
             "Kaynaktan OR ve sunucu ilişkilerini yeniden okur. Son başarılı okuma zamanı yanında yazar.",
             "Okuma güvenlik kontrolü yapmaz ve kaydı kapatmaz; yalnız listeyi güncel tutar.", canRefresh),
@@ -57,8 +57,8 @@ public static class InUseTours
         new("inuse-next", "Sıradaki adım",
             "Satırın bir sonraki işi: eksik cevaplar, değişen kaynak ya da Excel önizlemesi. İncele ile kaydı açarsınız.",
             "Her satırda yalnız bir adım gösterilir; hepsini birden çözmeniz gerekmez."),
-        new("inuse-closed", "Kapalı / tamamlanan",
-            "Ürünün tamamlanmış ya da kapalı bildiği kayıtlar ayrı sayfada, ne olduğu ve kanıtı ile yazılır.",
+        new("inuse-closed", "Ekibimizden çıkan / kapanan",
+            "Onaylanan, başka ekibe geçen ya da kaynakta kapanan kayıtlar ayrı sayfada, her biri kendi etiketi ve kanıtıyla yazılır.",
             "Bilinmeyen durum \"tamam\" diye gösterilmez; ürün bilmiyorsa bilmiyor der.")
     ];
 

@@ -76,14 +76,14 @@ async function tour(page, startId, expectedSteps) {
             assert.equal(await row.locator('.iur-next').count(), 1, 'one next step per row');
             assert.equal(await row.locator('details').evaluate(d => d.open), false, 'detail starts closed');
             assert.equal(await page.locator('.so-badge--critical').count(), 0, 'no red badge on a list row');
-            await page.getByRole('link', { name: 'Kapalı / tamamlanan' }).first().waitFor();
+            await page.getByRole('link', { name: 'Ekibimizden çıkan / kapanan' }).first().waitFor();
             await shot(page, 'list-1440-light');
         });
 
         await step('closed page: honest empty state, nothing is called done without evidence', async () => {
-            await page.getByRole('link', { name: 'Kapalı / tamamlanan' }).first().click();
+            await page.getByRole('link', { name: 'Ekibimizden çıkan / kapanan' }).first().click();
             await page.waitForURL(/\/in-use\/closed/);
-            await page.getByRole('heading', { name: 'Kapalı / tamamlanan incelemeler' }).waitFor();
+            await page.getByRole('heading', { name: 'Ekibimizden çıkan / kapanan kayıtlar' }).waitFor();
             await page.getByText('Bu liste nasıl belirlenir?').waitFor();
             const body = await page.locator('.so-inuse-closed').innerText();
             assert.match(body, /hiçbir kaydı tamamlanmış bilmiyor|kayıt · Son başarılı kaynak okuması/);

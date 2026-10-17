@@ -28,7 +28,7 @@ public partial class InUse
         [
             new("Aktif incelemeler", active.Result, "/in-use?view=review", _view == "review" && _search.Length == 0 && _status.Length == 0, "Henüz tamamlanmamış kayıtlar"),
             new("Doğrulama bekleyen", verification.Result, "/in-use?view=verification", _view == "verification", "WASAS durumu kaynaktan doğrulanmadı"),
-            new("Kapalı / tamamlanan", finished.Result, "/in-use/closed", false, "Ürünün tamamlanmış bildiği kayıtlar")
+            new("Ekibimizden çıkan / kapanan", finished.Result, "/in-use/closed", false, "Onaylanan, başka ekibe geçen ya da kaynakta kapanan")
         ];
     }
 

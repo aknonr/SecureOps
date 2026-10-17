@@ -7,9 +7,9 @@
 @inject ICurrentAccessProvider AccessProvider
 @inject NavigationManager Navigation
 
-<PageTitle>Kapalı / tamamlanan incelemeler · @WasasBrand.Name</PageTitle>
+<PageTitle>Ekibimizden çıkan / kapanan kayıtlar · @WasasBrand.Name</PageTitle>
 <div class="so-page so-page--wide so-inuse-closed">
-    <SoPageHeader Title="Kapalı / tamamlanan incelemeler" Lead="Ürünün tamamlanmış ya da kapalı bildiği kayıtlar. Her durum kendi kanıtıyla ayrı yazılır.">
+    <SoPageHeader Title="Ekibimizden çıkan / kapanan kayıtlar" Lead="Ekibimizden (WASAS) çıkan ya da kaynakta kapanan kayıtlar. Her durum kendi kanıtıyla ayrı yazılır.">
         <Actions><MudButton Href="/in-use" StartIcon="@Icons.Material.Filled.ArrowBack">Aktif incelemeler</MudButton></Actions>
     </SoPageHeader>
     @if (_access is null) { <SoLoading Message="Yetkiler doğrulanıyor" /> }
@@ -19,7 +19,7 @@
     else
     {
         <div class="so-panel-note" role="note"><MudIcon Icon="@Icons.Material.Outlined.Info" Size="Size.Small" aria-hidden="true" /><span>
-            <strong>Bu liste nasıl belirlenir?</strong> Sunucunun "tamamlanan" dediği kayıtlar buradadır: kaynak WASAS aktivitesini tamamlanmış ya da genel OR'u kapalı gösteriyor, ya da ürün kaydında WASAS aktivite onayı doğrulanmış. Yerel taslak, elle doğrulama notu ve arşivlenen rapor bir kaydı buraya taşımaz.</span></div>
+            <strong>Bu liste nasıl belirlenir?</strong> Sunucunun ayırdığı kayıtlar buradadır: ürünün doğrulanmış WASAS onayı var, kaynakta OR kapalı ya da kayıt artık WASAS grubuna atanmış değil. Kaynak okunamayan kayıt aktif listede kalır. Yerel taslak, elle doğrulama notu ve arşivlenen rapor bir kaydı buraya taşımaz; gruptan çıkmak da tek başına onay kanıtı değildir (geri gönderme de grubu değiştirir).</span></div>
         <div class="so-closed-filters">
             <MudTextField T="string" Label="OR, sunucu veya bildiren ara" aria-label="Kapalı kayıt ara" MaxLength="100" Value="_search" ValueChanged="SearchAsync" Immediate="true" DebounceInterval="350" Variant="Variant.Outlined" Margin="Margin.Dense" />
             <label>Sayfa boyutu<select aria-label="Kapalı kayıt sayfa boyutu" @bind="_size" @bind:after="FilterAsync"><option>10</option><option>25</option><option>50</option></select></label>
@@ -33,8 +33,9 @@
         }
         else if (_page is not null)
         {
+            @if (_page.Refresh.RecheckUnchecked > 0) { <MudAlert Severity="Severity.Info" role="status">Bir kısmı kaynakta kontrol edilemedi (@_page.Refresh.RecheckUnchecked kayıt); bu kayıtlar aktif listede bırakıldı.</MudAlert> }
             <p class="so-closed-count" role="status">@_page.Total kayıt · Son başarılı kaynak okuması: @(_page.Refresh.LastSuccessfulAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "henüz yok")</p>
-            <ul class="so-closed-records" aria-label="Kapalı ve tamamlanan kayıtlar">
+            <ul class="so-closed-records" aria-label="Ekibimizden çıkan ve kapanan kayıtlar">
                 @foreach (InUseRecord record in _page.Items)
                 {
                     InUseClosedFacts facts = InUsePresentation.Closed(record);

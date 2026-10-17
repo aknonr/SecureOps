@@ -16,7 +16,7 @@
     <SoPageHeader Title="Sunucu Kullanıma Alma Kontrolleri" Lead="@(Id.HasValue ? null : "Sunucuları inceleyin, eksik cevapları tamamlayın, Excel raporunu kontrol edin.")">
         <Actions>
             @if (!Id.HasValue && Can(Capabilities.InUseRefresh)) { <span data-tour="inuse-refresh" class="so-inuse-primary"><MudButton OnClick="RefreshAsync" Disabled="_busy" StartIcon="@Icons.Material.Filled.Sync" Variant="Variant.Filled" Color="Color.Info">In Use kaynağını yenile</MudButton></span> }
-            @if (!Id.HasValue && Can(Capabilities.InUseView)) { <span data-tour="inuse-closed"><MudButton Href="/in-use/closed" StartIcon="@Icons.Material.Filled.TaskAlt" Variant="Variant.Outlined">Kapalı / tamamlanan</MudButton></span> }
+            @if (!Id.HasValue && Can(Capabilities.InUseView)) { <span data-tour="inuse-closed"><MudButton Href="/in-use/closed" StartIcon="@Icons.Material.Filled.TaskAlt" Variant="Variant.Outlined">Ekibimizden çıkan / kapanan</MudButton></span> }
             @if (Can(Capabilities.InUseReview)) { <MudButton Href="/in-use/reports" StartIcon="@Icons.Material.Filled.History">Rapor geçmişi</MudButton> }
             @if (Id.HasValue) { <MudButton Href="@ListUrl" StartIcon="@Icons.Material.Filled.ArrowBack">Listeye dön</MudButton> }
         </Actions>
@@ -75,6 +75,7 @@
                 {
                     <p>Son başarılı okuma: <strong>@Time(_page.Refresh.LastSuccessfulAt)</strong> · @_page.Total kayıtlı eşleşme
                         <details class="so-inuse-inline"><summary>Yenileme ne yapar?</summary><p>Kaynak yenileme kayıtları, sunucu ilişkilerini ve bildirenleri okur; güvenlik kontrollerini yapmaz, kaydı kapatmaz.</p></details></p>
+                    @if (_page.Refresh.RecheckUnchecked > 0) { <MudAlert Severity="Severity.Info" role="status">Bir kısmı kaynakta kontrol edilemedi (@_page.Refresh.RecheckUnchecked kayıt); bu kayıtlar listede bırakıldı.</MudAlert> }
                     @if (_page.Refresh.Stale) { <MudAlert Severity="@(_page.Refresh.Issue == "SourceCompletenessUnverified" && _page.Refresh.LastSuccessfulAt >= DateTimeOffset.UtcNow.AddHours(-24) ? Severity.Info : Severity.Warning)">@RefreshIssue(_page.Refresh.Issue) Kayıtlı veriler korunur.</MudAlert> }
                     else if (_page.Items.Any(r => r.Source.ServiceItemsState == "Observed"))
                     { <p>Gözlenen servis öğeleri gösteriliyor; ilişkilerin tamlığı doğrulanmadı.</p> }
