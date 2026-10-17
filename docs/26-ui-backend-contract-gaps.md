@@ -1347,6 +1347,7 @@ What `view=tracking` returns: the server's own classification (`activityStatus` 
 - who approved the WASAS activity (the execution `InitiatorLabel` exists only on the per-record execution read, and only for callers with the review capability);
 - whether a manual verification ("Kaynakta kontrol ettim") was recorded, by whom and when — it is deliberately not a completion, but the closed page cannot show it either;
 - the report version/archive for records without a completion intent, and the time for source-classified records (the list has only `lastSeenAt`);
+- the source-side stage/assignment as a server-classified value (for example "not assigned to the WASAS group; completed or sent back not verified"): `Source.CurrentStage` exists in the contract but the corporate adapter does not fill it, and stage/group codes belong in server configuration, not in the UI; until then the page shows no such label;
 - a server filter by kind (activity completed / OR closed / verified by manual mode); the page offers search and paging only, not a client-side filter that would silently cover one page.
 
 Asked of the owner (IU-UI report): which evidence makes a record "tamamlandı" for the product (today: source activity Completed, source OR Closed, or an execution whose activity step is Verified) and whether manual verification should also move a record off the main list. Until answered the UI follows the server rule and documents it on the page.
