@@ -1337,6 +1337,15 @@ A page "Sunucu Erişim Analizi" (exact server name → members of its local Admi
 Needed: darker chip text or a lighter chip tint in light; a darker dark-theme primary/Error fill or dark contrast text (`ErrorContrastText`) in `SecureOpsTheme.cs`.
 Until then `AccessActionDialog` overrides only its own dark-theme confirm text colour in scoped CSS (`#1b0a09`, 8.41:1; mentor decision in #79, no token change). This is temporary: the rule goes when the token is fixed. `SessionRevokeDialog` and the other filled buttons are unchanged (2.28:1).
 
+## G-? — Service Accounts list: no `passwordLastSet`, no "last source" filter, no person lookup by id
+
+**Raised:** 2026-10-17, issue #84 (number requested from the owner in `docs/team/WORK-LOG.md`; never use an unconfirmed number). **Owner:** Service Accounts module (backend/contracts); the UI part of #84 is done without them.
+Observed in code on 2026-10-17 (no live system): 
+
+- `AccountListItem` has no `passwordLastSet`; it exists only in the detail observations and the risk report. **Needed:** the list DTO carries `passwordLastSet` together with its **source** and **observation date**. Password changes are PAM's job; the UI only shows what the API returns, so the list shows no password date today.
+- The list has a "Son kaynak" column (`LastObservedOn`, `LastPresence`) but `AccountListQuery` has no source filter. **Needed:** a `source` filter (and its allowed values) before the UI can offer one; filtering the visible page client-side would mislead (25 rows).
+- No route returns a person by id (`GET /people` is a name-prefix search and needs the Work capability). A filtered list opened from a shared link (`personId=…`) therefore shows the chip as "seçili kişi (ad gösterilemiyor)" unless a row already names that person. **Needed (optional):** `GET /people/{id}` or the person's name echoed in the list page.
+
 ## Note: enums cross the wire as numbers
 
 Not a gap. Recorded here because it caught out a test double, and now **formally frozen by the v1

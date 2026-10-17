@@ -161,6 +161,22 @@ async function problem(page) {
             accountUrl = page.url();
         });
 
+        await step('list: filter chips, URL state and clear', async () => {
+            await navigate(page, adminUi, 'service-accounts?search=' + encodeURIComponent('SYN_SVC_' + suffix));
+            const chips = page.getByRole('group', { name: 'Etkin süzgeçler' });
+            await chips.getByRole('button', { name: /Süzgeci kaldır: Hesap adı: SYN_SVC_/ }).waitFor();
+            await page.getByRole('status').filter({ hasText: '5 hesap' }).waitFor();
+            await chips.getByRole('button', { name: /Süzgeci kaldır: Hesap adı/ }).press('Enter');
+            await chips.waitFor({ state: 'detached' });
+            assert.equal(new URL(page.url()).searchParams.has('search'), false, 'removing the chip clears the URL filter');
+            await page.getByLabel('Hesap adı', { exact: true }).fill('SYN_SVC_' + suffix);
+            await page.getByRole('button', { name: 'Listele' }).click();
+            await chips.getByRole('button', { name: /Süzgeci kaldır: Hesap adı/ }).waitFor();
+            assert.equal(new URL(page.url()).searchParams.get('search'), 'SYN_SVC_' + suffix);
+            await page.getByRole('button', { name: 'Süzgeçleri temizle' }).click();
+            await chips.waitFor({ state: 'detached' });
+        });
+
         await step('ownership: confirmed team (organization scope)', async () => {
             await tab(page, 'Sahiplik');
             await expand(page, 'Sahiplik öner veya teyit et');

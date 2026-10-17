@@ -46,9 +46,13 @@
         }
     }
 
-    private Task ChangedAsync(PersonView? person)
+    /// <summary>The chosen person record (name included), for callers that show who was picked.</summary>
+    [Parameter] public EventCallback<PersonView?> Selected { get; set; }
+
+    private async Task ChangedAsync(PersonView? person)
     {
         _value = person;
-        return ValueChanged.InvokeAsync(person?.Id);
+        await Selected.InvokeAsync(person);
+        await ValueChanged.InvokeAsync(person?.Id);
     }
 }
