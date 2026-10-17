@@ -17,12 +17,13 @@
             <span class="so-dialog-icon @ToneClass" aria-hidden="true">
                 <MudIcon Icon="@ActionIcon" />
             </span>
-            <span>@Title</span>
+            <h2 class="so-dialog-heading">@Title</h2>
         </div>
     </TitleContent>
 
     <DialogContent>
-        <div class="so-dialog-subject">
+        <div class="so-dialog-subject" tabindex="-1" @ref="_landing">
+            <span class="sr-only">@Title. </span>
             <span class="so-dialog-subject-label">İlgili kullanıcı</span>
             <span class="so-dialog-subject-value">@SubjectLabel</span>
         </div>
@@ -40,11 +41,10 @@
                 {
                     string role = definition.Code;
                     <label class="so-role-option">
-                        <MudCheckBox T="bool"
-                                     Value="@_selectedRoles.Contains(role)"
-                                     ValueChanged="@(checkedNow => ToggleRole(role, checkedNow))"
-                                     Dense="true"
-                                     Color="Color.Primary" />
+                        @* Native checkbox inside its label: MudCheckBox renders an unnamed input and focuses a span. *@
+                        <input type="checkbox"
+                               checked="@_selectedRoles.Contains(role)"
+                               @onchange="@(args => ToggleRole(role, args.Value is true))" />
                         <span class="so-role-option-text">
                             <span class="so-role-option-name">@(definition.Name == role ? AccessLabels.RoleLabel(role) : definition.Name)</span>
                             @if (definition.Purpose is { Length: > 0 } description)
@@ -73,17 +73,19 @@
 
         @if (Action != AccessAction.ReplaceRoles)
         {
-        <MudTextField @bind-Value="_reason"
-                      InputId="access-decision-reason"
-                      aria-label="Gerekçe"
-                      Label="Gerekçe"
-                      Variant="Variant.Outlined"
-                      Lines="3"
-                      Immediate="true"
-                      Counter="@AccessDecisionRules.MaxReasonLength"
-                      MaxLength="@AccessDecisionRules.MaxReasonLength"
-                      HelperText="Bu gerekçe denetim kaydına işlenir."
-                      Class="so-dialog-reason" />
+        <div class="so-dialog-reason-box">
+            <MudTextField @bind-Value="_reason"
+                          InputId="access-decision-reason"
+                          aria-label="Gerekçe"
+                          Label="Gerekçe"
+                          Variant="Variant.Outlined"
+                          Lines="3"
+                          Immediate="true"
+                          Counter="@AccessDecisionRules.MaxReasonLength"
+                          MaxLength="@AccessDecisionRules.MaxReasonLength"
+                          HelperText="Bu gerekçe denetim kaydına işlenir."
+                          Class="so-dialog-reason" />
+        </div>
 
         @if (_reasonError is not null)
         {
@@ -93,14 +95,16 @@
     </DialogContent>
 
     <DialogActions>
-        <MudButton OnClick="Cancel" Variant="Variant.Text">Vazgeç</MudButton>
-        <MudButton OnClick="Confirm"
-                   Disabled="@(NeedsRoles && (_loading || _loadProblem is not null))"
-                   Variant="Variant.Filled"
-                   Color="@ConfirmColor"
-                   StartIcon="@ActionIcon">
-            @ConfirmLabel
-        </MudButton>
+        <div class="so-dialog-buttons">
+            <MudButton OnClick="Cancel" Variant="Variant.Text">Vazgeç</MudButton>
+            <MudButton OnClick="Confirm"
+                       Disabled="@(NeedsRoles && (_loading || _loadProblem is not null))"
+                       Variant="Variant.Filled"
+                       Color="@ConfirmColor"
+                       StartIcon="@ActionIcon">
+                @ConfirmLabel
+            </MudButton>
+        </div>
     </DialogActions>
 </MudDialog>
 
@@ -156,6 +160,7 @@
     private IReadOnlyList<AccessRoleDefinition> _definitions = [];
     private UiProblem? _loadProblem;
     private bool _loading;
+    private ElementReference _landing;
 
     private bool NeedsRoles => Action is AccessAction.Approve or AccessAction.ReplaceRoles;
 
@@ -227,6 +232,18 @@
             try { _definitions = await AccessAdmin.RolesAsync(CancellationToken.None); }
             catch (SecureOpsApiException exception) { _loadProblem = exception.Problem; }
             finally { _loading = false; }
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // MudBlazor 6.16 opens the dialog without moving focus, so the keyboard stays on the page behind
+        // it and its focus trap never engages. The first block inside the trap is the landing point (the
+        // title is outside the trap): a screen reader hears the title and the user, and Tab then starts at
+        // the first control and stays inside the dialog.
+        if (firstRender)
+        {
+            await _landing.FocusAsync();
         }
     }
 
